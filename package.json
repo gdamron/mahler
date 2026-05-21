@@ -1,0 +1,19 @@
+{
+  "name": "@fugue/harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Human-orchestrated multi-agent harness for issue-scoped workspaces.",
+  "type": "module",
+  "bin": {
+    "harness": "./dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/**/*.test.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,145 @@
+import type { AgentName, HarnessConfig, LinearIssue, LinearProject } from "./types.js";
+
+export function workflowMarkdown(): string {
+  return `# Harness Workflow
+
+This workspace uses Harness for human-orchestrated multi-agent development.
+
+## What To Do When Prompted
+
+- If asked to "work on FUG-123", run the harness issue workflow for that issue.
+- If asked to "work on project X in Linear", use Linear MCP to inspect the project, select one eligible issue, then run the issue workflow.
+- Do not edit code in the product workspace root.
+- Do not edit sibling issue workspaces.
+- Before changing code, read the generated issue workspace files: \`TASK.md\`, \`AGENT_SESSION.md\`, and \`HANDOFF.md\`.
+- Before stopping, update \`HANDOFF.md\` with changed files, tests run, blockers, and next steps.
+
+## Atomic Unit
+
+Linear issues are the atomic unit for code changes, commits, and PRs. Project prompts are issue-selection prompts.
+
+## Linear Selection Rules
+
+For project prompts, select the highest-priority issue that:
+
+- is open and unblocked,
+- is not already active in a workspace,
+- is assigned to an accepted configured agent user,
+- has all required configured labels.
+
+Tie-break by priority first, then oldest update/create timestamp.
+
+## Human Orchestration
+
+The human remains responsible for final review and merge decisions unless a prompt explicitly delegates a narrower action.
+`;
+}
+
+export function rootAgentBlock(config: HarnessConfig): string {
+  return `\n## Harness Workflow\n\nThis workspace uses Harness. If prompted to work on a Linear issue or project, follow \`WORKFLOW.md\` and the workspace-local policy modules under \`.harness/policies/\`.\n\n- Issue prompt: run \`${config.harnessCommand} issue <ISSUE> --agent <codex|claude>\`.\n- Project prompt: use Linear MCP to fetch project details and issues, write the metadata to JSON if needed, then run \`${config.harnessCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- Work only in generated issue workspaces under \`${config.workspaceDir}/issues/\`.\n`;
+}
+
+export function taskMarkdown(issue: LinearIssue, source: string): string {
+  return `# ${issue.identifier}: ${issue.title}
+
+Linear source: ${source}
+${issue.url ? `Linear URL: ${issue.url}\n` : ""}
+## Description
+
+${issue.description?.trim() || "_No description supplied. If Linear MCP is unavailable, ask the human for missing context before inventing requirements._"}
+
+## Required First Steps
+
+- Read \`AGENT_SESSION.md\`.
+- Read \`HANDOFF.md\`.
+- Inspect the repo before changing code.
+- Keep work scoped to this Linear issue.
+`;
+}
+
+export function sessionMarkdown(issue: LinearIssue, agent: AgentName, repoPath: string): string {
+  return `# Agent Session
+
+- Issue: ${issue.identifier}
+- Agent: ${agent}
+- Code workspace: ${repoPath}
+
+## Rules
+
+- Work only inside this issue workspace and its repo worktrees.
+- Do not edit the product workspace root.
+- Follow installed policies in \`.harness/policies/\`.
+- Update \`HANDOFF.md\` before stopping.
+`;
+}
+
+export function handoffMarkdown(issue: LinearIssue): string {
+  return `# Handoff: ${issue.identifier}
+
+## Status
+
+- State: not started
+- Current owner:
+- Blockers:
+
+## Changes
+
+-
+
+## Tests
+
+- Not run yet.
+
+## Next Steps
+
+-
+`;
+}
+
+export function projectMarkdown(project: LinearProject, selected: LinearIssue, reason: string): string {
+  return `# Linear Project: ${project.name}
+
+${project.description?.trim() || "_No project description supplied._"}
+
+## Selected Issue
+
+- ${selected.identifier}: ${selected.title}
+- Reason: ${reason}
+
+## Policy
+
+Project prompts resolve to a single eligible Linear issue before code work begins. Continue in the issue workspace for ${selected.identifier}.
+`;
+}
+
+export function nativeAdapter(agent: "codex" | "claude"): string {
+  return `# Harness Native Adapter: ${agent}
+
+This file is generated from Harness canonical policies.
+
+When the user asks to work on a Linear issue or project:
+
+1. Read \`WORKFLOW.md\`.
+2. Read \`.harness/policies/issue-selection.md\` and \`.harness/policies/workspace-safety.md\`.
+3. Use Linear MCP for issue or project details.
+4. Run the harness command described in \`.harness/config.json\`.
+5. Work only in the generated issue workspace.
+6. Follow phase policies for implementation, review, commit, PR, and handoff.
+
+Do not bypass the harness workspace setup just because the product repo is visible from the root directory.
+`;
+}
+
+export function launchCommand(agent: AgentName, repoPath: string, metadataPath: string): string {
+  if (agent === "codex") {
+    return `codex --cd ${shell(repoPath)} --add-dir ${shell(metadataPath)}`;
+  }
+  if (agent === "claude") {
+    return `claude --add-dir ${shell(metadataPath)} ${shell(repoPath)}`;
+  }
+  return `<launch ${agent} in ${repoPath} with metadata dir ${metadataPath}>`;
+}
+
+function shell(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}

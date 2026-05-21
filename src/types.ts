@@ -1,0 +1,56 @@
+export type AgentName = "codex" | "claude" | string;
+
+export interface RepoConfig {
+  name: string;
+  path: string;
+  baseBranch: string;
+  remote?: string;
+}
+
+export interface HarnessConfig {
+  version: 1;
+  harnessCommand: string;
+  workspaceDir: string;
+  repos: RepoConfig[];
+  linear: {
+    acceptedAssignees: string[];
+    requiredLabels: string[];
+  };
+  agents: Record<string, AgentProfile>;
+}
+
+export interface AgentProfile {
+  runtime: string;
+  role: string;
+  policies: string[];
+}
+
+export interface LinearIssue {
+  id?: string;
+  identifier: string;
+  title: string;
+  description?: string;
+  priority?: number | null;
+  state?: string;
+  stateType?: string;
+  assignee?: string | null;
+  assigneeName?: string | null;
+  labels?: string[];
+  blocked?: boolean;
+  updatedAt?: string;
+  createdAt?: string;
+  url?: string;
+}
+
+export interface LinearProject {
+  id?: string;
+  name: string;
+  description?: string;
+  url?: string;
+  issues: LinearIssue[];
+}
+
+export interface IssueSelection {
+  issue: LinearIssue;
+  reason: string;
+}

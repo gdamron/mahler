@@ -1,11 +1,11 @@
 {
-  "name": "@fugue/harness",
+  "name": "mahler",
   "version": "0.1.0",
   "private": true,
-  "description": "Human-orchestrated multi-agent harness for issue-scoped workspaces.",
+  "description": "Human-orchestrated multi-agent workflow tool for issue-scoped workspaces.",
   "type": "module",
   "bin": {
-    "harness": "./dist/src/cli.js"
+    "mahler": "./dist/src/cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

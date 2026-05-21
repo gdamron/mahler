@@ -8,8 +8,8 @@ test("workflow names issue prompts and project prompts", () => {
   assert.match(workflow, /work on project X in Linear/);
 });
 
-test("native adapter tells agent not to bypass harness", () => {
-  assert.match(nativeAdapter("codex"), /Do not bypass the harness workspace setup/);
+test("native adapter tells agent not to bypass Mahler", () => {
+  assert.match(nativeAdapter("codex"), /Do not bypass the Mahler workspace setup/);
 });
 
 test("launch commands are agent specific", () => {

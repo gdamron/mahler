@@ -5,7 +5,7 @@ Linear issues are the atomic unit of implementation, commits, and PRs.
 When asked to work on a specific issue:
 
 1. Use Linear MCP to fetch the issue title, description, status, labels, assignee, blockers, and project.
-2. Run the harness issue workflow for that identifier.
+2. Run the Mahler issue workflow for that identifier.
 3. If Linear MCP is unavailable or the issue metadata is incomplete, stop and ask the human for the missing context.
 
 When asked to work on a Linear project:

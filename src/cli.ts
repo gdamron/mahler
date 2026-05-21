@@ -69,7 +69,7 @@ function install(workspaceInput: string): void {
   writeFileEnsured(resolve(workspace, ".harness", "agents", "claude", "HARNESS.md"), nativeAdapter("claude"));
   mergeRootInstruction(resolve(workspace, "AGENTS.md"), rootAgentBlock(config));
   mergeRootInstruction(resolve(workspace, "CLAUDE.md"), rootAgentBlock(config));
-  console.log(`Installed harness workflow into ${workspace}`);
+  console.log(`Installed Mahler workflow into ${workspace}`);
 }
 
 function createIssue(identifier: string, flags: Record<string, string | boolean>): void {
@@ -188,11 +188,11 @@ function writeSelectedIssueFile(projectDir: string, issue: LinearIssue): string 
 }
 
 function installedReadme(): string {
-  return `# Installed Harness Files
+  return `# Installed Mahler Files
 
-This directory contains runtime configuration and policies installed by the Harness CLI.
+This directory contains runtime configuration and policies installed by the Mahler CLI.
 
-- \`config.json\`: workspace-specific harness configuration.
+- \`config.json\`: workspace-specific Mahler configuration.
 - \`policies/\`: canonical workflow policies used by all agents.
 - \`agents/\`: workspace-local native adapters for supported agents.
 `;
@@ -263,10 +263,10 @@ function escapeRegex(value: string): string {
 
 function usage(): void {
   console.log(`Usage:
-  harness install <workspace>
-  harness issue <ISSUE> --workspace <path> --agent codex|claude [--linear-file issue.json]
-  harness project <PROJECT> --workspace <path> --agent codex|claude --linear-file project.json
-  harness status --workspace <path>
-  harness handoff <ISSUE> --workspace <path>
+  mahler install <workspace>
+  mahler issue <ISSUE> --workspace <path> --agent codex|claude [--linear-file issue.json]
+  mahler project <PROJECT> --workspace <path> --agent codex|claude --linear-file project.json
+  mahler status --workspace <path>
+  mahler handoff <ISSUE> --workspace <path>
 `);
 }

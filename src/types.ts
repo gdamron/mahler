@@ -9,7 +9,7 @@ export interface RepoConfig {
 
 export interface HarnessConfig {
   version: 1;
-  harnessCommand: string;
+  mahlerCommand: string;
   workspaceDir: string;
   repos: RepoConfig[];
   linear: {

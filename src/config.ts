@@ -5,7 +5,7 @@ import type { HarnessConfig } from "./types.js";
 export function defaultConfig(workspace: string): HarnessConfig {
   return {
     version: 1,
-    harnessCommand: "harness",
+    mahlerCommand: "mahler",
     workspaceDir: "workspaces",
     repos: [
       {

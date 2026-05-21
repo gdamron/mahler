@@ -7,17 +7,10 @@ export function defaultConfig(workspace: string): HarnessConfig {
     version: 1,
     mahlerCommand: "mahler",
     workspaceDir: "workspaces",
-    repos: [
-      {
-        name: "fugue",
-        path: "fugue",
-        baseBranch: "main",
-        remote: "origin"
-      }
-    ],
+    repos: [],
     linear: {
-      acceptedAssignees: ["gonzo"],
-      requiredLabels: ["agent"]
+      acceptedAssignees: [],
+      requiredLabels: []
     },
     agents: {
       codex: {
@@ -46,6 +39,24 @@ export function defaultConfig(workspace: string): HarnessConfig {
           "handoff"
         ]
       }
+    }
+  };
+}
+
+export function withInstallOptions(
+  config: HarnessConfig,
+  options: {
+    repos?: HarnessConfig["repos"];
+    acceptedAssignees?: string[];
+    requiredLabels?: string[];
+  }
+): HarnessConfig {
+  return {
+    ...config,
+    repos: options.repos ?? config.repos,
+    linear: {
+      acceptedAssignees: options.acceptedAssignees ?? config.linear.acceptedAssignees,
+      requiredLabels: options.requiredLabels ?? config.linear.requiredLabels
     }
   };
 }

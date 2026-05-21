@@ -23,8 +23,13 @@ directory.
 3. Install Mahler into the product workspace.
 
    ```sh
-   mahler install /path/to/product-workspace
+   mahler install /path/to/product-workspace --linear-assignee <username> --linear-label agent
    ```
+
+   Mahler scans the product workspace for immediate child git repositories and
+   writes them into `.harness/config.json`. If the human has not provided a
+   Linear username or label, install without those flags and leave the filters
+   empty until they can be configured.
 
 4. Ensure future agent sessions can run Mahler.
 

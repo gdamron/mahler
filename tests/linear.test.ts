@@ -1,10 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaultConfig } from "../src/config.js";
+import { defaultConfig, withInstallOptions } from "../src/config.js";
 import { selectProjectIssue } from "../src/linear.js";
 
 test("selectProjectIssue filters by assignee and label", () => {
-  const config = defaultConfig("/tmp/workspace");
+  const config = withInstallOptions(defaultConfig("/tmp/workspace"), {
+    acceptedAssignees: ["gonzo"],
+    requiredLabels: ["agent"]
+  });
   const selection = selectProjectIssue(
     {
       name: "Project",
@@ -21,7 +24,10 @@ test("selectProjectIssue filters by assignee and label", () => {
 });
 
 test("selectProjectIssue sorts by priority then oldest update", () => {
-  const config = defaultConfig("/tmp/workspace");
+  const config = withInstallOptions(defaultConfig("/tmp/workspace"), {
+    acceptedAssignees: ["gonzo"],
+    requiredLabels: ["agent"]
+  });
   const selection = selectProjectIssue(
     {
       name: "Project",

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultConfig, loadConfig } from "./config.js";
+import { defaultConfig, loadConfig, withInstallOptions } from "./config.js";
 import { readIssueFile, readProjectFile, selectProjectIssue } from "./linear.js";
 import {
   handoffMarkdown,
@@ -33,7 +33,7 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   switch (args.command) {
     case "install":
-      install(required(args.rest[0], "workspace path is required"));
+      install(required(args.rest[0], "workspace path is required"), args.flags);
       break;
     case "issue":
       createIssue(required(args.rest[0], "issue identifier is required"), args.flags);
@@ -52,10 +52,14 @@ async function main(): Promise<void> {
   }
 }
 
-function install(workspaceInput: string): void {
+function install(workspaceInput: string, flags: Record<string, string | boolean>): void {
   const workspace = resolve(workspaceInput);
   ensureDir(workspace);
-  const config = defaultConfig(workspace);
+  const config = withInstallOptions(defaultConfig(workspace), {
+    repos: discoverRepos(workspace),
+    acceptedAssignees: listFlag(flags, "linear-assignee"),
+    requiredLabels: listFlag(flags, "linear-label")
+  });
   ensureDir(resolve(workspace, ".harness", "policies"));
   ensureDir(resolve(workspace, ".harness", "agents", "codex"));
   ensureDir(resolve(workspace, ".harness", "agents", "claude"));
@@ -70,6 +74,10 @@ function install(workspaceInput: string): void {
   mergeRootInstruction(resolve(workspace, "AGENTS.md"), rootAgentBlock(config));
   mergeRootInstruction(resolve(workspace, "CLAUDE.md"), rootAgentBlock(config));
   console.log(`Installed Mahler workflow into ${workspace}`);
+  console.log(`Configured ${config.repos.length} repo(s): ${config.repos.map((repo) => repo.name).join(", ") || "(none)"}`);
+  if (config.linear.acceptedAssignees.length === 0) {
+    console.log("No Linear assignee filter configured. Add one with --linear-assignee <username> or edit .harness/config.json.");
+  }
 }
 
 function createIssue(identifier: string, flags: Record<string, string | boolean>): void {
@@ -81,6 +89,9 @@ function createIssue(identifier: string, flags: Record<string, string | boolean>
     throw new Error(`Linear issue file identifier ${issue.identifier} does not match ${identifier}`);
   }
   const paths = issuePaths(workspace, config, issue.identifier);
+  if (config.repos.length === 0) {
+    throw new Error("No repos configured. Run `mahler install` in a workspace containing git repos or edit .harness/config.json.");
+  }
   ensureDir(paths.meta);
   for (const repo of config.repos) {
     const source = abs(workspace, repo.path);
@@ -124,6 +135,10 @@ function createProject(projectName: string, flags: Record<string, string | boole
 
 function status(workspace: string): void {
   const config = loadConfig(workspace);
+  if (config.repos.length === 0) {
+    console.log("No repos configured.");
+    return;
+  }
   const issueRoot = resolve(workspace, config.workspaceDir, "issues");
   const issues = listDirectories(issueRoot);
   if (issues.length === 0) {
@@ -217,6 +232,27 @@ function policyNames(): string[] {
   return ["issue-selection", "workspace-safety", "implementation", "review", "commit", "pr", "handoff"];
 }
 
+function discoverRepos(workspace: string): HarnessConfig["repos"] {
+  return listDirectories(workspace)
+    .filter((entry) => existsSync(resolve(workspace, entry, ".git")))
+    .map((entry) => ({
+      name: entry,
+      path: entry,
+      baseBranch: detectBaseBranch(resolve(workspace, entry)),
+      remote: "origin"
+    }));
+}
+
+function detectBaseBranch(repoPath: string): string {
+  const candidates = ["main", "master"];
+  for (const candidate of candidates) {
+    const result = spawnSync("git", ["rev-parse", "--verify", candidate], { cwd: repoPath, encoding: "utf8" });
+    if (result.status === 0) return candidate;
+  }
+  const current = spawnSync("git", ["branch", "--show-current"], { cwd: repoPath, encoding: "utf8" });
+  return current.stdout.trim() || "main";
+}
+
 function repoRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 }
@@ -252,6 +288,15 @@ function stringFlag(flags: Record<string, string | boolean>, key: string): strin
   return typeof value === "string" ? value : undefined;
 }
 
+function listFlag(flags: Record<string, string | boolean>, key: string): string[] {
+  const value = stringFlag(flags, key);
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 function required(value: string | undefined, message: string): string {
   if (!value) throw new Error(message);
   return value;
@@ -263,7 +308,7 @@ function escapeRegex(value: string): string {
 
 function usage(): void {
   console.log(`Usage:
-  mahler install <workspace>
+  mahler install <workspace> [--linear-assignee user[,user...]] [--linear-label label[,label...]]
   mahler issue <ISSUE> --workspace <path> --agent codex|claude [--linear-file issue.json]
   mahler project <PROJECT> --workspace <path> --agent codex|claude --linear-file project.json
   mahler status --workspace <path>

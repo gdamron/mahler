@@ -30,11 +30,15 @@ issue before any code workspace is created.
 ```sh
 npm install
 npm run build
-mahler install /path/to/product-workspace
+mahler install /path/to/product-workspace --linear-assignee gonzo --linear-label agent
 mahler issue FUG-123 --workspace /path/to/product-workspace --agent codex
 mahler project "Project X" --workspace /path/to/product-workspace --agent claude --linear-file project.json
 mahler status --workspace /path/to/product-workspace
 mahler handoff FUG-123 --workspace /path/to/product-workspace
 ```
+
+`mahler install` scans the target workspace for immediate child git repos and
+writes them into `.harness/config.json`. Linear assignee and label filters are
+explicit install options; Mahler does not ship a default assignee.
 
 See `INSTALL.md` for agent-facing installation instructions.

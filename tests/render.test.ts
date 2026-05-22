@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { defaultConfig } from "../src/config.js";
-import { launchCommand, nativeAdapter, rootAgentBlock, workflowMarkdown } from "../src/render.js";
+import { claudeAgentDefinition, codexAgentDefinition, launchCommand, nativeAdapter, rootAgentBlock, workflowMarkdown } from "../src/render.js";
 
 test("workflow names issue prompts and project prompts", () => {
   const workflow = workflowMarkdown();
@@ -19,8 +19,13 @@ test("native adapters reference routing, profiles, skills, and policies", () => 
     assert.match(adapter, /work on MAH-123/);
     assert.match(adapter, /\.harness\/config\.json/);
     assert.match(adapter, /\.harness\/agents\/profiles/);
-    assert.match(adapter, /\.harness\/skills\/work-on-issue\.md/);
-    assert.match(adapter, /\.harness\/skills\/select-project-issue\.md/);
+    if (runtime === "codex") {
+      assert.match(adapter, /\.agents\/skills\/work-on-issue\/SKILL\.md/);
+      assert.match(adapter, /\.agents\/skills\/select-project-issue\/SKILL\.md/);
+    } else {
+      assert.match(adapter, /\.claude\/skills\/work-on-issue\/SKILL\.md/);
+      assert.match(adapter, /\.claude\/skills\/select-project-issue\/SKILL\.md/);
+    }
     assert.match(adapter, /\.harness\/policies/);
     assert.match(adapter, /\.harness\/tmp\/linear/);
     assert.match(adapter, /mahler linear-template issue\|project/);
@@ -39,8 +44,22 @@ test("root agent block gives bare prompt path to mahler issue", () => {
   assert.match(block, /mahler issue <ISSUE> --agent <codex\|claude> --linear-file <issue\.json>/);
   assert.match(block, /Active profile check/);
   assert.match(block, /\.harness\/agents\/profiles/);
-  assert.match(block, /\.harness\/skills/);
+  assert.match(block, /\.agents\/skills/);
+  assert.match(block, /\.claude\/skills/);
   assert.match(block, /\.harness\/policies/);
+});
+
+test("native agent definitions include profile permissions", () => {
+  const profile = {
+    name: "implementer",
+    description: "Implements issue-scoped changes and leaves a handoff.",
+    allowedSkills: ["work-on-issue", "handoff"],
+    deniedSkills: ["commit", "pr"]
+  };
+  assert.match(codexAgentDefinition(profile), /\.agents\/skills\/<skill>\/SKILL\.md/);
+  assert.match(codexAgentDefinition(profile), /Allowed skills: work-on-issue, handoff/);
+  assert.match(claudeAgentDefinition(profile), /\.claude\/skills\/<skill>\/SKILL\.md/);
+  assert.match(claudeAgentDefinition(profile), /Denied skills: commit, pr/);
 });
 
 test("launch commands are agent specific", () => {

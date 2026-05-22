@@ -1,4 +1,9 @@
-# Skill: Work On Issue
+---
+name: work-on-issue
+description: Set up and perform issue-scoped implementation work from Linear issue metadata.
+---
+
+# Work On Issue
 
 ## Triggers
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -48,24 +48,23 @@ test("can enforces allowed and denied skills", () => {
   assert.match(denied.stderr, /Ask the human/);
 });
 
-test("commit and pr are allowed for committer and full-stack profiles", () => {
+test("commit and pr diagnostics are allowed for committer and full-stack profiles", () => {
   const workspace = installWorkspace();
-  mkdirSync(resolve(workspace, "workspaces", "issues", "MAH-4"), { recursive: true });
 
   setCodexProfile(workspace, "committer");
-  const commit = run(["commit", "MAH-4", "--workspace", workspace, "--agent", "codex"]);
+  const commit = run(["can", "codex", "commit", "--workspace", workspace]);
   assert.equal(commit.status, 0, commit.stderr);
-  assert.match(commit.stdout, /commit workflow allowed/);
+  assert.match(commit.stdout, /codex can use commit/);
 
   setCodexProfile(workspace, "full-stack");
-  const pr = run(["pr", "MAH-4", "--workspace", workspace, "--agent", "codex"]);
+  const pr = run(["can", "codex", "pr", "--workspace", workspace]);
   assert.equal(pr.status, 0, pr.stderr);
-  assert.match(pr.stdout, /pr workflow allowed/);
+  assert.match(pr.stdout, /codex can use pr/);
 });
 
-test("implementer profile cannot use commit workflow", () => {
+test("implementer profile cannot use commit diagnostic", () => {
   const workspace = installWorkspace();
-  const result = run(["commit", "MAH-4", "--workspace", workspace, "--agent", "codex"]);
+  const result = run(["can", "codex", "commit", "--workspace", workspace]);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Profile gate denied/);
   assert.match(result.stderr, /cannot use skill "commit"/);

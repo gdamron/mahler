@@ -56,10 +56,10 @@ test("doctor fails when .harness/config.json is missing", () => {
 
 test("doctor fails when a required skill file is missing", () => {
   const workspace = installWorkspace();
-  rmSync(resolve(workspace, ".harness", "skills", "work-on-issue.md"));
+  rmSync(resolve(workspace, ".agents", "skills", "work-on-issue", "SKILL.md"));
   const { status, stdout } = runDoctor(workspace);
   assert.notEqual(status, 0);
-  assert.match(stdout, /missing skills\/work-on-issue\.md/);
+  assert.match(stdout, /missing Codex skill: \.agents\/skills\/work-on-issue\/SKILL\.md/);
 });
 
 test("doctor fails when an adapter HARNESS.md is missing required references", () => {

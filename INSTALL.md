@@ -66,16 +66,19 @@ that does not rely on any global setup such as `npm link`.
    The installed product workspace should contain:
    - `WORKFLOW.md`
    - `.harness/`
+   - `.agents/`
+   - `.codex/`
+   - `.claude/`
    - generated `workspaces/`
 
    Do not copy `src/`, `tests/`, `package.json`, `tsconfig.json`, or other
    Mahler source files into the product workspace unless intentionally
    vendoring the tool.
 
-   The `.harness/` directory contains installed policies, skills, agent
-   profiles, and runtime-specific adapter instructions. Policies are
-   canonical rules, skills compose policies into workflows, and profiles
-   define which skills an agent role may use.
+   The `.harness/` directory contains Mahler config, shared policies,
+   profile data, and runtime adapter notes. Native agent artifacts are
+   generated into `.agents/skills/`, `.codex/agents/`, `.claude/skills/`,
+   and `.claude/agents/`.
 
 ## After Install
 

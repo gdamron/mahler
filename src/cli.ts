@@ -7,6 +7,8 @@ import { defaultConfig, loadConfig, withInstallOptions } from "./config.js";
 import { adapterRuntimes, policyNames, profileNames, skillNames } from "./scaffold.js";
 import { linearIssueTemplate, linearProjectTemplate, readIssueFile, readProjectFile, selectProjectIssue } from "./linear.js";
 import {
+  claudeAgentDefinition,
+  codexAgentDefinition,
   handoffMarkdown,
   launchCommand,
   nativeAdapter,
@@ -16,7 +18,7 @@ import {
   taskMarkdown,
   workflowMarkdown
 } from "./render.js";
-import type { AgentName, HarnessConfig, LinearIssue } from "./types.js";
+import type { AgentName, HarnessConfig, InstalledProfile, LinearIssue } from "./types.js";
 import { abs, ensureDir, listDirectories, run, slugify, writeFileEnsured } from "./util.js";
 
 interface Args {
@@ -45,8 +47,18 @@ async function main(): Promise<void> {
     case "status":
       status(workspaceFlag(args.flags));
       break;
+    case "profile":
+      printProfile(required(args.rest[0], "agent is required"), workspaceFlag(args.flags));
+      break;
+    case "can":
+      canUseSkill(
+        required(args.rest[0], "agent is required"),
+        required(args.rest[1], "skill is required"),
+        workspaceFlag(args.flags)
+      );
+      break;
     case "handoff":
-      handoff(required(args.rest[0], "issue identifier is required"), workspaceFlag(args.flags));
+      handoff(required(args.rest[0], "issue identifier is required"), args.flags);
       break;
     case "doctor":
       doctor(required(args.rest[0], "workspace path is required"));
@@ -103,7 +115,8 @@ function doctor(workspaceInput: string): void {
   }
 
   checkFiles(results, harness, "policies", policyNames(), ".md");
-  checkFiles(results, harness, "skills", skillNames(), ".md");
+  checkSkillOutputs(results, workspace, ".agents", "Codex");
+  checkSkillOutputs(results, workspace, ".claude", "Claude");
 
   for (const profile of profileNames()) {
     const path = resolve(harness, "agents", "profiles", `${profile}.json`);
@@ -119,6 +132,21 @@ function doctor(workspaceInput: string): void {
     }
   }
 
+  for (const profile of profileNames()) {
+    const codexAgent = resolve(workspace, ".codex", "agents", `${profile}.toml`);
+    const claudeAgent = resolve(workspace, ".claude", "agents", `${profile}.md`);
+    if (!existsSync(codexAgent)) {
+      results.push({ level: "error", message: `missing Codex agent: .codex/agents/${profile}.toml` });
+    } else {
+      results.push({ level: "ok", message: `Codex agent ${profile} present` });
+    }
+    if (!existsSync(claudeAgent)) {
+      results.push({ level: "error", message: `missing Claude agent: .claude/agents/${profile}.md` });
+    } else {
+      results.push({ level: "ok", message: `Claude agent ${profile} present` });
+    }
+  }
+
   for (const runtime of adapterRuntimes()) {
     const path = resolve(harness, "agents", runtime, "HARNESS.md");
     if (!existsSync(path)) {
@@ -128,7 +156,7 @@ function doctor(workspaceInput: string): void {
     const body = readFileSync(path, "utf8");
     if (
       !body.includes("work on MAH-123") ||
-      !body.includes(".harness/skills") ||
+      !body.includes(runtime === "codex" ? ".agents/skills" : ".claude/skills") ||
       !body.includes(".harness/policies") ||
       !body.includes(".harness/agents/profiles") ||
       !body.includes(".harness/tmp/linear") ||
@@ -178,6 +206,22 @@ function checkFiles(results: DoctorResult[], harness: string, dir: string, names
   }
 }
 
+function checkSkillOutputs(results: DoctorResult[], workspace: string, root: ".agents" | ".claude", label: string): void {
+  for (const skill of skillNames()) {
+    const path = resolve(workspace, root, "skills", skill, "SKILL.md");
+    if (!existsSync(path)) {
+      results.push({ level: "error", message: `missing ${label} skill: ${root}/skills/${skill}/SKILL.md` });
+      continue;
+    }
+    const body = readFileSync(path, "utf8");
+    if (!body.startsWith("---\n") || !body.includes(`name: ${skill}`) || !body.includes("description:")) {
+      results.push({ level: "error", message: `${label} skill ${skill} missing required SKILL.md frontmatter` });
+    } else {
+      results.push({ level: "ok", message: `${label} skill ${skill} present` });
+    }
+  }
+}
+
 function fail(results: DoctorResult[]): void {
   let errors = 0;
   let warnings = 0;
@@ -200,8 +244,11 @@ function install(workspaceInput: string, flags: Record<string, string | boolean>
     requiredLabels: listFlag(flags, "linear-label")
   });
   ensureDir(resolve(workspace, ".harness", "policies"));
-  ensureDir(resolve(workspace, ".harness", "skills"));
   ensureDir(resolve(workspace, ".harness", "agents", "profiles"));
+  ensureDir(resolve(workspace, ".agents", "skills"));
+  ensureDir(resolve(workspace, ".codex", "agents"));
+  ensureDir(resolve(workspace, ".claude", "skills"));
+  ensureDir(resolve(workspace, ".claude", "agents"));
   writeFileEnsured(resolve(workspace, ".harness", "config.json"), `${JSON.stringify(config, null, 2)}\n`);
   writeFileEnsured(resolve(workspace, ".harness", "README.md"), installedReadme());
   writeFileEnsured(resolve(workspace, "WORKFLOW.md"), workflowMarkdown());
@@ -209,10 +256,16 @@ function install(workspaceInput: string, flags: Record<string, string | boolean>
     writeFileEnsured(resolve(workspace, ".harness", "policies", `${policy}.md`), readPolicy(policy));
   }
   for (const skill of skillNames()) {
-    writeFileEnsured(resolve(workspace, ".harness", "skills", `${skill}.md`), readSkill(skill));
+    const body = generatedFile(readSkill(skill), `skills/${skill}/SKILL.md`);
+    writeFileEnsured(resolve(workspace, ".agents", "skills", skill, "SKILL.md"), body);
+    writeFileEnsured(resolve(workspace, ".claude", "skills", skill, "SKILL.md"), body);
   }
   for (const profile of profileNames()) {
-    writeFileEnsured(resolve(workspace, ".harness", "agents", "profiles", `${profile}.json`), readProfile(profile));
+    const profileBody = readProfile(profile);
+    const parsed = normalizeProfile(JSON.parse(profileBody), profile);
+    writeFileEnsured(resolve(workspace, ".harness", "agents", "profiles", `${profile}.json`), profileBody);
+    writeFileEnsured(resolve(workspace, ".codex", "agents", `${profile}.toml`), codexAgentDefinition(parsed));
+    writeFileEnsured(resolve(workspace, ".claude", "agents", `${profile}.md`), claudeAgentDefinition(parsed));
   }
   for (const runtime of adapterRuntimes()) {
     ensureDir(resolve(workspace, ".harness", "agents", runtime));
@@ -231,6 +284,7 @@ function createIssue(identifier: string, flags: Record<string, string | boolean>
   const workspace = workspaceFlag(flags);
   const agent = String(flags.agent ?? "codex");
   const config = loadConfig(workspace);
+  const active = requireSkill(workspace, agent, "work-on-issue");
   const issue = readIssueFile(stringFlag(flags, "linear-file")) ?? fallbackIssue(identifier, flags);
   if (issue.identifier !== identifier) {
     throw new Error(`Linear issue file identifier ${issue.identifier} does not match ${identifier}`);
@@ -250,7 +304,7 @@ function createIssue(identifier: string, flags: Record<string, string | boolean>
   }
   const primaryRepo = resolve(paths.repos, config.repos[0].name);
   writeFileEnsured(resolve(paths.meta, "TASK.md"), taskMarkdown(issue, flags["linear-file"] ? "linear-file" : "manual/fallback"));
-  writeFileEnsured(resolve(paths.meta, "AGENT_SESSION.md"), sessionMarkdown(issue, agent, primaryRepo));
+  writeFileEnsured(resolve(paths.meta, "AGENT_SESSION.md"), sessionMarkdown(issue, agent, primaryRepo, active.profile));
   writeFileEnsured(resolve(paths.meta, "HANDOFF.md"), handoffMarkdown(issue));
   writeFileEnsured(resolve(paths.meta, "linear-issue.json"), `${JSON.stringify(issue, null, 2)}\n`);
   console.log(`Issue workspace ready: ${paths.root}`);
@@ -261,6 +315,7 @@ function createProject(projectName: string, flags: Record<string, string | boole
   const workspace = workspaceFlag(flags);
   const agent = String(flags.agent ?? "codex");
   const config = loadConfig(workspace);
+  requireSkill(workspace, agent, "select-project-issue");
   const project = readProjectFile(stringFlag(flags, "linear-file"));
   if (!project) {
     throw new Error("Project workflow requires --linear-file with Linear MCP project details and issues in v1");
@@ -306,13 +361,108 @@ function status(workspace: string): void {
   }
 }
 
-function handoff(identifier: string, workspace: string): void {
+function printProfile(agent: string, workspace: string): void {
+  const active = loadActiveProfile(workspace, agent);
+  console.log(`Agent: ${agent}`);
+  console.log(`Runtime: ${active.agent.runtime}`);
+  console.log(`Profile: ${active.profile.name}`);
+  if (active.profile.description) console.log(`Description: ${active.profile.description}`);
+  console.log(`Allowed skills: ${active.profile.allowedSkills.join(", ") || "(none)"}`);
+  console.log(`Denied skills: ${active.profile.deniedSkills.join(", ") || "(none)"}`);
+}
+
+function canUseSkill(agent: string, skill: string, workspace: string): void {
+  const active = loadActiveProfile(workspace, agent);
+  const result = checkSkill(active.profile, skill);
+  if (!result.allowed) {
+    console.error(askHumanMessage(agent, active.profile.name, skill, result.reason));
+    process.exit(1);
+  }
+  console.log(`${agent} can use ${skill} via profile ${active.profile.name}`);
+}
+
+function handoff(identifier: string, flags: Record<string, string | boolean>): void {
+  const workspace = workspaceFlag(flags);
+  const agent = String(flags.agent ?? "codex");
+  requireSkill(workspace, agent, "handoff");
   const config = loadConfig(workspace);
   const path = resolve(workspace, config.workspaceDir, "issues", identifier, "HANDOFF.md");
   if (!existsSync(path)) {
     throw new Error(`No handoff found at ${path}`);
   }
   console.log(readFileSync(path, "utf8"));
+}
+
+function requireSkill(workspace: string, agent: string, skill: string): { agent: HarnessConfig["agents"][string]; profile: InstalledProfile } {
+  const active = loadActiveProfile(workspace, agent);
+  const result = checkSkill(active.profile, skill);
+  if (!result.allowed) {
+    throw new Error(askHumanMessage(agent, active.profile.name, skill, result.reason));
+  }
+  return active;
+}
+
+function loadActiveProfile(workspace: string, agent: string): { agent: HarnessConfig["agents"][string]; profile: InstalledProfile } {
+  const config = loadConfig(workspace);
+  const agentConfig = config.agents[agent];
+  if (!agentConfig) {
+    throw new Error(`Unknown agent "${agent}". Configure it in .harness/config.json before using Mahler workflow gates.`);
+  }
+  const profilePath = resolve(workspace, ".harness", "agents", "profiles", `${agentConfig.profile}.json`);
+  if (!existsSync(profilePath)) {
+    throw new Error(`Missing profile for ${agent}: ${profilePath}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(profilePath, "utf8"));
+  } catch (error) {
+    throw new Error(`Profile ${agentConfig.profile} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return { agent: agentConfig, profile: normalizeProfile(parsed, agentConfig.profile) };
+}
+
+function normalizeProfile(value: unknown, expectedName: string): InstalledProfile {
+  if (!value || typeof value !== "object") {
+    throw new Error(`Profile ${expectedName} must be a JSON object`);
+  }
+  const record = value as Record<string, unknown>;
+  const allowedSkills = stringArray(record.allowedSkills);
+  const deniedSkills = stringArray(record.deniedSkills);
+  if (typeof record.name !== "string" || record.name.length === 0) {
+    throw new Error(`Profile ${expectedName} is missing name`);
+  }
+  if (!allowedSkills || !deniedSkills) {
+    throw new Error(`Profile ${expectedName} must define allowedSkills and deniedSkills arrays`);
+  }
+  return {
+    name: record.name,
+    description: typeof record.description === "string" ? record.description : undefined,
+    allowedSkills,
+    deniedSkills,
+    runtimeHints: undefined
+  };
+}
+
+function checkSkill(profile: InstalledProfile, skill: string): { allowed: boolean; reason: string } {
+  if (!skillNames().includes(skill)) {
+    return { allowed: false, reason: `unknown skill "${skill}"` };
+  }
+  if (profile.deniedSkills.includes(skill)) {
+    return { allowed: false, reason: `profile explicitly denies "${skill}"` };
+  }
+  if (!profile.allowedSkills.includes(skill)) {
+    return { allowed: false, reason: `profile does not allow "${skill}"` };
+  }
+  return { allowed: true, reason: "allowed" };
+}
+
+function askHumanMessage(agent: string, profile: string, skill: string, reason: string): string {
+  return `Profile gate denied: agent "${agent}" uses profile "${profile}" and cannot use skill "${skill}" (${reason}). Ask the human to switch profiles or delegate this workflow.`;
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || !value.every((entry) => typeof entry === "string")) return undefined;
+  return value;
 }
 
 function printLinearTemplate(kind: string): void {
@@ -368,9 +518,15 @@ This directory contains runtime configuration and policies installed by the Mahl
 
 - \`config.json\`: workspace-specific Mahler configuration.
 - \`policies/\`: canonical workflow policies used by all agents.
-- \`skills/\`: task entrypoints composed from policies.
 - \`agents/profiles/\`: role and capability profiles.
-- \`agents/\`: workspace-local native adapters for supported runtimes.
+- \`agents/\`: workspace-local adapter notes for supported runtimes.
+
+Native agent artifacts are generated outside .harness:
+
+- \`.agents/skills/\`: Codex project skills.
+- \`.codex/agents/\`: Codex project agents.
+- \`.claude/skills/\`: Claude project skills.
+- \`.claude/agents/\`: Claude project agents.
 `;
 }
 
@@ -390,7 +546,7 @@ function readPolicy(name: string): string {
 }
 
 function readSkill(name: string): string {
-  const path = resolve(repoRoot(), "skills", `${name}.md`);
+  const path = resolve(repoRoot(), "skills", name, "SKILL.md");
   return readFileSync(path, "utf8");
 }
 
@@ -473,13 +629,26 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function generatedFile(content: string, source: string): string {
+  const marker = "\n---\n";
+  if (content.startsWith("---\n")) {
+    const end = content.indexOf(marker, marker.length);
+    if (end !== -1) {
+      return `${content.slice(0, end + marker.length)}<!-- Generated by Mahler from ${source}. Do not edit directly. -->\n${content.slice(end + marker.length)}`;
+    }
+  }
+  return `<!-- Generated by Mahler from ${source}. Do not edit directly. -->\n${content}`;
+}
+
 function usage(): void {
   console.log(`Usage:
   mahler install <workspace> [--linear-assignee user[,user...]] [--linear-label label[,label...]]
   mahler issue <ISSUE> --workspace <path> --agent codex|claude [--linear-file issue.json]
   mahler project <PROJECT> --workspace <path> --agent codex|claude --linear-file project.json
   mahler status --workspace <path>
-  mahler handoff <ISSUE> --workspace <path>
+  mahler profile <agent> --workspace <path>
+  mahler can <agent> <skill> --workspace <path>
+  mahler handoff <ISSUE> --workspace <path> --agent codex|claude
   mahler doctor <workspace>
   mahler linear-template issue|project
 `);

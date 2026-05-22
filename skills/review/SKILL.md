@@ -1,4 +1,9 @@
-# Skill: Review
+---
+name: review
+description: Review an issue workspace diff and report findings before handoff.
+---
+
+# Review
 
 ## Triggers
 

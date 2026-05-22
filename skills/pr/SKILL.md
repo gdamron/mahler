@@ -1,4 +1,9 @@
-# Skill: PR
+---
+name: pr
+description: Prepare or open a pull request for committed issue-scoped work.
+---
+
+# PR
 
 ## Triggers
 

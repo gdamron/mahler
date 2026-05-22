@@ -1,4 +1,9 @@
-# Skill: Handoff
+---
+name: handoff
+description: Summarize current issue workspace state, blockers, tests, and next steps.
+---
+
+# Handoff
 
 ## Triggers
 

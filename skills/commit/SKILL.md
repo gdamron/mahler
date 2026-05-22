@@ -1,4 +1,9 @@
-# Skill: Commit
+---
+name: commit
+description: Commit completed issue-scoped work after checking tests and staged changes.
+---
+
+# Commit
 
 ## Triggers
 

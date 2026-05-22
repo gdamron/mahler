@@ -1,4 +1,4 @@
-import type { AgentName, HarnessConfig, LinearIssue, LinearProject } from "./types.js";
+import type { AgentName, HarnessConfig, InstalledProfile, LinearIssue, LinearProject } from "./types.js";
 
 export function workflowMarkdown(): string {
   return `# Mahler Workflow
@@ -40,7 +40,7 @@ export function rootAgentBlock(config: HarnessConfig): string {
   const claude = config.agents.claude;
   const codexProfile = codex ? `codex: ${codex.profile}` : "codex: configured profile";
   const claudeProfile = claude ? `claude: ${claude.profile}` : "claude: configured profile";
-  return `\n## Mahler Workflow\n\nThis workspace uses Mahler. Bare prompts like \`work on MAH-123\`, \`start MAH-123\`, or \`work on project X in Linear\` must route through Mahler before code changes.\n\nRuntime adapter references:\n\n- Codex: read \`.harness/agents/codex/HARNESS.md\` and this AGENTS.md block.\n- Claude: read \`.harness/agents/claude/HARNESS.md\` and this CLAUDE.md block.\n\nRequired routing:\n\n- Issue prompt: use Linear MCP to fetch issue metadata, write it under \`.harness/tmp/linear/\` using \`${config.mahlerCommand} linear-template issue\` as the shape, then run \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>\`.\n- Project prompt: use Linear MCP to fetch project details and issues, write the metadata under \`.harness/tmp/linear/\` using \`${config.mahlerCommand} linear-template project\` as the shape, then run \`${config.mahlerCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- Active profile check: inspect \`.harness/config.json\` and the active profile in \`.harness/agents/profiles/\` (${codexProfile}; ${claudeProfile}) before choosing a skill.\n- Skill lookup: use the matching canonical installed skill under \`.harness/skills/\`; use \`work-on-issue.md\` for issue prompts and \`select-project-issue.md\` for project prompts.\n- Policy lookup: read every policy listed by the selected skill from \`.harness/policies/\` instead of duplicating policy rules here.\n- Work only in generated issue workspaces under \`${config.workspaceDir}/issues/\`.\n- If the active profile does not allow the requested skill or Linear metadata is unavailable, stop and ask the human.\n`;
+  return `\n## Mahler Workflow\n\nThis workspace uses Mahler. Bare prompts like \`work on MAH-123\`, \`start MAH-123\`, or \`work on project X in Linear\` must route through Mahler before code changes.\n\nMahler compiles canonical workflow source into native agent artifacts:\n\n- Codex skills: \`.agents/skills/<skill>/SKILL.md\`\n- Codex agents: \`.codex/agents/<profile>.toml\`\n- Claude skills: \`.claude/skills/<skill>/SKILL.md\`\n- Claude agents: \`.claude/agents/<profile>.md\`\n- Shared config and policies: \`.harness/config.json\` and \`.harness/policies/\`\n\nRequired routing:\n\n- Active profile check: inspect \`.harness/config.json\` and the active profile in \`.harness/agents/profiles/\` (${codexProfile}; ${claudeProfile}) before choosing a skill.\n- Issue prompt: use the native \`work-on-issue\` skill. It fetches Linear metadata, writes \`.harness/tmp/linear/<ISSUE>.json\`, then runs \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>\`.\n- Project prompt: use the native \`select-project-issue\` skill. It fetches Linear project metadata, writes \`.harness/tmp/linear/<project>.json\`, then runs \`${config.mahlerCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- For review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.\n- Work only in generated issue workspaces under \`${config.workspaceDir}/issues/\`.\n- If the active profile does not allow the requested skill or Linear metadata is unavailable, stop and ask the human.\n`;
 }
 
 export function taskMarkdown(issue: LinearIssue, source: string): string {
@@ -61,18 +61,21 @@ ${issue.description?.trim() || "_No description supplied. If Linear MCP is unava
 `;
 }
 
-export function sessionMarkdown(issue: LinearIssue, agent: AgentName, repoPath: string): string {
+export function sessionMarkdown(issue: LinearIssue, agent: AgentName, repoPath: string, profile?: InstalledProfile): string {
   return `# Agent Session
 
 - Issue: ${issue.identifier}
 - Agent: ${agent}
-- Code workspace: ${repoPath}
+${profile ? `- Profile: ${profile.name}
+- Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
+- Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
+` : ""}- Code workspace: ${repoPath}
 
 ## Rules
 
 - Work only inside this issue workspace and its repo worktrees.
 - Do not edit the product workspace root.
-- Follow installed skills in \`.harness/skills/\` and policies in \`.harness/policies/\`.
+- Follow the native installed skills for this agent and policies in \`.harness/policies/\`.
 - Update \`HANDOFF.md\` before stopping.
 `;
 }
@@ -133,8 +136,8 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 1. Read \`WORKFLOW.md\`.
 2. Read \`.harness/config.json\` to identify the active Codex profile.
 3. Read that profile under \`.harness/agents/profiles/\`.
-4. For \`work on ISSUE-123\`, use \`.harness/skills/work-on-issue.md\`.
-5. For project prompts, use \`.harness/skills/select-project-issue.md\`.
+4. For \`work on ISSUE-123\`, use \`.agents/skills/work-on-issue/SKILL.md\`.
+5. For project prompts, use \`.agents/skills/select-project-issue/SKILL.md\`.
 6. Read every policy named by the selected skill from \`.harness/policies/\`.
 7. Use Linear MCP for issue or project details.
 8. Write Linear metadata JSON under \`.harness/tmp/linear/\` using \`mahler linear-template issue|project\` as the shape.
@@ -158,8 +161,8 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 1. Read \`WORKFLOW.md\`.
 2. Read \`.harness/config.json\` to identify the active Claude profile.
 3. Read that profile under \`.harness/agents/profiles/\`.
-4. For \`work on ISSUE-123\`, use \`.harness/skills/work-on-issue.md\`.
-5. For project prompts, use \`.harness/skills/select-project-issue.md\`.
+4. For \`work on ISSUE-123\`, use \`.claude/skills/work-on-issue/SKILL.md\`.
+5. For project prompts, use \`.claude/skills/select-project-issue/SKILL.md\`.
 6. Read every policy named by the selected skill from \`.harness/policies/\`.
 7. Use Linear MCP for issue or project details.
 8. Write Linear metadata JSON under \`.harness/tmp/linear/\` using \`mahler linear-template issue|project\` as the shape.
@@ -168,6 +171,39 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 11. Stop and ask the human if the active profile does not allow the requested skill or Linear metadata is unavailable.
 
 Project-local Claude instructions in \`CLAUDE.md\` intentionally point back to these canonical installed skills and policies.
+`;
+}
+
+export function codexAgentDefinition(profile: InstalledProfile): string {
+  return `# Generated by Mahler. Edit agents/${profile.name}.json, then rerun mahler install.
+name = "${tomlString(profile.name)}"
+description = "${tomlString(profile.description ?? `${profile.name} Mahler profile`)}"
+
+instructions = """
+You are operating with the Mahler ${profile.name} profile.
+
+Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
+Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
+
+Before choosing a workflow skill, read .harness/config.json and .harness/agents/profiles/${profile.name}.json. Use the native skill under .agents/skills/<skill>/SKILL.md only if this profile allows it. If a requested skill is denied, stop and ask the human to switch profiles or delegate the workflow.
+"""
+`;
+}
+
+export function claudeAgentDefinition(profile: InstalledProfile): string {
+  return `---
+name: ${profile.name}
+description: ${profile.description ?? `${profile.name} Mahler profile`}
+---
+
+# Mahler ${profile.name} Profile
+
+Generated by Mahler. Edit \`agents/${profile.name}.json\`, then rerun \`mahler install\`.
+
+Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
+Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
+
+Before choosing a workflow skill, read \`.harness/config.json\` and \`.harness/agents/profiles/${profile.name}.json\`. Use the native skill under \`.claude/skills/<skill>/SKILL.md\` only if this profile allows it. If a requested skill is denied, stop and ask the human to switch profiles or delegate the workflow.
 `;
 }
 
@@ -183,4 +219,8 @@ export function launchCommand(agent: AgentName, repoPath: string, metadataPath: 
 
 function shell(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function tomlString(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"').replaceAll("\n", "\\n");
 }

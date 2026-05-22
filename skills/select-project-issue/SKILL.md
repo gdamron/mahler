@@ -1,4 +1,9 @@
-# Skill: Select Project Issue
+---
+name: select-project-issue
+description: Resolve a Linear project prompt to one eligible issue and create its workspace.
+---
+
+# Select Project Issue
 
 ## Triggers
 

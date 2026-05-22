@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultConfig, loadConfig, withInstallOptions } from "./config.js";
+import { adapterRuntimes, policyNames, profileNames, skillNames } from "./scaffold.js";
 import { readIssueFile, readProjectFile, selectProjectIssue } from "./linear.js";
 import {
   handoffMarkdown,
@@ -47,9 +48,137 @@ async function main(): Promise<void> {
     case "handoff":
       handoff(required(args.rest[0], "issue identifier is required"), workspaceFlag(args.flags));
       break;
+    case "doctor":
+      doctor(required(args.rest[0], "workspace path is required"));
+      break;
     default:
       usage();
   }
+}
+
+interface DoctorResult {
+  level: "ok" | "warn" | "error";
+  message: string;
+}
+
+function doctor(workspaceInput: string): void {
+  const workspace = resolve(workspaceInput);
+  const results: DoctorResult[] = [];
+  const harness = resolve(workspace, ".harness");
+
+  if (!existsSync(workspace)) {
+    fail([{ level: "error", message: `workspace not found: ${workspace}` }]);
+    return;
+  }
+
+  const configPath = resolve(harness, "config.json");
+  if (!existsSync(configPath)) {
+    fail([{ level: "error", message: `missing .harness/config.json — run \`mahler install ${workspace}\`` }]);
+    return;
+  }
+
+  let config: HarnessConfig;
+  try {
+    config = loadConfig(workspace);
+    results.push({ level: "ok", message: ".harness/config.json parses" });
+  } catch (error) {
+    fail([{ level: "error", message: `.harness/config.json invalid: ${error instanceof Error ? error.message : String(error)}` }]);
+    return;
+  }
+
+  if (config.repos.length === 0) {
+    results.push({ level: "error", message: "no repos configured — run install in a workspace containing git repos or edit .harness/config.json" });
+  } else {
+    for (const repo of config.repos) {
+      const repoPath = abs(workspace, repo.path);
+      if (!existsSync(resolve(repoPath, ".git"))) {
+        results.push({ level: "error", message: `repo \"${repo.name}\" missing .git at ${repoPath}` });
+      } else {
+        results.push({ level: "ok", message: `repo ${repo.name} present (${repo.baseBranch})` });
+      }
+    }
+  }
+
+  checkFiles(results, harness, "policies", policyNames(), ".md");
+  checkFiles(results, harness, "skills", skillNames(), ".md");
+
+  for (const profile of profileNames()) {
+    const path = resolve(harness, "agents", "profiles", `${profile}.json`);
+    if (!existsSync(path)) {
+      results.push({ level: "error", message: `missing profile: agents/profiles/${profile}.json` });
+      continue;
+    }
+    try {
+      JSON.parse(readFileSync(path, "utf8"));
+      results.push({ level: "ok", message: `profile ${profile} present` });
+    } catch (error) {
+      results.push({ level: "error", message: `profile ${profile} is not valid JSON: ${error instanceof Error ? error.message : String(error)}` });
+    }
+  }
+
+  for (const runtime of adapterRuntimes()) {
+    const path = resolve(harness, "agents", runtime, "HARNESS.md");
+    if (!existsSync(path)) {
+      results.push({ level: "error", message: `missing adapter: agents/${runtime}/HARNESS.md` });
+      continue;
+    }
+    const body = readFileSync(path, "utf8");
+    if (!body.includes(".harness/skills") || !body.includes(".harness/agents/profiles")) {
+      results.push({ level: "error", message: `adapter agents/${runtime}/HARNESS.md missing skills/profiles references` });
+    } else {
+      results.push({ level: "ok", message: `adapter ${runtime} wired` });
+    }
+  }
+
+  const workflow = resolve(workspace, "WORKFLOW.md");
+  if (!existsSync(workflow)) {
+    results.push({ level: "error", message: "missing WORKFLOW.md" });
+  } else {
+    results.push({ level: "ok", message: "WORKFLOW.md present" });
+  }
+
+  for (const rootFile of ["AGENTS.md", "CLAUDE.md"]) {
+    const path = resolve(workspace, rootFile);
+    if (!existsSync(path)) {
+      results.push({ level: "error", message: `missing ${rootFile}` });
+      continue;
+    }
+    if (!readFileSync(path, "utf8").includes("<!-- HARNESS:START -->")) {
+      results.push({ level: "error", message: `${rootFile} missing <!-- HARNESS:START --> block` });
+    } else {
+      results.push({ level: "ok", message: `${rootFile} contains harness block` });
+    }
+  }
+
+  if (config.linear.acceptedAssignees.length === 0) {
+    results.push({ level: "warn", message: "no Linear assignee filter configured — add --linear-assignee on install or edit .harness/config.json" });
+  }
+
+  fail(results);
+}
+
+function checkFiles(results: DoctorResult[], harness: string, dir: string, names: string[], ext: string): void {
+  for (const name of names) {
+    const path = resolve(harness, dir, `${name}${ext}`);
+    if (!existsSync(path)) {
+      results.push({ level: "error", message: `missing ${dir}/${name}${ext}` });
+    } else {
+      results.push({ level: "ok", message: `${dir}/${name}${ext} present` });
+    }
+  }
+}
+
+function fail(results: DoctorResult[]): void {
+  let errors = 0;
+  let warnings = 0;
+  for (const result of results) {
+    const prefix = result.level === "ok" ? "ok  " : result.level === "warn" ? "warn" : "err ";
+    console.log(`${prefix} ${result.message}`);
+    if (result.level === "error") errors += 1;
+    if (result.level === "warn") warnings += 1;
+  }
+  console.log(`\n${results.length} checks, ${errors} error(s), ${warnings} warning(s)`);
+  if (errors > 0) process.exit(1);
 }
 
 function install(workspaceInput: string, flags: Record<string, string | boolean>): void {
@@ -62,8 +191,6 @@ function install(workspaceInput: string, flags: Record<string, string | boolean>
   });
   ensureDir(resolve(workspace, ".harness", "policies"));
   ensureDir(resolve(workspace, ".harness", "skills"));
-  ensureDir(resolve(workspace, ".harness", "agents", "codex"));
-  ensureDir(resolve(workspace, ".harness", "agents", "claude"));
   ensureDir(resolve(workspace, ".harness", "agents", "profiles"));
   writeFileEnsured(resolve(workspace, ".harness", "config.json"), `${JSON.stringify(config, null, 2)}\n`);
   writeFileEnsured(resolve(workspace, ".harness", "README.md"), installedReadme());
@@ -77,8 +204,10 @@ function install(workspaceInput: string, flags: Record<string, string | boolean>
   for (const profile of profileNames()) {
     writeFileEnsured(resolve(workspace, ".harness", "agents", "profiles", `${profile}.json`), readProfile(profile));
   }
-  writeFileEnsured(resolve(workspace, ".harness", "agents", "codex", "HARNESS.md"), nativeAdapter("codex"));
-  writeFileEnsured(resolve(workspace, ".harness", "agents", "claude", "HARNESS.md"), nativeAdapter("claude"));
+  for (const runtime of adapterRuntimes()) {
+    ensureDir(resolve(workspace, ".harness", "agents", runtime));
+    writeFileEnsured(resolve(workspace, ".harness", "agents", runtime, "HARNESS.md"), nativeAdapter(runtime));
+  }
   mergeRootInstruction(resolve(workspace, "AGENTS.md"), rootAgentBlock(config));
   mergeRootInstruction(resolve(workspace, "CLAUDE.md"), rootAgentBlock(config));
   console.log(`Installed Mahler workflow into ${workspace}`);
@@ -238,26 +367,14 @@ function readPolicy(name: string): string {
   return readFileSync(path, "utf8");
 }
 
-function policyNames(): string[] {
-  return ["issue-selection", "workspace-safety", "implementation", "review", "commit", "pr", "handoff"];
-}
-
 function readSkill(name: string): string {
   const path = resolve(repoRoot(), "skills", `${name}.md`);
   return readFileSync(path, "utf8");
 }
 
-function skillNames(): string[] {
-  return ["work-on-issue", "select-project-issue", "review", "commit", "pr", "handoff"];
-}
-
 function readProfile(name: string): string {
   const path = resolve(repoRoot(), "agents", `${name}.json`);
   return readFileSync(path, "utf8");
-}
-
-function profileNames(): string[] {
-  return ["implementer", "reviewer", "committer", "full-stack"];
 }
 
 function discoverRepos(workspace: string): HarnessConfig["repos"] {
@@ -341,5 +458,6 @@ function usage(): void {
   mahler project <PROJECT> --workspace <path> --agent codex|claude --linear-file project.json
   mahler status --workspace <path>
   mahler handoff <ISSUE> --workspace <path>
+  mahler doctor <workspace>
 `);
 }

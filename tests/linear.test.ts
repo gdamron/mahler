@@ -1,7 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { defaultConfig, withInstallOptions } from "../src/config.js";
-import { selectProjectIssue } from "../src/linear.js";
+import { linearIssueTemplate, linearProjectTemplate, normalizeIssue, selectProjectIssue } from "../src/linear.js";
+
+test("linearIssueTemplate has the parseable issue metadata shape", () => {
+  const template = linearIssueTemplate();
+  assert.equal(template.identifier, "ISSUE-123");
+  assert.equal(template.title, "Issue title");
+  assert.deepEqual(template.labels, ["agent"]);
+  assert.equal(template.blocked, false);
+  assert.equal(normalizeIssue({ ...template }).identifier, "ISSUE-123");
+});
+
+test("linearProjectTemplate has the parseable project metadata shape", () => {
+  const template = linearProjectTemplate();
+  assert.equal(template.name, "Project name");
+  assert.equal(template.issues.length, 1);
+  assert.equal(normalizeIssue({ ...template.issues[0] }).title, "Issue title");
+});
 
 test("selectProjectIssue filters by assignee and label", () => {
   const config = withInstallOptions(defaultConfig("/tmp/workspace"), {

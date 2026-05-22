@@ -47,6 +47,11 @@ directory.
    Mahler source files into the product workspace unless intentionally
    vendoring the tool.
 
+   The `.harness/` directory contains installed policies, skills, agent
+   profiles, and runtime-specific adapter instructions. Policies are canonical
+   rules, skills compose policies into workflows, and profiles define which
+   skills an agent role may use.
+
 ## After Install
 
 Start a fresh agent in the product workspace and prompt it normally:

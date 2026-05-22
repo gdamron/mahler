@@ -21,6 +21,8 @@ issue before any code workspace is created.
 - Agents work in dedicated git worktrees under `workspaces/issues/`.
 - Policies live in canonical Mahler modules and are rendered into
   workspace-local Claude/Codex instruction surfaces.
+- Skills compose policies into named workflows, and agent profiles declare
+  which skills each role can use.
 - Linear MCP is the preferred source of issue and project context. If an agent
   lacks Linear MCP access, it must ask for missing metadata instead of
   inventing it.
@@ -40,5 +42,9 @@ mahler handoff FUG-123 --workspace /path/to/product-workspace
 `mahler install` scans the target workspace for immediate child git repos and
 writes them into `.harness/config.json`. Linear assignee and label filters are
 explicit install options; Mahler does not ship a default assignee.
+
+Install also writes canonical policies, skills, and agent profiles into
+`.harness/`. Claude/Codex adapters reference those installed files instead of
+duplicating workflow rules.
 
 See `INSTALL.md` for agent-facing installation instructions.

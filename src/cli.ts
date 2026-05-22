@@ -61,13 +61,21 @@ function install(workspaceInput: string, flags: Record<string, string | boolean>
     requiredLabels: listFlag(flags, "linear-label")
   });
   ensureDir(resolve(workspace, ".harness", "policies"));
+  ensureDir(resolve(workspace, ".harness", "skills"));
   ensureDir(resolve(workspace, ".harness", "agents", "codex"));
   ensureDir(resolve(workspace, ".harness", "agents", "claude"));
+  ensureDir(resolve(workspace, ".harness", "agents", "profiles"));
   writeFileEnsured(resolve(workspace, ".harness", "config.json"), `${JSON.stringify(config, null, 2)}\n`);
   writeFileEnsured(resolve(workspace, ".harness", "README.md"), installedReadme());
   writeFileEnsured(resolve(workspace, "WORKFLOW.md"), workflowMarkdown());
   for (const policy of policyNames()) {
     writeFileEnsured(resolve(workspace, ".harness", "policies", `${policy}.md`), readPolicy(policy));
+  }
+  for (const skill of skillNames()) {
+    writeFileEnsured(resolve(workspace, ".harness", "skills", `${skill}.md`), readSkill(skill));
+  }
+  for (const profile of profileNames()) {
+    writeFileEnsured(resolve(workspace, ".harness", "agents", "profiles", `${profile}.json`), readProfile(profile));
   }
   writeFileEnsured(resolve(workspace, ".harness", "agents", "codex", "HARNESS.md"), nativeAdapter("codex"));
   writeFileEnsured(resolve(workspace, ".harness", "agents", "claude", "HARNESS.md"), nativeAdapter("claude"));
@@ -209,7 +217,9 @@ This directory contains runtime configuration and policies installed by the Mahl
 
 - \`config.json\`: workspace-specific Mahler configuration.
 - \`policies/\`: canonical workflow policies used by all agents.
-- \`agents/\`: workspace-local native adapters for supported agents.
+- \`skills/\`: task entrypoints composed from policies.
+- \`agents/profiles/\`: role and capability profiles.
+- \`agents/\`: workspace-local native adapters for supported runtimes.
 `;
 }
 
@@ -230,6 +240,24 @@ function readPolicy(name: string): string {
 
 function policyNames(): string[] {
   return ["issue-selection", "workspace-safety", "implementation", "review", "commit", "pr", "handoff"];
+}
+
+function readSkill(name: string): string {
+  const path = resolve(repoRoot(), "skills", `${name}.md`);
+  return readFileSync(path, "utf8");
+}
+
+function skillNames(): string[] {
+  return ["work-on-issue", "select-project-issue", "review", "commit", "pr", "handoff"];
+}
+
+function readProfile(name: string): string {
+  const path = resolve(repoRoot(), "agents", `${name}.json`);
+  return readFileSync(path, "utf8");
+}
+
+function profileNames(): string[] {
+  return ["implementer", "reviewer", "committer", "full-stack"];
 }
 
 function discoverRepos(workspace: string): HarnessConfig["repos"] {

@@ -12,6 +12,13 @@ test("native adapter tells agent not to bypass Mahler", () => {
   assert.match(nativeAdapter("codex"), /Do not bypass the Mahler workspace setup/);
 });
 
+test("native adapter references profiles and skills", () => {
+  const adapter = nativeAdapter("claude");
+  assert.match(adapter, /\.harness\/agents\/profiles/);
+  assert.match(adapter, /\.harness\/skills/);
+  assert.match(adapter, /Read every policy named by that skill/);
+});
+
 test("launch commands are agent specific", () => {
   assert.match(launchCommand("codex", "/tmp/repo", "/tmp/meta"), /^codex --cd/);
   assert.match(launchCommand("claude", "/tmp/repo", "/tmp/meta"), /^claude --add-dir/);

@@ -1,0 +1,10 @@
+{
+  "name": "reviewer",
+  "description": "Reviews issue workspace diffs and records findings.",
+  "allowedSkills": ["review", "handoff"],
+  "deniedSkills": ["commit", "pr", "work-on-issue"],
+  "runtimeHints": {
+    "codex": "Use Codex review/inspection behavior without editing unless explicitly asked.",
+    "claude": "Use Claude review/inspection behavior without editing unless explicitly asked."
+  }
+}

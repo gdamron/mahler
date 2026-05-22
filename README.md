@@ -37,6 +37,7 @@ mahler issue FUG-123 --workspace /path/to/product-workspace --agent codex
 mahler project "Project X" --workspace /path/to/product-workspace --agent claude --linear-file project.json
 mahler status --workspace /path/to/product-workspace
 mahler handoff FUG-123 --workspace /path/to/product-workspace
+mahler doctor /path/to/product-workspace
 ```
 
 `mahler install` scans the target workspace for immediate child git repos and
@@ -46,5 +47,9 @@ explicit install options; Mahler does not ship a default assignee.
 Install also writes canonical policies, skills, and agent profiles into
 `.harness/`. Claude/Codex adapters reference those installed files instead of
 duplicating workflow rules.
+
+Run `mahler doctor <workspace>` after install (or any time) to verify the
+configured repos, policies, skills, profiles, and adapter docs. It exits
+non-zero with a clear message if anything is missing.
 
 See `INSTALL.md` for agent-facing installation instructions.

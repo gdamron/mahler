@@ -36,7 +36,12 @@ mahler install /path/to/product-workspace --linear-assignee gonzo --linear-label
 mahler issue FUG-123 --workspace /path/to/product-workspace --agent codex
 mahler project "Project X" --workspace /path/to/product-workspace --agent claude --linear-file project.json
 mahler status --workspace /path/to/product-workspace
-mahler handoff FUG-123 --workspace /path/to/product-workspace
+mahler profile codex --workspace /path/to/product-workspace
+mahler can codex commit --workspace /path/to/product-workspace
+mahler review FUG-123 --workspace /path/to/product-workspace --agent codex
+mahler commit FUG-123 --workspace /path/to/product-workspace --agent codex
+mahler pr FUG-123 --workspace /path/to/product-workspace --agent codex
+mahler handoff FUG-123 --workspace /path/to/product-workspace --agent codex
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project
@@ -49,6 +54,11 @@ explicit install options; Mahler does not ship a default assignee.
 Install also writes canonical policies, skills, and agent profiles into
 `.harness/`. Claude/Codex adapters reference those installed files instead of
 duplicating workflow rules.
+
+Use `mahler profile <agent>` and `mahler can <agent> <skill>` to inspect the
+active profile gate. `review`, `commit`, and `pr` currently scaffold those
+workflows after permission checks; denied skills exit with an ask-human
+message.
 
 Run `mahler doctor <workspace>` after install (or any time) to verify the
 configured repos, policies, skills, profiles, and adapter docs. It exits

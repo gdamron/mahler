@@ -1,4 +1,4 @@
-import type { AgentName, HarnessConfig, LinearIssue, LinearProject } from "./types.js";
+import type { AgentName, HarnessConfig, InstalledProfile, LinearIssue, LinearProject } from "./types.js";
 
 export function workflowMarkdown(): string {
   return `# Mahler Workflow
@@ -61,12 +61,15 @@ ${issue.description?.trim() || "_No description supplied. If Linear MCP is unava
 `;
 }
 
-export function sessionMarkdown(issue: LinearIssue, agent: AgentName, repoPath: string): string {
+export function sessionMarkdown(issue: LinearIssue, agent: AgentName, repoPath: string, profile?: InstalledProfile): string {
   return `# Agent Session
 
 - Issue: ${issue.identifier}
 - Agent: ${agent}
-- Code workspace: ${repoPath}
+${profile ? `- Profile: ${profile.name}
+- Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
+- Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
+` : ""}- Code workspace: ${repoPath}
 
 ## Rules
 

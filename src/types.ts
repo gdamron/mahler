@@ -27,6 +27,14 @@ export interface AgentProfile {
   skills: string[];
 }
 
+export interface InstalledProfile {
+  name: string;
+  description?: string;
+  allowedSkills: string[];
+  deniedSkills: string[];
+  runtimeHints?: Record<string, string>;
+}
+
 export interface LinearIssue {
   id?: string;
   identifier: string;

@@ -126,8 +126,15 @@ function doctor(workspaceInput: string): void {
       continue;
     }
     const body = readFileSync(path, "utf8");
-    if (!body.includes(".harness/skills") || !body.includes(".harness/agents/profiles")) {
-      results.push({ level: "error", message: `adapter agents/${runtime}/HARNESS.md missing skills/profiles references` });
+    if (
+      !body.includes("work on MAH-123") ||
+      !body.includes(".harness/skills") ||
+      !body.includes(".harness/policies") ||
+      !body.includes(".harness/agents/profiles") ||
+      !body.includes(".harness/tmp/linear") ||
+      !body.includes("mahler linear-template issue|project")
+    ) {
+      results.push({ level: "error", message: `adapter agents/${runtime}/HARNESS.md missing routing/profile/skill/policy references` });
     } else {
       results.push({ level: "ok", message: `adapter ${runtime} wired` });
     }

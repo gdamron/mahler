@@ -15,7 +15,9 @@ export function defaultConfig(workspace: string): HarnessConfig {
     agents: {
       codex: {
         runtime: "codex",
+        profile: "implementer",
         role: "implementer",
+        skills: ["work-on-issue", "select-project-issue", "handoff"],
         policies: [
           "issue-selection",
           "workspace-safety",
@@ -28,7 +30,9 @@ export function defaultConfig(workspace: string): HarnessConfig {
       },
       claude: {
         runtime: "claude",
+        profile: "implementer",
         role: "implementer",
+        skills: ["work-on-issue", "select-project-issue", "handoff"],
         policies: [
           "issue-selection",
           "workspace-safety",

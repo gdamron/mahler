@@ -1,0 +1,10 @@
+{
+  "name": "full-stack",
+  "description": "Can perform every v1 Mahler workflow phase.",
+  "allowedSkills": ["select-project-issue", "work-on-issue", "review", "commit", "pr", "handoff"],
+  "deniedSkills": [],
+  "runtimeHints": {
+    "codex": "Use interactive Codex in the generated issue workspace.",
+    "claude": "Use interactive Claude in the generated issue workspace."
+  }
+}

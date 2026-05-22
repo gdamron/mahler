@@ -36,7 +36,7 @@ The human remains responsible for final review and merge decisions unless a prom
 }
 
 export function rootAgentBlock(config: HarnessConfig): string {
-  return `\n## Mahler Workflow\n\nThis workspace uses Mahler. If prompted to work on a Linear issue or project, follow \`WORKFLOW.md\` and the workspace-local policy modules under \`.harness/policies/\`.\n\n- Issue prompt: run \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude>\`.\n- Project prompt: use Linear MCP to fetch project details and issues, write the metadata to JSON if needed, then run \`${config.mahlerCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- Work only in generated issue workspaces under \`${config.workspaceDir}/issues/\`.\n`;
+  return `\n## Mahler Workflow\n\nThis workspace uses Mahler. If prompted to work on a Linear issue or project, follow \`WORKFLOW.md\`, the workspace-local skills under \`.harness/skills/\`, and policy modules under \`.harness/policies/\`.\n\n- Issue prompt: run \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude>\`.\n- Project prompt: use Linear MCP to fetch project details and issues, write the metadata to JSON if needed, then run \`${config.mahlerCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- Work only in generated issue workspaces under \`${config.workspaceDir}/issues/\`.\n- If a requested action is not allowed by the active profile in \`.harness/agents/profiles/\`, stop and ask the human.\n`;
 }
 
 export function taskMarkdown(issue: LinearIssue, source: string): string {
@@ -68,7 +68,7 @@ export function sessionMarkdown(issue: LinearIssue, agent: AgentName, repoPath: 
 
 - Work only inside this issue workspace and its repo worktrees.
 - Do not edit the product workspace root.
-- Follow installed policies in \`.harness/policies/\`.
+- Follow installed skills in \`.harness/skills/\` and policies in \`.harness/policies/\`.
 - Update \`HANDOFF.md\` before stopping.
 `;
 }
@@ -115,16 +115,18 @@ Project prompts resolve to a single eligible Linear issue before code work begin
 export function nativeAdapter(agent: "codex" | "claude"): string {
   return `# Mahler Native Adapter: ${agent}
 
-This file is generated from Mahler canonical policies.
+This file is generated from Mahler canonical skills, profiles, and policies.
 
 When the user asks to work on a Linear issue or project:
 
 1. Read \`WORKFLOW.md\`.
-2. Read \`.harness/policies/issue-selection.md\` and \`.harness/policies/workspace-safety.md\`.
-3. Use Linear MCP for issue or project details.
-4. Run the Mahler command described in \`.harness/config.json\`.
-5. Work only in the generated issue workspace.
-6. Follow phase policies for implementation, review, commit, PR, and handoff.
+2. Read the active profile under \`.harness/agents/profiles/\`.
+3. Use the matching skill under \`.harness/skills/\`.
+4. Read every policy named by that skill.
+5. Use Linear MCP for issue or project details.
+6. Run the Mahler command described in \`.harness/config.json\`.
+7. Work only in the generated issue workspace.
+8. Stop and ask the human if the active profile does not allow the requested skill.
 
 Do not bypass the Mahler workspace setup just because the product repo is visible from the root directory.
 `;

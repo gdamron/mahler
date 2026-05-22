@@ -21,8 +21,10 @@ export interface HarnessConfig {
 
 export interface AgentProfile {
   runtime: string;
+  profile: string;
   role: string;
   policies: string[];
+  skills: string[];
 }
 
 export interface LinearIssue {

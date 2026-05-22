@@ -1,0 +1,10 @@
+{
+  "name": "committer",
+  "description": "Commits completed issue-scoped work and prepares PR material.",
+  "allowedSkills": ["commit", "pr", "handoff"],
+  "deniedSkills": ["work-on-issue"],
+  "runtimeHints": {
+    "codex": "Verify the staged diff and tests before committing.",
+    "claude": "Verify the staged diff and tests before committing."
+  }
+}

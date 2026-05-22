@@ -1,0 +1,10 @@
+{
+  "name": "implementer",
+  "description": "Implements issue-scoped changes and leaves a handoff.",
+  "allowedSkills": ["select-project-issue", "work-on-issue", "handoff"],
+  "deniedSkills": ["commit", "pr"],
+  "runtimeHints": {
+    "codex": "Use interactive Codex in the generated issue workspace.",
+    "claude": "Use interactive Claude in the generated issue workspace."
+  }
+}

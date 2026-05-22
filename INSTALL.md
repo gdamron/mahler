@@ -96,3 +96,79 @@ work on project X in Linear
 
 The installed instructions tell the agent to resolve Linear context, create
 or select the issue workspace, and work only inside that workspace.
+
+## Manual Dogfood Checklist
+
+Use this checklist when validating Mahler against a real Linear issue from a
+fresh Codex or Claude session.
+
+1. Start with a clean product workspace that contains at least one child git
+   repository with a committed `main` or `master` branch.
+
+2. Build Mahler and install it into the product workspace.
+
+   ```sh
+   npm install
+   npm run build
+   node "$(pwd)/dist/src/cli.js" install /path/to/product-workspace \
+     --linear-assignee <agent-username> --linear-label agent
+   node "$(pwd)/dist/src/cli.js" doctor /path/to/product-workspace
+   ```
+
+   Expected result: `doctor` exits 0 and reports configured repos, policies,
+   Codex skills, Codex agents, Claude skills, Claude agents, root instruction
+   files, and adapter docs as present.
+
+3. Confirm the generated file tree in the product workspace.
+
+   ```text
+   AGENTS.md
+   CLAUDE.md
+   WORKFLOW.md
+   .harness/config.json
+   .harness/policies/
+   .harness/agents/profiles/
+   .harness/agents/codex/HARNESS.md
+   .harness/agents/claude/HARNESS.md
+   .agents/skills/<skill>/SKILL.md
+   .codex/agents/<profile>.toml
+   .claude/skills/<skill>/SKILL.md
+   .claude/agents/<profile>.md
+   ```
+
+4. Start a fresh Codex or Claude session in `/path/to/product-workspace`.
+   Prompt it with a real Linear issue:
+
+   ```text
+   work on MAH-5
+   ```
+
+   Expected result: the agent follows the generated native instructions,
+   reads the active profile and native `work-on-issue` skill, fetches Linear
+   metadata through Linear MCP, writes issue metadata under
+   `.harness/tmp/linear/`, and invokes the configured Mahler command with
+   `issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>`.
+
+5. Confirm the issue workspace was created.
+
+   ```text
+   workspaces/issues/<ISSUE>/
+   workspaces/issues/<ISSUE>/TASK.md
+   workspaces/issues/<ISSUE>/AGENT_SESSION.md
+   workspaces/issues/<ISSUE>/HANDOFF.md
+   workspaces/issues/<ISSUE>/linear-issue.json
+   workspaces/issues/<ISSUE>/repos/<repo>/
+   ```
+
+   Expected command output includes `Issue workspace ready:` and a launch
+   command for the selected runtime. `TASK.md` should name `linear-file` as
+   the Linear source, `AGENT_SESSION.md` should name the active profile, and
+   `HANDOFF.md` should begin in a not-started state.
+
+6. Verify runtime ownership.
+
+   Runtime orchestration happens through the generated native skills and agent
+   definitions: `.agents/skills/`, `.codex/agents/`, `.claude/skills/`, and
+   `.claude/agents/`. Mahler intentionally does not own separate CLI workflow
+   commands for review, commit, or PR behavior; those prompts route through the
+   generated native skills and shared policies.

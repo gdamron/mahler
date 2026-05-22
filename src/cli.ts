@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultConfig, loadConfig, withInstallOptions } from "./config.js";
 import { adapterRuntimes, policyNames, profileNames, skillNames } from "./scaffold.js";
-import { readIssueFile, readProjectFile, selectProjectIssue } from "./linear.js";
+import { linearIssueTemplate, linearProjectTemplate, readIssueFile, readProjectFile, selectProjectIssue } from "./linear.js";
 import {
   handoffMarkdown,
   launchCommand,
@@ -50,6 +50,9 @@ async function main(): Promise<void> {
       break;
     case "doctor":
       doctor(required(args.rest[0], "workspace path is required"));
+      break;
+    case "linear-template":
+      printLinearTemplate(required(args.rest[0], "template kind is required: issue or project"));
       break;
     default:
       usage();
@@ -305,6 +308,18 @@ function handoff(identifier: string, workspace: string): void {
   console.log(readFileSync(path, "utf8"));
 }
 
+function printLinearTemplate(kind: string): void {
+  if (kind === "issue") {
+    console.log(`${JSON.stringify(linearIssueTemplate(), null, 2)}\n`);
+    return;
+  }
+  if (kind === "project") {
+    console.log(`${JSON.stringify(linearProjectTemplate(), null, 2)}\n`);
+    return;
+  }
+  throw new Error(`Unknown Linear template "${kind}". Expected "issue" or "project".`);
+}
+
 function fallbackIssue(identifier: string, flags: Record<string, string | boolean>): LinearIssue {
   const title = stringFlag(flags, "title");
   if (!title) {
@@ -459,5 +474,6 @@ function usage(): void {
   mahler status --workspace <path>
   mahler handoff <ISSUE> --workspace <path>
   mahler doctor <workspace>
+  mahler linear-template issue|project
 `);
 }

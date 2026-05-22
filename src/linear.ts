@@ -1,6 +1,35 @@
 import { readFileSync } from "node:fs";
 import type { HarnessConfig, IssueSelection, LinearIssue, LinearProject } from "./types.js";
 
+export function linearIssueTemplate(): LinearIssue {
+  return {
+    id: "optional Linear UUID or identifier",
+    identifier: "ISSUE-123",
+    title: "Issue title",
+    description: "Issue description from Linear",
+    priority: 1,
+    state: "Todo",
+    stateType: "unstarted",
+    assignee: "agent username",
+    assigneeName: "Agent display name",
+    labels: ["agent"],
+    blocked: false,
+    updatedAt: "2026-05-22T00:00:00.000Z",
+    createdAt: "2026-05-22T00:00:00.000Z",
+    url: "https://linear.app/workspace/issue/ISSUE-123"
+  };
+}
+
+export function linearProjectTemplate(): LinearProject {
+  return {
+    id: "optional Linear project UUID",
+    name: "Project name",
+    description: "Project description from Linear",
+    url: "https://linear.app/workspace/project/project-slug",
+    issues: [linearIssueTemplate()]
+  };
+}
+
 export function readIssueFile(path?: string): LinearIssue | undefined {
   if (!path) return undefined;
   return normalizeIssue(JSON.parse(readFileSync(path, "utf8")));

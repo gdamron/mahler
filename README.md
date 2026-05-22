@@ -38,6 +38,8 @@ mahler project "Project X" --workspace /path/to/product-workspace --agent claude
 mahler status --workspace /path/to/product-workspace
 mahler handoff FUG-123 --workspace /path/to/product-workspace
 mahler doctor /path/to/product-workspace
+mahler linear-template issue
+mahler linear-template project
 ```
 
 `mahler install` scans the target workspace for immediate child git repos and
@@ -51,5 +53,9 @@ duplicating workflow rules.
 Run `mahler doctor <workspace>` after install (or any time) to verify the
 configured repos, policies, skills, profiles, and adapter docs. It exits
 non-zero with a clear message if anything is missing.
+
+Use `mahler linear-template issue|project` to print the JSON shape expected by
+`--linear-file`. Agents should write temporary Linear MCP metadata under
+`.harness/tmp/linear/` in the product workspace before invoking Mahler.
 
 See `INSTALL.md` for agent-facing installation instructions.

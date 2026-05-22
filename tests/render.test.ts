@@ -17,6 +17,8 @@ test("native adapter references profiles and skills", () => {
   assert.match(adapter, /\.harness\/agents\/profiles/);
   assert.match(adapter, /\.harness\/skills/);
   assert.match(adapter, /Read every policy named by that skill/);
+  assert.match(adapter, /\.harness\/tmp\/linear/);
+  assert.match(adapter, /mahler linear-template issue\|project/);
 });
 
 test("launch commands are agent specific", () => {

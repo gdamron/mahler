@@ -69,3 +69,7 @@ Use `mahler linear-template issue|project` to print the JSON shape expected by
 `.harness/tmp/linear/` in the product workspace before invoking Mahler.
 
 See `INSTALL.md` for agent-facing installation instructions.
+
+`INSTALL.md` also includes a manual dogfood checklist for validating a fresh
+Codex or Claude session against a real Linear issue using the generated native
+skills and agent definitions.

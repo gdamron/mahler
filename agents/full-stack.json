@@ -1,7 +1,15 @@
 {
   "name": "full-stack",
   "description": "Can perform every v1 Mahler workflow phase.",
-  "allowedSkills": ["select-project-issue", "work-on-issue", "review", "commit", "pr", "handoff"],
+  "allowedSkills": [
+    "select-project-issue",
+    "work-on-issue",
+    "interview",
+    "review",
+    "commit",
+    "pr",
+    "handoff"
+  ],
   "deniedSkills": [],
   "runtimeHints": {
     "codex": "Use interactive Codex in the generated issue workspace.",

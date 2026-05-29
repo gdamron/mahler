@@ -14,6 +14,7 @@ description: Set up and perform issue-scoped implementation work from Linear iss
 ## Required Policies
 
 - issue-selection
+- interview
 - workspace-safety
 - implementation
 - handoff
@@ -32,9 +33,11 @@ description: Set up and perform issue-scoped implementation work from Linear iss
 ## Linear MCP Resolution
 
 1. Use Linear MCP `get_issue` with the requested issue identifier.
-2. If lookup fails, returns no issue, or omits `identifier`/`title`, stop and ask the human for the missing metadata.
+2. If lookup fails, returns no issue, or omits `identifier`/`title`, stop and ask
+   the human for the missing metadata.
 3. Map MCP fields into the JSON shape printed by `mahler linear-template issue`.
-4. Write the metadata to `.harness/tmp/linear/<ISSUE>.json` in the product workspace, creating the directory if needed.
+4. Write the metadata to `.harness/tmp/linear/<ISSUE>.json` in the product workspace,
+   creating the directory if needed.
 5. Run `mahler issue <ISSUE> --agent <agent> --linear-file .harness/tmp/linear/<ISSUE>.json`.
 
 ## Required Outputs

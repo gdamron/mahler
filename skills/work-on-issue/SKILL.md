@@ -1,6 +1,6 @@
 ---
 name: work-on-issue
-description: Set up and perform issue-scoped implementation work from Linear issue metadata.
+description: Create an issue brief and perform issue-scoped implementation work from Linear issue metadata.
 ---
 
 # Work On Issue
@@ -23,7 +23,8 @@ description: Set up and perform issue-scoped implementation work from Linear iss
 
 - `mahler linear-template issue`
 - `mahler issue <ISSUE> --agent <agent> --linear-file <issue.json>`
-- repo-local build, test, and inspection commands inside the generated issue workspace
+- git worktree commands for only the repos needed by the task
+- repo-local build, test, and inspection commands inside selected repo worktrees
 
 ## Expected Inputs
 
@@ -39,10 +40,15 @@ description: Set up and perform issue-scoped implementation work from Linear iss
 4. Write the metadata to `.harness/tmp/linear/<ISSUE>.json` in the product workspace,
    creating the directory if needed.
 5. Run `mahler issue <ISSUE> --agent <agent> --linear-file .harness/tmp/linear/<ISSUE>.json`.
+6. Read the generated issue brief under `.harness/issues/<ISSUE>/`.
+7. Decide which configured repos need worktrees for the task.
+8. Choose short-lived branch names using `.harness/policies/branching.md`.
+9. Create only the needed repo worktrees, preferably under `workspaces/issues/<ISSUE>/repos/<repo>`.
 
 ## Required Outputs
 
-- Generated issue workspace
+- Generated issue brief
+- Repo worktrees only where needed
 - Updated `HANDOFF.md`
 - Summary of changes and tests run
 

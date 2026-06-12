@@ -40,6 +40,7 @@ mahler status --workspace /path/to/product-workspace
 mahler profile codex --workspace /path/to/product-workspace
 mahler can codex commit --workspace /path/to/product-workspace
 mahler handoff FUG-123 --workspace /path/to/product-workspace --agent codex
+mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue FUG-123]
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project
@@ -47,7 +48,14 @@ mahler linear-template project
 
 `mahler install` scans the target workspace for immediate child git repos and
 writes them into `.harness/config.json`. Linear assignee and label filters are
-explicit install options; Mahler does not ship a default assignee.
+explicit install options; Mahler does not ship a default assignee. When a repo
+has a `package.json`, install pre-populates per-repo `checks` (test/lint/build
+commands) from its scripts; edit `.harness/config.json` to adjust them.
+
+`mahler check` is a local mirror of CI: it runs each repo's configured check
+commands (in the issue worktree when `--issue` is given, otherwise the source
+repo) and reports ok/fail per command. It is feedback, not a gate — the
+forge/CI remains the Tier 3 authority.
 
 Install compiles canonical Mahler source into native agent artifacts:
 

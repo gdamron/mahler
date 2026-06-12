@@ -18,7 +18,7 @@ import {
   taskMarkdown,
   workflowMarkdown
 } from "./render.js";
-import type { AgentName, HarnessConfig, InstalledProfile, LinearIssue } from "./types.js";
+import type { AgentName, HarnessConfig, InstalledProfile, LinearIssue, RepoChecks } from "./types.js";
 import { abs, ensureDir, listDirectories, slugify, writeFileEnsured } from "./util.js";
 
 interface Args {
@@ -59,6 +59,9 @@ async function main(): Promise<void> {
       break;
     case "handoff":
       handoff(required(args.rest[0], "issue identifier is required"), args.flags);
+      break;
+    case "check":
+      check(args.flags);
       break;
     case "doctor":
       doctor(required(args.rest[0], "workspace path is required"));
@@ -110,6 +113,9 @@ function doctor(workspaceInput: string): void {
         results.push({ level: "error", message: `repo \"${repo.name}\" missing .git at ${repoPath}` });
       } else {
         results.push({ level: "ok", message: `repo ${repo.name} present (${repo.baseBranch})` });
+      }
+      if (Object.keys(repo.checks ?? {}).length === 0) {
+        results.push({ level: "warn", message: `repo ${repo.name} has no checks configured — mahler check has nothing to run; add checks in .harness/config.json` });
       }
     }
   }
@@ -233,6 +239,63 @@ function fail(results: DoctorResult[]): void {
   }
   console.log(`\n${results.length} checks, ${errors} error(s), ${warnings} warning(s)`);
   if (errors > 0) process.exit(1);
+}
+
+function check(flags: Record<string, string | boolean>): void {
+  const checkOrder = ["test", "lint", "build"] as const;
+  const workspace = workspaceFlag(flags);
+  const config = loadConfig(workspace);
+  const repoFilter = stringFlag(flags, "repo");
+  const issue = stringFlag(flags, "issue");
+  let repos = config.repos;
+  if (repoFilter) {
+    repos = repos.filter((repo) => repo.name === repoFilter);
+    if (repos.length === 0) {
+      throw new Error(`Unknown repo "${repoFilter}". Configured repos: ${config.repos.map((repo) => repo.name).join(", ") || "(none)"}`);
+    }
+  }
+  if (repos.length === 0) {
+    throw new Error("No repos configured. Run `mahler install` in a workspace containing git repos or edit .harness/config.json.");
+  }
+  console.log("Running configured checks — a local mirror of what CI (Tier 3) will run.\n");
+  const results: DoctorResult[] = [];
+  let failures = 0;
+  for (const repo of repos) {
+    const cwd = issue
+      ? resolve(issuePaths(workspace, config, issue).worktreeRoot, "repos", repo.name)
+      : abs(workspace, repo.path);
+    if (!existsSync(cwd)) {
+      results.push({ level: "warn", message: `${repo.name}: skipped — no working dir at ${cwd}` });
+      continue;
+    }
+    const entries = checkOrder
+      .map((name) => ({ name, command: repo.checks?.[name] }))
+      .filter((entry): entry is { name: (typeof checkOrder)[number]; command: string } => Boolean(entry.command));
+    if (entries.length === 0) {
+      results.push({ level: "warn", message: `${repo.name}: no checks configured — add checks in .harness/config.json` });
+      continue;
+    }
+    for (const entry of entries) {
+      console.log(`--- ${repo.name}/${entry.name}: ${entry.command} (in ${cwd})`);
+      const run = spawnSync(entry.command, { cwd, shell: true, stdio: "inherit" });
+      if (run.status === 0) {
+        results.push({ level: "ok", message: `${repo.name}/${entry.name}: ${entry.command}` });
+      } else {
+        failures += 1;
+        results.push({ level: "error", message: `${repo.name}/${entry.name}: ${entry.command} (exit ${run.status ?? "signal"})` });
+      }
+    }
+  }
+  console.log("");
+  for (const result of results) {
+    const prefix = result.level === "ok" ? "ok  " : result.level === "warn" ? "warn" : "fail";
+    console.log(`${prefix} ${result.message}`);
+  }
+  if (failures > 0) {
+    console.log(`\n${failures} check(s) failed. CI will fail the same way — fix before opening a PR.`);
+    process.exit(1);
+  }
+  console.log("\nAll configured checks passed. This mirrors CI; the forge remains the authority.");
 }
 
 function install(workspaceInput: string, flags: Record<string, string | boolean>): void {
@@ -559,12 +622,34 @@ function readProfile(name: string): string {
 function discoverRepos(workspace: string): HarnessConfig["repos"] {
   return listDirectories(workspace)
     .filter((entry) => existsSync(resolve(workspace, entry, ".git")))
-    .map((entry) => ({
-      name: entry,
-      path: entry,
-      baseBranch: detectBaseBranch(resolve(workspace, entry)),
-      remote: "origin"
-    }));
+    .map((entry) => {
+      const repoPath = resolve(workspace, entry);
+      const checks = detectChecks(repoPath);
+      return {
+        name: entry,
+        path: entry,
+        baseBranch: detectBaseBranch(repoPath),
+        remote: "origin",
+        ...(checks ? { checks } : {})
+      };
+    });
+}
+
+function detectChecks(repoPath: string): RepoChecks | undefined {
+  const packagePath = resolve(repoPath, "package.json");
+  if (!existsSync(packagePath)) return undefined;
+  let scripts: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(readFileSync(packagePath, "utf8")) as { scripts?: Record<string, unknown> };
+    scripts = parsed.scripts ?? {};
+  } catch {
+    return undefined;
+  }
+  const checks: RepoChecks = {};
+  if (typeof scripts.test === "string") checks.test = "npm test";
+  if (typeof scripts.lint === "string") checks.lint = "npm run lint";
+  if (typeof scripts.build === "string") checks.build = "npm run build";
+  return Object.keys(checks).length > 0 ? checks : undefined;
 }
 
 function detectBaseBranch(repoPath: string): string {
@@ -650,6 +735,7 @@ function usage(): void {
   mahler profile <agent> --workspace <path>
   mahler can <agent> <skill> --workspace <path>
   mahler handoff <ISSUE> --workspace <path> --agent codex|claude
+  mahler check --workspace <path> [--repo <name>] [--issue <ISSUE>]
   mahler doctor <workspace>
   mahler linear-template issue|project
 `);

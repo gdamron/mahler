@@ -5,6 +5,14 @@ export interface RepoConfig {
   path: string;
   baseBranch: string;
   remote?: string;
+  /** Semantic check names mapped to shell commands; the local mirror of what CI runs. */
+  checks?: RepoChecks;
+}
+
+export interface RepoChecks {
+  test?: string;
+  lint?: string;
+  build?: string;
 }
 
 export interface HarnessConfig {

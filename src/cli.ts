@@ -295,7 +295,7 @@ function createIssue(identifier: string, flags: Record<string, string | boolean>
   }
   ensureDir(paths.meta);
   writeFileEnsured(resolve(paths.meta, "TASK.md"), taskMarkdown(issue, flags["linear-file"] ? "linear-file" : "manual/fallback"));
-  writeFileEnsured(resolve(paths.meta, "AGENT_SESSION.md"), sessionMarkdown(issue, agent, paths.worktreeRoot, config.repos, active.profile));
+  writeFileEnsured(resolve(paths.meta, "AGENT_SESSION.md"), sessionMarkdown(issue, agent, paths.worktreeRoot, config.repos, active.profile, config.guardrails));
   writeFileEnsured(resolve(paths.meta, "HANDOFF.md"), handoffMarkdown(issue));
   writeFileEnsured(resolve(paths.meta, "linear-issue.json"), `${JSON.stringify(issue, null, 2)}\n`);
   console.log(`Issue brief ready: ${paths.meta}`);

@@ -54,7 +54,8 @@ export function rootAgentBlock(config: HarnessConfig): string {
   const claudeProfile = claude
     ? `claude: ${claude.profile}`
     : "claude: configured profile";
-  return `\n## Mahler Workflow\n\nThis workspace uses Mahler. Bare prompts like \`work on MAH-123\`, \`start MAH-123\`, or \`work on project X in Linear\` should route through Mahler before code changes so the agent has the issue brief and shared policies.\n\nMahler compiles canonical workflow source into native agent artifacts:\n\n- Codex skills: \`.agents/skills/<skill>/SKILL.md\`\n- Codex agents: \`.codex/agents/<profile>.toml\`\n- Claude skills: \`.claude/skills/<skill>/SKILL.md\`\n- Claude agents: \`.claude/agents/<profile>.md\`\n- Shared config and policies: \`.harness/config.json\` and \`.harness/policies/\`\n\nRecommended routing:\n\n- Active profile check: inspect \`.harness/config.json\` and the active profile in \`.harness/agents/profiles/\` (${codexProfile}; ${claudeProfile}) before choosing a skill.\n- Issue prompt: use the native \`work-on-issue\` skill. It fetches Linear metadata, writes \`.harness/tmp/linear/<ISSUE>.json\`, then runs \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>\` to create a brief.\n- Project prompt: use the native \`select-project-issue\` skill. It fetches Linear project metadata, writes \`.harness/tmp/linear/<project>.json\`, then runs \`${config.mahlerCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- For review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.\n- Create git worktrees only for repos needed by the task, preferably under \`${config.workspaceDir}/issues/<ISSUE>/repos/<repo>\`.\n- Choose branch names using \`.harness/policies/branching.md\`; Mahler does not choose branch names for agents.\n- Record deliberate workflow deviations in \`.harness/issues/<ISSUE>/HANDOFF.md\`.\n- If the active profile does not allow the requested skill or Linear metadata is unavailable, stop and ask the human.\n`;
+  const guardrailLines = (config.guardrails ?? []).map((line) => `- ${line}`).join("\n") || "- (none declared)";
+  return `\n## Mahler Workflow\n\nThis workspace uses Mahler. Bare prompts like \`work on MAH-123\`, \`start MAH-123\`, or \`work on project X in Linear\` should route through Mahler before code changes so the agent has the issue brief and shared policies.\n\nMahler compiles canonical workflow source into native agent artifacts:\n\n- Codex skills: \`.agents/skills/<skill>/SKILL.md\`\n- Codex agents: \`.codex/agents/<profile>.toml\`\n- Claude skills: \`.claude/skills/<skill>/SKILL.md\`\n- Claude agents: \`.claude/agents/<profile>.md\`\n- Shared config and policies: \`.harness/config.json\` and \`.harness/policies/\`\n\nRecommended routing:\n\n- Active profile check: inspect \`.harness/config.json\` and the active profile in \`.harness/agents/profiles/\` (${codexProfile}; ${claudeProfile}) before choosing a skill.\n- Issue prompt: use the native \`work-on-issue\` skill. It fetches Linear metadata, writes \`.harness/tmp/linear/<ISSUE>.json\`, then runs \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>\` to create a brief.\n- Project prompt: use the native \`select-project-issue\` skill. It fetches Linear project metadata, writes \`.harness/tmp/linear/<project>.json\`, then runs \`${config.mahlerCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- For review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.\n- Create git worktrees only for repos needed by the task, preferably under \`${config.workspaceDir}/issues/<ISSUE>/repos/<repo>\`.\n- Choose branch names using \`.harness/policies/branching.md\`; Mahler does not choose branch names for agents.\n- Record deliberate workflow deviations in \`.harness/issues/<ISSUE>/HANDOFF.md\`.\n- If the requested skill is outside the active profile, treat it as a Tier 1 deviation: you may proceed deliberately, but record the reason (see \`.harness/policies/judgment.md\`). Stop and ask the human if Linear metadata is unavailable.\n\nGuardrails (Tier 3 — declared here so agents anticipate them; enforced by the forge/CI, not Mahler):\n\n${guardrailLines}\n`;
 }
 
 export function taskMarkdown(issue: LinearIssue, source: string): string {
@@ -83,6 +84,7 @@ export function sessionMarkdown(
   recommendedWorktreeRoot: string,
   repos: HarnessConfig["repos"],
   profile?: InstalledProfile,
+  guardrails: string[] = [],
 ): string {
   const repoLines = repos.length === 0
     ? "- (none configured)"
@@ -103,6 +105,10 @@ ${
 ## Configured Repos
 
 ${repoLines}
+
+## Guardrails (enforced outside Mahler — anticipate them)
+
+${guardrails.length === 0 ? "- (none declared in .harness/config.json)" : guardrails.map((line) => `- ${line}`).join("\n")}
 
 ## Rules
 

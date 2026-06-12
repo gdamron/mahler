@@ -9,6 +9,13 @@ test("defaultConfig does not assume repos or Linear assignees", () => {
   assert.deepEqual(config.linear.requiredLabels, []);
 });
 
+test("defaultConfig declares Tier 3 guardrails", () => {
+  const config = defaultConfig("/tmp/workspace");
+  assert.ok(config.guardrails.length >= 2);
+  assert.ok(config.guardrails.some((line) => line.includes("human-approved PR")));
+  assert.ok(config.guardrails.some((line) => line.includes("CI")));
+});
+
 test("withInstallOptions applies discovered repos and Linear filters", () => {
   const config = withInstallOptions(defaultConfig("/tmp/workspace"), {
     repos: [{ name: "app", path: "app", baseBranch: "main", remote: "origin" }],

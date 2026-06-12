@@ -1,6 +1,6 @@
 {
   "name": "reviewer",
-  "description": "Reviews issue workspace diffs and records findings.",
+  "description": "Reviews issue-scoped diffs and records findings.",
   "allowedSkills": ["review", "handoff"],
   "deniedSkills": ["commit", "pr", "work-on-issue"],
   "runtimeHints": {

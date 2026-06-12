@@ -32,7 +32,7 @@ test("profile prints active profile permissions", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Agent: codex/);
   assert.match(result.stdout, /Profile: implementer/);
-  assert.match(result.stdout, /Allowed skills: select-project-issue, work-on-issue, handoff/);
+  assert.match(result.stdout, /Allowed skills: interview, select-project-issue, work-on-issue, handoff/);
   assert.match(result.stdout, /Denied skills: commit, pr/);
 });
 
@@ -82,8 +82,8 @@ test("generated agent session records active profile details", () => {
 
   const issue = run(["issue", "MAH-4", "--workspace", workspace, "--agent", "codex", "--title", "Profile gate"]);
   assert.equal(issue.status, 0, issue.stderr);
-  const session = readFileSync(resolve(workspace, "workspaces", "issues", "MAH-4", "AGENT_SESSION.md"), "utf8");
+  const session = readFileSync(resolve(workspace, ".harness", "issues", "MAH-4", "AGENT_SESSION.md"), "utf8");
   assert.match(session, /Profile: implementer/);
-  assert.match(session, /Allowed skills: select-project-issue, work-on-issue, handoff/);
+  assert.match(session, /Allowed skills: interview, select-project-issue, work-on-issue, handoff/);
   assert.match(session, /Denied skills: commit, pr/);
 });

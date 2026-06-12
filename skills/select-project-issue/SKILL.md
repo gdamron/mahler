@@ -1,6 +1,6 @@
 ---
 name: select-project-issue
-description: Resolve a Linear project prompt to one eligible issue and create its workspace.
+description: Resolve a Linear project prompt to one eligible issue and create its brief.
 ---
 
 # Select Project Issue
@@ -44,8 +44,8 @@ description: Resolve a Linear project prompt to one eligible issue and create it
 ## Required Outputs
 
 - One selected eligible issue
-- Project brief under `workspaces/projects/`
-- Generated issue workspace for the selected issue
+- Project brief under `.harness/projects/`
+- Generated issue brief for the selected issue
 
 ## Stop Conditions
 

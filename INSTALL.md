@@ -69,7 +69,8 @@ that does not rely on any global setup such as `npm link`.
    - `.agents/`
    - `.codex/`
    - `.claude/`
-   - generated `workspaces/`
+   - generated `.harness/issues/` briefs
+   - optional agent-created `workspaces/`
 
    Do not copy `src/`, `tests/`, `package.json`, `tsconfig.json`, or other
    Mahler source files into the product workspace unless intentionally
@@ -94,8 +95,9 @@ or:
 work on project X in Linear
 ```
 
-The installed instructions tell the agent to resolve Linear context, create
-or select the issue workspace, and work only inside that workspace.
+The installed instructions tell the agent to resolve Linear context, create or
+select an issue brief, choose only the repos needed for the task, and create
+project-local worktrees for those repos.
 
 ## Manual Dogfood Checklist
 
@@ -143,29 +145,41 @@ fresh Codex or Claude session.
    work on MAH-5
    ```
 
-   Expected result: the agent follows the generated native instructions,
-   reads the active profile and native `work-on-issue` skill, fetches Linear
-   metadata through Linear MCP, writes issue metadata under
-   `.harness/tmp/linear/`, and invokes the configured Mahler command with
-   `issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>`.
+   Expected result: the agent follows the generated native instructions, reads
+   the active profile and native `work-on-issue` skill, fetches Linear metadata
+   through Linear MCP, writes issue metadata under `.harness/tmp/linear/`, and
+   invokes the configured Mahler command with `issue <ISSUE> --agent
+   <codex|claude> --linear-file <issue.json>`.
 
-5. Confirm the issue workspace was created.
+5. Confirm the issue brief was created.
 
    ```text
-   workspaces/issues/<ISSUE>/
-   workspaces/issues/<ISSUE>/TASK.md
-   workspaces/issues/<ISSUE>/AGENT_SESSION.md
-   workspaces/issues/<ISSUE>/HANDOFF.md
-   workspaces/issues/<ISSUE>/linear-issue.json
+   .harness/issues/<ISSUE>/
+   .harness/issues/<ISSUE>/TASK.md
+   .harness/issues/<ISSUE>/AGENT_SESSION.md
+   .harness/issues/<ISSUE>/HANDOFF.md
+   .harness/issues/<ISSUE>/linear-issue.json
+   ```
+
+   Expected command output includes `Issue brief ready:`, the recommended
+   worktree root, configured repo guidance, and a suggested launch command for
+   after the agent creates a repo worktree. `TASK.md` should name `linear-file`
+   as the Linear source, `AGENT_SESSION.md` should name the active profile and
+   configured repos, and `HANDOFF.md` should begin in a not-started state.
+
+6. Confirm the agent, not Mahler, chooses worktrees and branches.
+
+   The agent should create only the repo worktrees needed by the task,
+   preferably under:
+
+   ```text
    workspaces/issues/<ISSUE>/repos/<repo>/
    ```
 
-   Expected command output includes `Issue workspace ready:` and a launch
-   command for the selected runtime. `TASK.md` should name `linear-file` as
-   the Linear source, `AGENT_SESSION.md` should name the active profile, and
-   `HANDOFF.md` should begin in a not-started state.
+   Branch names should follow `.harness/policies/branching.md`; Mahler does
+   not force the branch name to the issue identifier.
 
-6. Verify runtime ownership.
+7. Verify runtime ownership.
 
    Runtime orchestration happens through the generated native skills and agent
    definitions: `.agents/skills/`, `.codex/agents/`, `.claude/skills/`, and

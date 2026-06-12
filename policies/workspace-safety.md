@@ -1,6 +1,6 @@
 # Workspace Safety Policy
 
-Agents must work only in generated issue workspaces.
+Agents should work from Mahler issue briefs and selected issue worktrees.
 
 Rules:
 
@@ -8,17 +8,19 @@ Rules:
 - Do not edit sibling issue workspaces.
 - Do not reuse an issue workspace already owned by another active agent.
 - Read `TASK.md`, `AGENT_SESSION.md`, and `HANDOFF.md` before changing code.
-- Keep code edits inside repo worktrees under `workspaces/issues/<ISSUE>/repos/`.
-- Stop and ask the human if the generated workspace is missing or inconsistent.
+- Create git worktrees only for repos needed by the task.
+- Prefer repo worktrees under `workspaces/issues/<ISSUE>/repos/<repo>`.
+- Record deliberate workflow deviations in `HANDOFF.md`.
+- Stop and ask the human if the issue brief is missing or inconsistent.
 
 ## Work Trees
 
-For parallel AI agent work, use git worktrees to run multiple branches simultaneously:
+For parallel AI agent work, use git worktrees to run multiple branches simultaneously. Choose branch names using the branching policy and create only the repo worktrees needed for the task.
 
 ```bash
 # Create a worktree for a feature branch
-git worktree add ../project-feature-a feature/task-creation
-git worktree add ../project-feature-b feature/user-settings
+git -C app worktree add ../workspaces/issues/ISSUE-123/repos/app feature/task-creation
+git -C api worktree add ../workspaces/issues/ISSUE-123/repos/api feature/user-settings
 
 # Each worktree is a separate directory with its own branch
 # Agents can work in parallel without interfering

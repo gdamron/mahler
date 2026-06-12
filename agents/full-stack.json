@@ -12,7 +12,7 @@
   ],
   "deniedSkills": [],
   "runtimeHints": {
-    "codex": "Use interactive Codex in the generated issue workspace.",
-    "claude": "Use interactive Claude in the generated issue workspace."
+    "codex": "Use interactive Codex in the selected issue worktree.",
+    "claude": "Use interactive Claude in the selected issue worktree."
   }
 }

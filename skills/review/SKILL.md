@@ -1,6 +1,6 @@
 ---
 name: review
-description: Review an issue workspace diff and report findings before handoff.
+description: Review an issue-scoped diff and report findings before handoff.
 ---
 
 # Review
@@ -19,12 +19,12 @@ description: Review an issue workspace diff and report findings before handoff.
 
 ## Allowed Commands
 
-- git diff and status commands in the generated issue workspace
+- git diff and status commands in selected issue worktrees
 - repo-local test or check commands needed to validate findings
 
 ## Expected Inputs
 
-- Existing issue workspace
+- Existing issue brief and selected worktree
 - Diff or branch to review
 
 ## Required Outputs
@@ -35,6 +35,6 @@ description: Review an issue workspace diff and report findings before handoff.
 
 ## Stop Conditions
 
-- no issue workspace exists
+- no issue brief exists
 - review target is ambiguous
 - active profile does not allow this skill

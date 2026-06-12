@@ -9,8 +9,11 @@ test("workflow names issue prompts and project prompts", () => {
   assert.match(workflow, /work on project X in Linear/);
 });
 
-test("native adapter tells agent not to bypass Mahler", () => {
-  assert.match(nativeAdapter("codex"), /Do not bypass the Mahler workspace setup/);
+test("native adapter tells agent to create briefs and choose worktrees", () => {
+  const adapter = nativeAdapter("codex");
+  assert.match(adapter, /create the issue brief/);
+  assert.match(adapter, /Decide which configured repos need worktrees/);
+  assert.match(adapter, /Record deliberate workflow deviations/);
 });
 
 test("native adapters reference routing, profiles, skills, and policies", () => {
@@ -42,7 +45,10 @@ test("root agent block gives bare prompt path to mahler issue", () => {
   const block = rootAgentBlock(defaultConfig("/tmp/workspace"));
   assert.match(block, /work on MAH-123/);
   assert.match(block, /mahler issue <ISSUE> --agent <codex\|claude> --linear-file <issue\.json>/);
+  assert.match(block, /Recommended routing/);
   assert.match(block, /Active profile check/);
+  assert.match(block, /Create git worktrees only for repos needed/);
+  assert.match(block, /Mahler does not choose branch names/);
   assert.match(block, /\.harness\/agents\/profiles/);
   assert.match(block, /\.agents\/skills/);
   assert.match(block, /\.claude\/skills/);

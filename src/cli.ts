@@ -19,7 +19,7 @@ import {
   workflowMarkdown
 } from "./render.js";
 import type { AgentName, HarnessConfig, InstalledProfile, LinearIssue } from "./types.js";
-import { abs, ensureDir, listDirectories, run, slugify, writeFileEnsured } from "./util.js";
+import { abs, ensureDir, listDirectories, slugify, writeFileEnsured } from "./util.js";
 
 interface Args {
   command?: string;
@@ -294,21 +294,22 @@ function createIssue(identifier: string, flags: Record<string, string | boolean>
     throw new Error("No repos configured. Run `mahler install` in a workspace containing git repos or edit .harness/config.json.");
   }
   ensureDir(paths.meta);
-  for (const repo of config.repos) {
-    const source = abs(workspace, repo.path);
-    const target = resolve(paths.repos, repo.name);
-    if (!existsSync(target)) {
-      ensureDir(dirname(target));
-      run("git", ["worktree", "add", "-B", issue.identifier, target, repo.baseBranch], source);
-    }
-  }
-  const primaryRepo = resolve(paths.repos, config.repos[0].name);
   writeFileEnsured(resolve(paths.meta, "TASK.md"), taskMarkdown(issue, flags["linear-file"] ? "linear-file" : "manual/fallback"));
-  writeFileEnsured(resolve(paths.meta, "AGENT_SESSION.md"), sessionMarkdown(issue, agent, primaryRepo, active.profile));
+  writeFileEnsured(resolve(paths.meta, "AGENT_SESSION.md"), sessionMarkdown(issue, agent, paths.worktreeRoot, config.repos, active.profile));
   writeFileEnsured(resolve(paths.meta, "HANDOFF.md"), handoffMarkdown(issue));
   writeFileEnsured(resolve(paths.meta, "linear-issue.json"), `${JSON.stringify(issue, null, 2)}\n`);
-  console.log(`Issue workspace ready: ${paths.root}`);
-  console.log(`Launch command:\n${launchCommand(agent, primaryRepo, paths.meta)}`);
+  console.log(`Issue brief ready: ${paths.meta}`);
+  console.log(`Recommended worktree root: ${paths.worktreeRoot}`);
+  console.log("Configured repos:");
+  for (const repo of config.repos) {
+    console.log(`- ${repo.name}: source ${repo.path}, base ${repo.baseBranch}, suggested ${resolve(paths.worktreeRoot, "repos", repo.name)}`);
+  }
+  console.log("Next steps:");
+  console.log("- Inspect the issue brief and configured repos.");
+  console.log("- Create worktrees only for repos needed by the task.");
+  console.log("- Choose branch names using .harness/policies/branching.md.");
+  console.log("- Record deliberate workflow deviations in HANDOFF.md.");
+  console.log(`Suggested launch after creating a repo worktree:\n${launchCommand(agent, resolve(paths.worktreeRoot, "repos", "<repo>"), paths.meta)}`);
 }
 
 function createProject(projectName: string, flags: Record<string, string | boolean>): void {
@@ -320,9 +321,9 @@ function createProject(projectName: string, flags: Record<string, string | boole
   if (!project) {
     throw new Error("Project workflow requires --linear-file with Linear MCP project details and issues in v1");
   }
-  const active = new Set(listDirectories(resolve(workspace, config.workspaceDir, "issues")));
+  const active = new Set(listDirectories(resolve(workspace, ".harness", "issues")));
   const selection = selectProjectIssue(project, config, active);
-  const projectDir = resolve(workspace, config.workspaceDir, "projects", slugify(projectName));
+  const projectDir = resolve(workspace, ".harness", "projects", slugify(projectName));
   ensureDir(projectDir);
   writeFileEnsured(resolve(projectDir, "PROJECT.md"), projectMarkdown(project, selection.issue, selection.reason));
   writeFileEnsured(resolve(projectDir, "linear-project.json"), `${JSON.stringify(project, null, 2)}\n`);
@@ -342,22 +343,24 @@ function status(workspace: string): void {
     return;
   }
   const issueRoot = resolve(workspace, config.workspaceDir, "issues");
-  const issues = listDirectories(issueRoot);
+  const briefRoot = resolve(workspace, ".harness", "issues");
+  const issues = listDirectories(briefRoot);
   if (issues.length === 0) {
-    console.log("No issue workspaces.");
+    console.log("No issue briefs.");
     return;
   }
   for (const issue of issues) {
-    const issueDir = resolve(issueRoot, issue);
-    const repo = resolve(issueDir, "repos", config.repos[0].name);
-    let branch = "(missing repo)";
-    let dirty = "";
-    if (existsSync(repo)) {
-      branch = readGit(repo, ["branch", "--show-current"]);
-      dirty = readGit(repo, ["status", "--short"]);
+    const issueDir = resolve(briefRoot, issue);
+    const repoStatuses: string[] = [];
+    for (const configuredRepo of config.repos) {
+      const repo = resolve(issueRoot, issue, "repos", configuredRepo.name);
+      if (!existsSync(repo)) continue;
+      const branch = readGit(repo, ["branch", "--show-current"]) || "(detached)";
+      const dirty = readGit(repo, ["status", "--short"]) ? "dirty" : "clean";
+      repoStatuses.push(`${configuredRepo.name}:${branch} ${dirty}`);
     }
     const handoff = existsSync(resolve(issueDir, "HANDOFF.md")) ? "handoff: yes" : "handoff: missing";
-    console.log(`${issue}: ${branch || "(detached)"} ${dirty ? "dirty" : "clean"} ${handoff}`);
+    console.log(`${issue}: ${repoStatuses.join(", ") || "(no worktrees)"} ${handoff}`);
   }
 }
 
@@ -386,7 +389,7 @@ function handoff(identifier: string, flags: Record<string, string | boolean>): v
   const agent = String(flags.agent ?? "codex");
   requireSkill(workspace, agent, "handoff");
   const config = loadConfig(workspace);
-  const path = resolve(workspace, config.workspaceDir, "issues", identifier, "HANDOFF.md");
+  const path = resolve(workspace, ".harness", "issues", identifier, "HANDOFF.md");
   if (!existsSync(path)) {
     throw new Error(`No handoff found at ${path}`);
   }
@@ -491,12 +494,10 @@ function fallbackIssue(identifier: string, flags: Record<string, string | boolea
   };
 }
 
-function issuePaths(workspace: string, config: HarnessConfig, identifier: string): { root: string; meta: string; repos: string } {
-  const root = resolve(workspace, config.workspaceDir, "issues", identifier);
+function issuePaths(workspace: string, config: HarnessConfig, identifier: string): { meta: string; worktreeRoot: string } {
   return {
-    root,
-    meta: root,
-    repos: resolve(root, "repos")
+    meta: resolve(workspace, ".harness", "issues", identifier),
+    worktreeRoot: resolve(workspace, config.workspaceDir, "issues", identifier)
   };
 }
 

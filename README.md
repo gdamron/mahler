@@ -18,7 +18,8 @@ issue before any code workspace is created.
 - The human is the orchestrator.
 - Tasks (such as Linear issues) are the atomic unit for code changes, commits,
   and PRs.
-- Agents work in dedicated git worktrees under `workspaces/issues/`.
+- Agents create dedicated git worktrees only for the repos needed by a task,
+  preferably under `workspaces/issues/<ISSUE>/repos/`.
 - Policies live in canonical Mahler modules and are rendered into
   workspace-local Claude/Codex instruction surfaces.
 - Skills compose policies into named workflows, and agent profiles declare
@@ -67,6 +68,10 @@ non-zero with a clear message if anything is missing.
 Use `mahler linear-template issue|project` to print the JSON shape expected by
 `--linear-file`. Agents should write temporary Linear MCP metadata under
 `.harness/tmp/linear/` in the product workspace before invoking Mahler.
+
+`mahler issue` creates an issue brief under `.harness/issues/<ISSUE>/`. It does
+not create branches or worktrees. Agents choose branch names from policy and
+create worktrees only for the configured repos needed by the task.
 
 See `INSTALL.md` for agent-facing installation instructions.
 

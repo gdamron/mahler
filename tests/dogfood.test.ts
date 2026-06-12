@@ -19,8 +19,8 @@ function run(args: string[], cwd = process.cwd()): { status: number | null; stdo
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
-function initProductRepo(workspace: string): string {
-  const repo = resolve(workspace, "app");
+function initProductRepo(workspace: string, name = "app"): string {
+  const repo = resolve(workspace, name);
   const init = spawnSync("git", ["init", "-q", "-b", "main", repo], { encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
   writeFileSync(resolve(repo, "README.md"), "# App\n");
@@ -31,20 +31,24 @@ function initProductRepo(workspace: string): string {
   return repo;
 }
 
-test("dogfood issue prompt workflow installs native artifacts and creates an issue workspace", () => {
+test("dogfood issue prompt workflow installs native artifacts and creates an issue brief", () => {
   const workspace = mkdtempSync(resolve(tmpdir(), "mahler-dogfood-"));
   initProductRepo(workspace);
+  initProductRepo(workspace, "api");
 
   const install = run(["install", workspace, "--linear-assignee", "gonzo", "--linear-label", "agent"]);
   assert.equal(install.status, 0, install.stderr);
   assert.match(install.stdout, /Installed Mahler workflow/);
-  assert.match(install.stdout, /Configured 1 repo\(s\): app/);
+  assert.match(install.stdout, /Configured 2 repo\(s\): api, app/);
 
   const config = JSON.parse(readFileSync(resolve(workspace, ".harness", "config.json"), "utf8")) as {
     repos: Array<{ name: string; path: string; baseBranch: string }>;
     linear: { acceptedAssignees: string[]; requiredLabels: string[] };
   };
-  assert.deepEqual(config.repos, [{ name: "app", path: "app", baseBranch: "main", remote: "origin" }]);
+  assert.deepEqual(config.repos, [
+    { name: "api", path: "api", baseBranch: "main", remote: "origin" },
+    { name: "app", path: "app", baseBranch: "main", remote: "origin" }
+  ]);
   assert.deepEqual(config.linear.acceptedAssignees, ["gonzo"]);
   assert.deepEqual(config.linear.requiredLabels, ["agent"]);
 
@@ -107,26 +111,40 @@ test("dogfood issue prompt workflow installs native artifacts and creates an iss
 
   const issue = run(["issue", "MAH-5", "--workspace", workspace, "--agent", "codex", "--linear-file", issuePath]);
   assert.equal(issue.status, 0, issue.stderr);
-  assert.match(issue.stdout, /Issue workspace ready:/);
+  assert.match(issue.stdout, /Issue brief ready:/);
+  assert.match(issue.stdout, /\.harness\/issues\/MAH-5/);
+  assert.match(issue.stdout, /Recommended worktree root:/);
   assert.match(issue.stdout, /workspaces\/issues\/MAH-5/);
-  assert.match(issue.stdout, /Launch command:/);
+  assert.match(issue.stdout, /Create worktrees only for repos needed/);
+  assert.match(issue.stdout, /api: source api, base main/);
+  assert.match(issue.stdout, /app: source app, base main/);
+  assert.match(issue.stdout, /Suggested launch after creating a repo worktree:/);
   assert.match(issue.stdout, /codex --cd/);
 
-  const issueWorkspace = resolve(workspace, "workspaces", "issues", "MAH-5");
-  for (const path of ["TASK.md", "AGENT_SESSION.md", "HANDOFF.md", "linear-issue.json", "repos/app"]) {
-    assert.equal(existsSync(resolve(issueWorkspace, path)), true, `missing issue artifact ${path}`);
+  const issueBrief = resolve(workspace, ".harness", "issues", "MAH-5");
+  for (const path of ["TASK.md", "AGENT_SESSION.md", "HANDOFF.md", "linear-issue.json"]) {
+    assert.equal(existsSync(resolve(issueBrief, path)), true, `missing issue artifact ${path}`);
   }
-  assert.match(readFileSync(resolve(issueWorkspace, "TASK.md"), "utf8"), /Linear source: linear-file/);
-  assert.match(readFileSync(resolve(issueWorkspace, "AGENT_SESSION.md"), "utf8"), /Profile: implementer/);
-  assert.match(readFileSync(resolve(issueWorkspace, "HANDOFF.md"), "utf8"), /State: not started/);
+  assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-5", "repos", "app")), false);
+  assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-5", "repos", "api")), false);
+  assert.match(readFileSync(resolve(issueBrief, "TASK.md"), "utf8"), /Linear source: linear-file/);
+  assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /Profile: implementer/);
+  assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /api: source `api`, base `main`/);
+  assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /app: source `app`, base `main`/);
+  assert.match(readFileSync(resolve(issueBrief, "HANDOFF.md"), "utf8"), /State: not started/);
+  assert.match(readFileSync(resolve(issueBrief, "HANDOFF.md"), "utf8"), /Workflow Deviations/);
 
-  const issueJson = JSON.parse(readFileSync(resolve(issueWorkspace, "linear-issue.json"), "utf8")) as { identifier: string; title: string };
+  const issueJson = JSON.parse(readFileSync(resolve(issueBrief, "linear-issue.json"), "utf8")) as { identifier: string; title: string };
   assert.equal(issueJson.identifier, "MAH-5");
   assert.equal(issueJson.title, "Add end-to-end dogfood test for issue prompt workflow");
 
-  const worktreeBranch = spawnSync("git", ["-C", resolve(issueWorkspace, "repos", "app"), "branch", "--show-current"], {
+  const appWorktree = resolve(workspace, "workspaces", "issues", "MAH-5", "repos", "app");
+  const addWorktree = spawnSync("git", ["-C", resolve(workspace, "app"), "worktree", "add", "-b", "gonzo/mah-5-dogfood", appWorktree, "main"], {
     encoding: "utf8"
   });
-  assert.equal(worktreeBranch.status, 0, worktreeBranch.stderr);
-  assert.equal(worktreeBranch.stdout.trim(), "MAH-5");
+  assert.equal(addWorktree.status, 0, addWorktree.stderr);
+  const status = run(["status", "--workspace", workspace]);
+  assert.equal(status.status, 0, status.stderr);
+  assert.match(status.stdout, /MAH-5: app:gonzo\/mah-5-dogfood clean handoff: yes/);
+  assert.doesNotMatch(status.stdout, /api:/);
 });

@@ -295,7 +295,7 @@ function createIssue(identifier: string, flags: Record<string, string | boolean>
   }
   ensureDir(paths.meta);
   writeFileEnsured(resolve(paths.meta, "TASK.md"), taskMarkdown(issue, flags["linear-file"] ? "linear-file" : "manual/fallback"));
-  writeFileEnsured(resolve(paths.meta, "AGENT_SESSION.md"), sessionMarkdown(issue, agent, paths.worktreeRoot, config.repos, active.profile));
+  writeFileEnsured(resolve(paths.meta, "AGENT_SESSION.md"), sessionMarkdown(issue, agent, paths.worktreeRoot, config.repos, active.profile, config.guardrails));
   writeFileEnsured(resolve(paths.meta, "HANDOFF.md"), handoffMarkdown(issue));
   writeFileEnsured(resolve(paths.meta, "linear-issue.json"), `${JSON.stringify(issue, null, 2)}\n`);
   console.log(`Issue brief ready: ${paths.meta}`);
@@ -378,8 +378,8 @@ function canUseSkill(agent: string, skill: string, workspace: string): void {
   const active = loadActiveProfile(workspace, agent);
   const result = checkSkill(active.profile, skill);
   if (!result.allowed) {
-    console.error(askHumanMessage(agent, active.profile.name, skill, result.reason));
-    process.exit(1);
+    console.log(advisoryMessage(agent, active.profile.name, skill, result.reason));
+    return;
   }
   console.log(`${agent} can use ${skill} via profile ${active.profile.name}`);
 }
@@ -400,7 +400,7 @@ function requireSkill(workspace: string, agent: string, skill: string): { agent:
   const active = loadActiveProfile(workspace, agent);
   const result = checkSkill(active.profile, skill);
   if (!result.allowed) {
-    throw new Error(askHumanMessage(agent, active.profile.name, skill, result.reason));
+    console.error(advisoryMessage(agent, active.profile.name, skill, result.reason));
   }
   return active;
 }
@@ -459,8 +459,8 @@ function checkSkill(profile: InstalledProfile, skill: string): { allowed: boolea
   return { allowed: true, reason: "allowed" };
 }
 
-function askHumanMessage(agent: string, profile: string, skill: string, reason: string): string {
-  return `Profile gate denied: agent "${agent}" uses profile "${profile}" and cannot use skill "${skill}" (${reason}). Ask the human to switch profiles or delegate this workflow.`;
+function advisoryMessage(agent: string, profile: string, skill: string, reason: string): string {
+  return `Advisory: agent "${agent}" uses profile "${profile}", which does not include skill "${skill}" (${reason}). This is a Tier 1 norm, not a block: you may proceed deliberately, but record the reason in HANDOFF.md under Workflow Deviations, and ask the human first if this changes scope, ownership, or an outward action (see .harness/policies/judgment.md).`;
 }
 
 function stringArray(value: unknown): string[] | undefined {

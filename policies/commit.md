@@ -2,7 +2,10 @@
 
 ## Core Principles
 
-Commits are allowed only when the assigned role permits committing.
+Committing is normally done by a profile that includes the commit skill. Role
+fit is a Tier 1 norm (see the judgment policy): a deliberate, recorded
+deviation is acceptable; an unrecorded one is not. Pushing is a Tier 2 action
+that needs explicit human go-ahead.
 
 ### The Save Point Pattern
 
@@ -46,7 +49,7 @@ the last known-good state instantly.
 
 - Verify the workspace belongs to the active issue.
 - Check `git status`.
-- Run relevant tests or record why they were not run.
+- Run relevant tests or record why they were not run (a Tier 1 deviation).
 - Review the staged diff.
 - Do not include co-author metadata.
 

@@ -1,5 +1,9 @@
 # Implementation Policy
 
+These are norms, not rules (see the judgment policy): deviate when the task
+genuinely calls for it, and record the reason in `HANDOFF.md`. The principles
+below earn their place by making work reviewable and reversible.
+
 ## Core Principles
 
 ### Keep Changes Small

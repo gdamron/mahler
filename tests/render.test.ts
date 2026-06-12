@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { defaultConfig } from "../src/config.js";
-import { claudeAgentDefinition, codexAgentDefinition, launchCommand, nativeAdapter, rootAgentBlock, workflowMarkdown } from "../src/render.js";
+import { claudeAgentDefinition, codexAgentDefinition, launchCommand, nativeAdapter, rootAgentBlock, sessionMarkdown, workflowMarkdown } from "../src/render.js";
 
 test("workflow names issue prompts and project prompts", () => {
   const workflow = workflowMarkdown();
@@ -53,6 +53,25 @@ test("root agent block gives bare prompt path to mahler issue", () => {
   assert.match(block, /\.agents\/skills/);
   assert.match(block, /\.claude\/skills/);
   assert.match(block, /\.harness\/policies/);
+});
+
+test("root agent block and session brief declare Tier 3 guardrails", () => {
+  const config = defaultConfig("/tmp/workspace");
+  const block = rootAgentBlock(config);
+  assert.match(block, /Guardrails \(Tier 3/);
+  assert.match(block, /enforced by the forge\/CI, not Mahler/);
+  assert.match(block, /human-approved PR/);
+
+  const session = sessionMarkdown(
+    { identifier: "MAH-1", title: "t", labels: [], blocked: false },
+    "codex",
+    "/tmp/workspace/workspaces/issues/MAH-1",
+    config.repos,
+    undefined,
+    config.guardrails
+  );
+  assert.match(session, /## Guardrails \(enforced outside Mahler/);
+  assert.match(session, /human-approved PR/);
 });
 
 test("native agent definitions include profile permissions", () => {

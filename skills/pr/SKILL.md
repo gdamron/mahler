@@ -13,6 +13,7 @@ description: Prepare or open a pull request for committed issue-scoped work.
 
 ## Required Policies
 
+- judgment
 - workspace-safety
 - pr
 - handoff
@@ -37,4 +38,5 @@ description: Prepare or open a pull request for committed issue-scoped work.
 
 - branch has uncommitted changes
 - no remote is configured
-- active profile does not allow this skill
+- active profile does not include this skill and the human has not explicitly confirmed the deviation
+- the human has not given explicit go-ahead to push or open the PR for this change (Tier 2 — see the judgment policy)

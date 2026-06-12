@@ -16,6 +16,8 @@ export interface HarnessConfig {
     acceptedAssignees: string[];
     requiredLabels: string[];
   };
+  /** Tier 3 hard limits declared for agent anticipation; enforced by the forge/CI, never by Mahler. */
+  guardrails: string[];
   agents: Record<string, AgentProfile>;
 }
 

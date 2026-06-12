@@ -13,6 +13,7 @@ description: Summarize current issue workspace state, blockers, tests, and next 
 
 ## Required Policies
 
+- judgment
 - handoff
 
 ## Allowed Commands

@@ -12,6 +12,10 @@ export function defaultConfig(workspace: string): HarnessConfig {
       acceptedAssignees: [],
       requiredLabels: []
     },
+    guardrails: [
+      "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
+      "Required CI checks must pass before merge (enforced by CI)."
+    ],
     agents: {
       codex: {
         runtime: "codex",
@@ -21,6 +25,7 @@ export function defaultConfig(workspace: string): HarnessConfig {
         policies: [
           "issue-selection",
           "workspace-safety",
+          "judgment",
           "implementation",
           "review",
           "commit",
@@ -36,6 +41,7 @@ export function defaultConfig(workspace: string): HarnessConfig {
         policies: [
           "issue-selection",
           "workspace-safety",
+          "judgment",
           "implementation",
           "review",
           "commit",
@@ -75,5 +81,5 @@ export function loadConfig(workspace: string): HarnessConfig {
     return defaultConfig(workspace);
   }
   const parsed = JSON.parse(readFileSync(path, "utf8")) as HarnessConfig;
-  return parsed;
+  return { ...parsed, guardrails: parsed.guardrails ?? [] };
 }

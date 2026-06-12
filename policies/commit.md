@@ -62,13 +62,11 @@ git diff --staged
 # 2. Ensure no secrets
 git diff --staged | grep -i "password\|secret\|api_key\|token"
 
-# 3. Run tests (command will vary by project)
-npm test
+# 3. Run the configured checks for touched repos — a local mirror of CI.
+#    Per-repo commands live under "checks" in .harness/config.json.
+mahler check --workspace <workspace> --issue <ISSUE>
 
-# 4. Run linting (command will vary by project)
-npm run lint
-
-# 5. Run additional checks (e.g. type checking, formatting)
+# 4. Run additional checks not configured above (e.g. type checking, formatting)
 ```
 
 ### Handling Generated Files

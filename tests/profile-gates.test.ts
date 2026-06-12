@@ -36,16 +36,17 @@ test("profile prints active profile permissions", () => {
   assert.match(result.stdout, /Denied skills: commit, pr/);
 });
 
-test("can enforces allowed and denied skills", () => {
+test("can reports allowed skills and advises on out-of-profile skills", () => {
   const workspace = installWorkspace();
   const allowed = run(["can", "codex", "handoff", "--workspace", workspace]);
   assert.equal(allowed.status, 0, allowed.stderr);
   assert.match(allowed.stdout, /codex can use handoff/);
 
-  const denied = run(["can", "codex", "commit", "--workspace", workspace]);
-  assert.notEqual(denied.status, 0);
-  assert.match(denied.stderr, /Profile gate denied/);
-  assert.match(denied.stderr, /Ask the human/);
+  const outOfProfile = run(["can", "codex", "commit", "--workspace", workspace]);
+  assert.equal(outOfProfile.status, 0, outOfProfile.stderr);
+  assert.match(outOfProfile.stdout, /Advisory/);
+  assert.match(outOfProfile.stdout, /Workflow Deviations/);
+  assert.match(outOfProfile.stdout, /judgment\.md/);
 });
 
 test("commit and pr diagnostics are allowed for committer and full-stack profiles", () => {
@@ -62,12 +63,22 @@ test("commit and pr diagnostics are allowed for committer and full-stack profile
   assert.match(pr.stdout, /codex can use pr/);
 });
 
-test("implementer profile cannot use commit diagnostic", () => {
+test("commands gated by requireSkill proceed with an advisory for out-of-profile skills", () => {
   const workspace = installWorkspace();
-  const result = run(["can", "codex", "commit", "--workspace", workspace]);
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Profile gate denied/);
-  assert.match(result.stderr, /cannot use skill "commit"/);
+  const repoDir = resolve(workspace, "app");
+  spawnSync("git", ["init", "-q", "-b", "main", repoDir]);
+  spawnSync("git", ["-C", repoDir, "commit", "--allow-empty", "-m", "init", "-q"], {
+    env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" }
+  });
+  const reinstall = run(["install", workspace]);
+  assert.equal(reinstall.status, 0, reinstall.stderr);
+
+  setCodexProfile(workspace, "reviewer");
+  const issue = run(["issue", "MAH-5", "--workspace", workspace, "--agent", "codex", "--title", "Advisory gate"]);
+  assert.equal(issue.status, 0, issue.stderr);
+  assert.match(issue.stderr, /Advisory/);
+  assert.match(issue.stderr, /Workflow Deviations/);
+  assert.match(issue.stdout, /Issue brief ready/);
 });
 
 test("generated agent session records active profile details", () => {

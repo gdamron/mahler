@@ -13,6 +13,7 @@ description: Review an issue-scoped diff and report findings before handoff.
 
 ## Required Policies
 
+- judgment
 - workspace-safety
 - review
 - handoff

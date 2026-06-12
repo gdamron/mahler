@@ -13,6 +13,7 @@ description: Resolve a Linear project prompt to one eligible issue and create it
 
 ## Required Policies
 
+- judgment
 - issue-selection
 - interview
 - workspace-safety

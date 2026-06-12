@@ -1,5 +1,5 @@
 export function policyNames(): string[] {
-  return ["issue-selection", "workspace-safety", "implementation", "review", "commit", "pr", "handoff"];
+  return ["issue-selection", "workspace-safety", "judgment", "implementation", "review", "commit", "pr", "handoff"];
 }
 
 export function skillNames(): string[] {

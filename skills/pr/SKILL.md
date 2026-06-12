@@ -13,6 +13,7 @@ description: Prepare or open a pull request for committed issue-scoped work.
 
 ## Required Policies
 
+- judgment
 - workspace-safety
 - pr
 - handoff

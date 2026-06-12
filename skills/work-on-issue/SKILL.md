@@ -13,6 +13,7 @@ description: Create an issue brief and perform issue-scoped implementation work 
 
 ## Required Policies
 
+- judgment
 - issue-selection
 - interview
 - workspace-safety

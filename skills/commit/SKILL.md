@@ -13,6 +13,7 @@ description: Commit completed issue-scoped work after checking tests and staged 
 
 ## Required Policies
 
+- judgment
 - workspace-safety
 - commit
 - handoff

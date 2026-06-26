@@ -21,7 +21,8 @@ This workspace uses Mahler for human-orchestrated multi-agent development.
 - Create git worktrees only for repos needed by the task.
 - Prefer project-local worktrees under \`workspaces/issues/<ISSUE>/repos/<repo>\`.
 - Choose branch names using \`.harness/policies/branching.md\`; Mahler does not choose branch names for you.
-- Record deliberate workflow deviations in \`HANDOFF.md\`.
+- At session start, read the active \`.harness/decisions/\` ledger (not \`archive/\`) to recover durable decisions from earlier sessions.
+- Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide\` to \`.harness/decisions/\`.
 - Before stopping, update \`HANDOFF.md\` with changed files, tests run, blockers, and next steps.
 
 ## Atomic Unit
@@ -55,7 +56,7 @@ export function rootAgentBlock(config: HarnessConfig): string {
     ? `claude: ${claude.profile}`
     : "claude: configured profile";
   const guardrailLines = (config.guardrails ?? []).map((line) => `- ${line}`).join("\n") || "- (none declared)";
-  return `\n## Mahler Workflow\n\nThis workspace uses Mahler. Bare prompts like \`work on MAH-123\`, \`start MAH-123\`, or \`work on project X in Linear\` should route through Mahler before code changes so the agent has the issue brief and shared policies.\n\nMahler compiles canonical workflow source into native agent artifacts:\n\n- Codex skills: \`.agents/skills/<skill>/SKILL.md\`\n- Codex agents: \`.codex/agents/<profile>.toml\`\n- Claude skills: \`.claude/skills/<skill>/SKILL.md\`\n- Claude agents: \`.claude/agents/<profile>.md\`\n- Shared config and policies: \`.harness/config.json\` and \`.harness/policies/\`\n\nRecommended routing:\n\n- Active profile check: inspect \`.harness/config.json\` and the active profile in \`.harness/agents/profiles/\` (${codexProfile}; ${claudeProfile}) before choosing a skill.\n- Issue prompt: use the native \`work-on-issue\` skill. It fetches Linear metadata, writes \`.harness/tmp/linear/<ISSUE>.json\`, then runs \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>\` to create a brief.\n- Project prompt: use the native \`select-project-issue\` skill. It fetches Linear project metadata, writes \`.harness/tmp/linear/<project>.json\`, then runs \`${config.mahlerCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- For review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.\n- Create git worktrees only for repos needed by the task, preferably under \`${config.workspaceDir}/issues/<ISSUE>/repos/<repo>\`.\n- Choose branch names using \`.harness/policies/branching.md\`; Mahler does not choose branch names for agents.\n- Record deliberate workflow deviations in \`.harness/issues/<ISSUE>/HANDOFF.md\`.\n- If the requested skill is outside the active profile, treat it as a Tier 1 deviation: you may proceed deliberately, but record the reason (see \`.harness/policies/judgment.md\`). Stop and ask the human if Linear metadata is unavailable.\n\nGuardrails (Tier 3 — declared here so agents anticipate them; enforced by the forge/CI, not Mahler):\n\n${guardrailLines}\n`;
+  return `\n## Mahler Workflow\n\nThis workspace uses Mahler. Bare prompts like \`work on MAH-123\`, \`start MAH-123\`, or \`work on project X in Linear\` should route through Mahler before code changes so the agent has the issue brief and shared policies.\n\nMahler compiles canonical workflow source into native agent artifacts:\n\n- Codex skills: \`.agents/skills/<skill>/SKILL.md\`\n- Codex agents: \`.codex/agents/<profile>.toml\`\n- Claude skills: \`.claude/skills/<skill>/SKILL.md\`\n- Claude agents: \`.claude/agents/<profile>.md\`\n- Shared config and policies: \`.harness/config.json\` and \`.harness/policies/\`\n\nRecommended routing:\n\n- Active profile check: inspect \`.harness/config.json\` and the active profile in \`.harness/agents/profiles/\` (${codexProfile}; ${claudeProfile}) before choosing a skill.\n- Issue prompt: use the native \`work-on-issue\` skill. It fetches Linear metadata, writes \`.harness/tmp/linear/<ISSUE>.json\`, then runs \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>\` to create a brief.\n- Project prompt: use the native \`select-project-issue\` skill. It fetches Linear project metadata, writes \`.harness/tmp/linear/<project>.json\`, then runs \`${config.mahlerCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- For review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.\n- Create git worktrees only for repos needed by the task, preferably under \`${config.workspaceDir}/issues/<ISSUE>/repos/<repo>\`.\n- Choose branch names using \`.harness/policies/branching.md\`; Mahler does not choose branch names for agents.\n- Record deliberate workflow deviations in \`.harness/issues/<ISSUE>/HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide\` to \`.harness/decisions/\`. Read the active ledger (not \`archive/\`) at session start to recover durable decisions.\n- If the requested skill is outside the active profile, treat it as a Tier 1 deviation: you may proceed deliberately, but record the reason (see \`.harness/policies/judgment.md\`). Stop and ask the human if Linear metadata is unavailable.\n\nGuardrails (Tier 3 — declared here so agents anticipate them; enforced by the forge/CI, not Mahler):\n\n${guardrailLines}\n`;
 }
 
 export function taskMarkdown(issue: LinearIssue, source: string): string {
@@ -117,7 +118,8 @@ ${guardrails.length === 0 ? "- (none declared in .harness/config.json)" : guardr
 - Choose short-lived branch names using \`.harness/policies/branching.md\`.
 - Do not edit the product workspace root.
 - Follow the native installed skills for this agent and policies in \`.harness/policies/\`.
-- Record deliberate workflow deviations in \`HANDOFF.md\`.
+- At session start, read the active \`.harness/decisions/\` ledger (not \`archive/\`) to recover durable decisions from earlier sessions.
+- Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide\` to \`.harness/decisions/\`.
 - Update \`HANDOFF.md\` before stopping.
 `;
 }
@@ -145,7 +147,7 @@ export function handoffMarkdown(issue: LinearIssue): string {
 
 ## Workflow Deviations
 
-- None recorded.
+- None recorded. Record Tier-1 deviations here; for those whose reason generalizes beyond this issue, also add a \`.harness/decisions/\` ledger note via \`mahler decide\` (see \`.harness/policies/judgment.md\`).
 `;
 }
 
@@ -194,8 +196,8 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 9. Run the Mahler command described in \`.harness/config.json\` to create the issue brief.
 10. Decide which configured repos need worktrees, choose branch names using \`.harness/policies/branching.md\`, and create only those worktrees.
 11. Prefer project-local worktrees under \`workspaces/issues/<ISSUE>/repos/<repo>\`.
-12. Record deliberate workflow deviations in \`HANDOFF.md\`.
-13. If the requested skill is outside the active profile, treat it as a deliberate deviation: confirm with the human, then record the reason in \`HANDOFF.md\`. Stop and ask if Linear metadata is unavailable.
+12. Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent codex\` to \`.harness/decisions/\`. At session start, read the active ledger in \`.harness/decisions/\` (not \`archive/\`) to recover durable decisions — the next session never reads a prior issue's HANDOFF.
+13. If the requested skill is outside the active profile, treat it as a deliberate deviation: confirm with the human, then record the reason in \`HANDOFF.md\` and the \`.harness/decisions/\` ledger. Stop and ask if Linear metadata is unavailable.
 
 ## Confirm Before Outward Actions
 
@@ -229,8 +231,8 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 9. Run the Mahler command described in \`.harness/config.json\` to create the issue brief.
 10. Decide which configured repos need worktrees, choose branch names using \`.harness/policies/branching.md\`, and create only those worktrees.
 11. Prefer project-local worktrees under \`workspaces/issues/<ISSUE>/repos/<repo>\`.
-12. Record deliberate workflow deviations in \`HANDOFF.md\`.
-13. If the requested skill is outside the active profile, treat it as a deliberate deviation: confirm with the human, then record the reason in \`HANDOFF.md\`. Stop and ask if Linear metadata is unavailable.
+12. Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent claude\` to \`.harness/decisions/\`. At session start, read the active ledger in \`.harness/decisions/\` (not \`archive/\`) to recover durable decisions — the next session never reads a prior issue's HANDOFF.
+13. If the requested skill is outside the active profile, treat it as a deliberate deviation: confirm with the human, then record the reason in \`HANDOFF.md\` and the \`.harness/decisions/\` ledger. Stop and ask if Linear metadata is unavailable.
 
 ## Confirm Before Outward Actions
 

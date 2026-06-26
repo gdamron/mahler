@@ -9,6 +9,23 @@ test("workflow names issue prompts and project prompts", () => {
   assert.match(workflow, /work on project X in Linear/);
 });
 
+test("workflow distinguishes the orchestrator agent from the human authority", () => {
+  const workflow = workflowMarkdown();
+  // Orchestrator is an agent role that coordinates sub-agents, not the human.
+  assert.match(workflow, /[Oo]rchestrator agent/);
+  assert.match(workflow, /coordinates sub-agents/i);
+  assert.match(workflow, /synthesizes their outputs/i);
+  assert.match(workflow, /surfaces risks to the human/i);
+  // It is the primary interface to the human and empowered to act directly.
+  assert.match(workflow, /primary interface to the human/i);
+  assert.match(workflow, /empowered to take any action/i);
+  // Human stays the final accountable authority for review and merge.
+  assert.match(workflow, /final accountable authority/i);
+  assert.match(workflow, /final review and merge/i);
+  // The human is not modeled as an agent.
+  assert.match(workflow, /not modeled as an agent/i);
+});
+
 test("native adapter tells agent to create briefs and choose worktrees", () => {
   const adapter = nativeAdapter("codex");
   assert.match(adapter, /create the issue brief/);

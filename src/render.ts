@@ -9,7 +9,7 @@ import type {
 export function workflowMarkdown(): string {
   return `# Mahler Workflow
 
-This workspace uses Mahler for human-orchestrated multi-agent development.
+This workspace uses Mahler for multi-agent development. An **orchestrator agent** coordinates the work; the **human developer** stays the final accountable authority.
 
 ## What To Do When Prompted
 
@@ -40,9 +40,13 @@ For project prompts, select the highest-priority issue that:
 
 Tie-break by priority first, then oldest update/create timestamp.
 
-## Human Orchestration
+## Roles
 
-The human remains responsible for final review and merge decisions unless a prompt explicitly delegates a narrower action.
+- **Human developer** — the final accountable authority for quality, integration, merge, and release. Owns final review and merge decisions unless a prompt explicitly delegates a narrower action. The human is not modeled as an agent.
+- **Orchestrator agent** — the default coordinating role and the primary interface to the human developer: it surfaces risks to the human, reports synthesis, and asks for direction. It plans agent-level work, delegates scoped slices to sub-agents, coordinates sub-agents, synthesizes their outputs, and runs quality checks within the bounds of the delegated work. It is empowered to take any action directly when delegation is not warranted, pausing at Tier 2 boundaries (push/PR) for human go-ahead.
+- **Sub-agents** — scoped specialist agents launched and delegated by the orchestrator for a specific slice of the task.
+
+Tier 2 actions (push, PR) and Tier 3 guardrails (base-branch merge, CI) still apply: the orchestrator pauses for human go-ahead and never bypasses the forge.
 `;
 }
 

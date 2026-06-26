@@ -54,10 +54,13 @@ test("dogfood issue prompt workflow installs native artifacts and creates an iss
 
   for (const path of [
     ".harness/policies/implementation.md",
+    ".harness/agents/profiles/orchestrator.json",
     ".harness/agents/profiles/implementer.json",
     ".agents/skills/work-on-issue/SKILL.md",
+    ".codex/agents/orchestrator.toml",
     ".codex/agents/implementer.toml",
     ".claude/skills/work-on-issue/SKILL.md",
+    ".claude/agents/orchestrator.md",
     ".claude/agents/implementer.md",
     "AGENTS.md",
     "CLAUDE.md",
@@ -128,7 +131,7 @@ test("dogfood issue prompt workflow installs native artifacts and creates an iss
   assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-5", "repos", "app")), false);
   assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-5", "repos", "api")), false);
   assert.match(readFileSync(resolve(issueBrief, "TASK.md"), "utf8"), /Linear source: linear-file/);
-  assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /Profile: implementer/);
+  assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /Profile: orchestrator/);
   assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /api: source `api`, base `main`/);
   assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /app: source `app`, base `main`/);
   assert.match(readFileSync(resolve(issueBrief, "HANDOFF.md"), "utf8"), /State: not started/);

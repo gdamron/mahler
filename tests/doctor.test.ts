@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   appendFileSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -44,6 +45,26 @@ test("doctor exits 0 when repos are configured and everything is wired", () => {
   const { status, stdout } = runDoctor(workspace);
   assert.equal(status, 0, stdout);
   assert.match(stdout, /repo app present/);
+});
+
+test("doctor warns (but passes) when a profile allows an uninstalled skill", () => {
+  const workspace = installWorkspace();
+  const repoDir = resolve(workspace, "app");
+  spawnSync("git", ["init", "-q", "-b", "main", repoDir]);
+  spawnSync("git", ["-C", repoDir, "commit", "--allow-empty", "-m", "init", "-q"], {
+    env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" }
+  });
+  const customAgents = resolve(workspace, ".harness", "custom", "agents");
+  mkdirSync(customAgents, { recursive: true });
+  writeFileSync(
+    resolve(customAgents, "scoped.json"),
+    JSON.stringify({ name: "scoped", allowedSkills: ["made-up-skill"], deniedSkills: [] }, null, 2)
+  );
+  const reinstall = spawnSync(cli[0], [cli[1], "install", workspace], { encoding: "utf8" });
+  assert.equal(reinstall.status, 0, reinstall.stderr);
+  const { status, stdout } = runDoctor(workspace);
+  assert.equal(status, 0, stdout);
+  assert.match(stdout, /profile scoped allowedSkills references uninstalled skill "made-up-skill"/);
 });
 
 test("doctor fails when .harness/config.json is missing", () => {

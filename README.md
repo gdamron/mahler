@@ -71,7 +71,24 @@ generated native skills rather than CLI workflow commands.
 
 Run `mahler doctor <workspace>` after install (or any time) to verify the
 configured repos, policies, skills, profiles, and adapter docs. It exits
-non-zero with a clear message if anything is missing.
+non-zero with a clear message if anything is missing, and warns when a profile
+allows a skill that is not installed.
+
+### Customizing a workspace
+
+The install set is discovered by scanning Mahler's canonical source, so new
+policies, skills, and profiles install automatically. To adapt the workflow for
+one workspace without forking Mahler, drop files under
+`.harness/custom/{policies,skills,agents}/`:
+
+- A custom file with the **same name** as a Mahler default **replaces** it.
+- A custom file with a **new name** is **added** to the install set.
+- Reinstall (`mahler install`) never overwrites anything under `.harness/custom/`.
+- Composed markdown carries a provenance header (for example
+  `> Mahler default was replaced by .harness/custom/policies/review.md`) so
+  agents read a single file. A malformed override fails `install`.
+
+See `.harness/custom/README.md` (written on install) and `INSTALL.md` for details.
 
 Use `mahler linear-template issue|project` to print the JSON shape expected by
 `--linear-file`. Agents should write temporary Linear MCP metadata under

@@ -17,6 +17,7 @@ description: Create an issue brief and perform issue-scoped implementation work 
 - issue-selection
 - interview
 - workspace-safety
+- sub-agent-delegation
 - implementation
 - definition-of-done
 - handoff

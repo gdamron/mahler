@@ -23,6 +23,9 @@ issue before any code workspace is created.
   output, and surfaces risks. It is empowered to take any action directly when
   warranted — delegation is the common case, not a capability limit — and pauses
   at Tier 2 boundaries (push/PR) for human go-ahead.
+- Sub-agent delegation uses native/runtime agent capabilities plus the installed
+  `sub-agent-delegation` policy and brief template. Sub-agents are read-only by
+  default unless an orchestrator brief explicitly grants scoped edit authority.
 - Tasks (such as Linear issues) are the atomic unit for code changes, commits,
   and PRs.
 - Agents create dedicated git worktrees only for the repos needed by a task,

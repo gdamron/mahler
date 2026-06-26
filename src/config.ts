@@ -32,6 +32,7 @@ export function defaultConfig(workspace: string): HarnessConfig {
         policies: [
           "issue-selection",
           "workspace-safety",
+          "sub-agent-delegation",
           "judgment",
           "implementation",
           "definition-of-done",
@@ -49,6 +50,7 @@ export function defaultConfig(workspace: string): HarnessConfig {
         policies: [
           "issue-selection",
           "workspace-safety",
+          "sub-agent-delegation",
           "judgment",
           "implementation",
           "definition-of-done",

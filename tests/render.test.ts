@@ -26,6 +26,14 @@ test("workflow distinguishes the orchestrator agent from the human authority", (
   assert.match(workflow, /not modeled as an agent/i);
 });
 
+test("workflow documents sub-agent delegation policy defaults", () => {
+  const workflow = workflowMarkdown();
+  assert.match(workflow, /sub-agent-delegation\.md/);
+  assert.match(workflow, /default sub-agent authority is read-only/i);
+  assert.match(workflow, /native\/runtime agent capabilities/i);
+  assert.match(workflow, /not Mahler CLI commands/i);
+});
+
 test("native adapter tells agent to create briefs and choose worktrees", () => {
   const adapter = nativeAdapter("codex");
   assert.match(adapter, /create the issue brief/);
@@ -66,6 +74,9 @@ test("root agent block gives bare prompt path to mahler issue", () => {
   assert.match(block, /Active profile check/);
   assert.match(block, /Create git worktrees only for repos needed/);
   assert.match(block, /Mahler does not choose branch names/);
+  assert.match(block, /Sub-agent delegation/);
+  assert.match(block, /default to read-only authority/);
+  assert.match(block, /mahler subagent \.\.\./);
   assert.match(block, /\.harness\/agents\/profiles/);
   assert.match(block, /\.agents\/skills/);
   assert.match(block, /\.claude\/skills/);
@@ -89,6 +100,21 @@ test("root agent block and session brief declare Tier 3 guardrails", () => {
   );
   assert.match(session, /## Guardrails \(enforced outside Mahler/);
   assert.match(session, /human-approved PR/);
+});
+
+test("session brief points orchestrators to sub-agent delegation policy", () => {
+  const config = defaultConfig("/tmp/workspace");
+  const session = sessionMarkdown(
+    { identifier: "MAH-15", title: "t", labels: [], blocked: false },
+    "codex",
+    "/tmp/workspace/workspaces/issues/MAH-15",
+    config.repos,
+    undefined,
+    config.guardrails
+  );
+  assert.match(session, /sub-agent-delegation\.md/);
+  assert.match(session, /prefer configured roles/i);
+  assert.match(session, /read-only unless edit scope is explicit/i);
 });
 
 test("task and session briefs render layered Definition of Done", () => {

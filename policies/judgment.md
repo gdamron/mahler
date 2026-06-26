@@ -24,8 +24,27 @@ Examples: using a skill outside the active profile's recommendation, commit
 size, branch naming, scope judgment calls.
 
 Deviation is allowed and reversible. Mahler never blocks these. The requirement
-is the record: write the reason in the `Workflow Deviations` section of the
-issue's `HANDOFF.md` — what you decided, why, the risk, and any follow-up. An
+is the record:
+
+1. Always write the reason in the `Workflow Deviations` section of the issue's
+   `HANDOFF.md` — what you decided, why, the risk, and any follow-up.
+2. *Only when the reason generalizes beyond this issue* — a decision a future,
+   unrelated session should know — also append it to the cross-session ledger
+   with `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent
+   <agent>` (writes `.harness/decisions/<date>-<slug>.md`).
+
+Keep the ledger lean. `HANDOFF.md` is per-issue and a later session never reads a
+*prior* issue's handoff, so the ledger exists to carry forward only the durable
+reasons worth re-reading every session. A purely issue-local judgment call stays
+in `HANDOFF.md` only — recording it in the ledger turns the ledger into noise the
+next session must wade through.
+
+At the start of a session, read the active ledger in `.harness/decisions/` (not
+`archive/`) to recover earlier intent; filter by the `issue:` or `rule:`
+frontmatter when you only need a slice. The ledger is **append-only**: never
+edit, delete, or move entries. Humans curate — promoting recurring decisions into
+a policy or `CLAUDE.md` rule and moving folded or stale notes to
+`.harness/decisions/archive/` (which sessions do not read by default). An
 unrecorded deviation is a workflow failure; a recorded one is a review input.
 
 ### Tier 2 — Confirm (get explicit human go-ahead first)

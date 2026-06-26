@@ -24,6 +24,7 @@ description: Create an issue brief and perform issue-scoped implementation work 
 
 - `mahler linear-template issue`
 - `mahler issue <ISSUE> --agent <agent> --linear-file <issue.json>`
+- `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
 - git worktree commands for only the repos needed by the task
 - repo-local build, test, and inspection commands inside selected repo worktrees
 
@@ -41,7 +42,10 @@ description: Create an issue brief and perform issue-scoped implementation work 
 4. Write the metadata to `.harness/tmp/linear/<ISSUE>.json` in the product workspace,
    creating the directory if needed.
 5. Run `mahler issue <ISSUE> --agent <agent> --linear-file .harness/tmp/linear/<ISSUE>.json`.
-6. Read the generated issue brief under `.harness/issues/<ISSUE>/`.
+6. Read the generated issue brief under `.harness/issues/<ISSUE>/`, and read the
+   active `.harness/decisions/` ledger (not `archive/`) to recover durable
+   decisions and intent from earlier sessions (record a new deviation with
+   `mahler decide` only when its reason generalizes beyond this issue).
 7. Decide which configured repos need worktrees for the task.
 8. Choose short-lived branch names using `.harness/policies/branching.md`.
 9. Create only the needed repo worktrees, preferably under `workspaces/issues/<ISSUE>/repos/<repo>`.

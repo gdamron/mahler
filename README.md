@@ -40,6 +40,7 @@ mahler status --workspace /path/to/product-workspace
 mahler profile codex --workspace /path/to/product-workspace
 mahler can codex commit --workspace /path/to/product-workspace
 mahler handoff FUG-123 --workspace /path/to/product-workspace --agent codex
+mahler decide --rule scope --reason "expanded to fix adjacent bug" --issue FUG-123 --agent codex --workspace /path/to/product-workspace
 mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue FUG-123]
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
@@ -56,6 +57,19 @@ commands) from its scripts; edit `.harness/config.json` to adjust them.
 commands (in the issue worktree when `--issue` is given, otherwise the source
 repo) and reports ok/fail per command. It is feedback, not a gate — the
 forge/CI remains the Tier 3 authority.
+
+`mahler decide` appends a note to the decisions ledger
+(`.harness/decisions/<YYYY-MM-DD>-<slug>.md`): the durable, cross-session record
+of Tier-1 deviations and the reasons behind them. A per-issue `HANDOFF.md` is
+not enough — a later session never reads a prior issue's handoff, so the ledger
+carries intent forward (the "experience" an agent otherwise lacks each session).
+Because the ledger is read at the start of every session, it stays lean:
+only deviations whose reason _generalizes beyond the issue that produced them_
+belong here; purely issue-local calls stay in `HANDOFF.md`. It is append-only —
+agents never edit, delete, or move entries — and humans curate, promoting
+recurring decisions into policy and moving stale notes to
+`.harness/decisions/archive/` (not read by default). It is designed to fold into
+a future shared memory store with no migration.
 
 Install compiles canonical Mahler source into native agent artifacts:
 

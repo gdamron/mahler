@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { defaultConfig } from "../src/config.js";
-import { claudeAgentDefinition, codexAgentDefinition, launchCommand, nativeAdapter, rootAgentBlock, sessionMarkdown, workflowMarkdown } from "../src/render.js";
+import { claudeAgentDefinition, codexAgentDefinition, handoffMarkdown, launchCommand, nativeAdapter, rootAgentBlock, sessionMarkdown, workflowMarkdown } from "../src/render.js";
 
 test("workflow names issue prompts and project prompts", () => {
   const workflow = workflowMarkdown();
@@ -72,6 +72,25 @@ test("root agent block and session brief declare Tier 3 guardrails", () => {
   );
   assert.match(session, /## Guardrails \(enforced outside Mahler/);
   assert.match(session, /human-approved PR/);
+});
+
+test("handoff markdown includes structured status review quality and deviations", () => {
+  const handoff = handoffMarkdown({ identifier: "MAH-10", title: "t", labels: [], blocked: false });
+  assert.match(handoff, /## Status/);
+  assert.match(handoff, /- Phase: brief-created/);
+  assert.match(handoff, /- State: not started/);
+  assert.match(handoff, /## Reviews/);
+  assert.match(handoff, /- Self-review: not started/);
+  assert.match(handoff, /- Agent review: not requested/);
+  assert.match(handoff, /- Human review: pending/);
+  assert.match(handoff, /## Quality/);
+  assert.match(handoff, /- Relevant tests\/checks:/);
+  assert.match(handoff, /- Full test suite:/);
+  assert.match(handoff, /- Known risks:/);
+  assert.match(handoff, /- Skipped checks and reasons:/);
+  assert.match(handoff, /## Workflow Deviations/);
+  assert.match(handoff, /\| Decision \| Reason \| Risk \| Follow-up \|/);
+  assert.match(handoff, /\|---\|---\|---\|---\|/);
 });
 
 test("native agent definitions include profile permissions", () => {

@@ -129,17 +129,27 @@ export function handoffMarkdown(issue: LinearIssue): string {
 
 ## Status
 
+- Phase: brief-created
 - State: not started
 - Current owner:
 - Blockers:
 
+## Reviews
+
+- Self-review: not started
+- Agent review: not requested
+- Human review: pending
+
+## Quality
+
+- Relevant tests/checks:
+- Full test suite:
+- Known risks:
+- Skipped checks and reasons:
+
 ## Changes
 
 -
-
-## Tests
-
-- Not run yet.
 
 ## Next Steps
 
@@ -147,7 +157,10 @@ export function handoffMarkdown(issue: LinearIssue): string {
 
 ## Workflow Deviations
 
-- None recorded. Record Tier-1 deviations here; for those whose reason generalizes beyond this issue, also add a \`.harness/decisions/\` ledger note via \`mahler decide\` (see \`.harness/policies/judgment.md\`).
+Record deliberate deviations here. Reference a \`.harness/decisions/\` ledger note when one exists (see \`.harness/policies/judgment.md\`).
+
+| Decision | Reason | Risk | Follow-up |
+|---|---|---|---|
 `;
 }
 

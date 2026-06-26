@@ -17,6 +17,7 @@ function install(workspace: string): { status: number | null; stderr: string } {
 test("discovery scans canonical source, including branching and interview", () => {
   assert.ok(policyNames().includes("branching"), "branching policy should be discovered");
   assert.ok(policyNames().includes("interview"), "interview policy should be discovered");
+  assert.ok(policyNames().includes("sub-agent-delegation"), "sub-agent delegation policy should be discovered");
   assert.ok(skillNames().includes("interview"), "interview skill should be discovered");
   for (const profile of ["implementer", "reviewer", "committer", "full-stack"]) {
     assert.ok(profileNames().includes(profile), `missing profile ${profile}`);
@@ -39,6 +40,7 @@ test("install writes discovered policies, skills, and profiles", () => {
   // Previously omitted by the hardcoded lists — now installed via discovery.
   assert.equal(existsSync(resolve(workspace, ".harness", "policies", "branching.md")), true);
   assert.equal(existsSync(resolve(workspace, ".harness", "policies", "interview.md")), true);
+  assert.equal(existsSync(resolve(workspace, ".harness", "policies", "sub-agent-delegation.md")), true);
   assert.equal(existsSync(resolve(workspace, ".agents", "skills", "interview", "SKILL.md")), true);
   assert.equal(existsSync(resolve(workspace, ".claude", "skills", "interview", "SKILL.md")), true);
   // Baseline artifacts still present.

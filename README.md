@@ -1,9 +1,10 @@
 # Mahler
 
-Mahler (as in Gustav, everyone's favorite composer/conductor) is a human-
-orchestrated workflow tool for multi-agent software work. It installs project-
-scoped instructions, policies, and helpers so agents can be prompted with small
-requests such as:
+Mahler (as in Gustav, everyone's favorite composer/conductor) is a workflow
+tool for multi-agent software work. An orchestrator agent coordinates the work
+under a human developer who stays the final accountable authority. It installs
+project-scoped instructions, policies, and helpers so agents can be prompted
+with small requests such as:
 
 ```sh
 work on ISSUE-123
@@ -15,7 +16,13 @@ issue before any code workspace is created.
 
 ## Principles
 
-- The human is the orchestrator.
+- The human developer is the final accountable authority for quality,
+  integration, merge, and release — not modeled as an agent.
+- The orchestrator agent is the default coordinating role and the primary
+  interface to the human: it plans, delegates to sub-agents, synthesizes their
+  output, and surfaces risks. It is empowered to take any action directly when
+  warranted — delegation is the common case, not a capability limit — and pauses
+  at Tier 2 boundaries (push/PR) for human go-ahead.
 - Tasks (such as Linear issues) are the atomic unit for code changes, commits,
   and PRs.
 - Agents create dedicated git worktrees only for the repos needed by a task,

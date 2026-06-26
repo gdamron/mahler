@@ -31,17 +31,25 @@ test("profile prints active profile permissions", () => {
   const result = run(["profile", "codex", "--workspace", workspace]);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Agent: codex/);
-  assert.match(result.stdout, /Profile: implementer/);
-  assert.match(result.stdout, /Allowed skills: interview, select-project-issue, work-on-issue, handoff/);
-  assert.match(result.stdout, /Denied skills: commit, pr/);
+  assert.match(result.stdout, /Profile: orchestrator/);
+  assert.match(result.stdout, /Allowed skills: select-project-issue, work-on-issue, interview, review, commit, pr, handoff/);
+  assert.match(result.stdout, /Denied skills: \(none\)/);
 });
 
-test("can reports allowed skills and advises on out-of-profile skills", () => {
+test("can reports allowed skills for the empowered orchestrator default", () => {
   const workspace = installWorkspace();
-  const allowed = run(["can", "codex", "handoff", "--workspace", workspace]);
-  assert.equal(allowed.status, 0, allowed.stderr);
-  assert.match(allowed.stdout, /codex can use handoff/);
+  // The default orchestrator is empowered to take any action, including commit.
+  for (const skill of ["handoff", "commit", "pr", "review"]) {
+    const allowed = run(["can", "codex", skill, "--workspace", workspace]);
+    assert.equal(allowed.status, 0, allowed.stderr);
+    assert.match(allowed.stdout, new RegExp(`codex can use ${skill}`));
+  }
+});
 
+test("can advises on out-of-profile skills for scoped profiles", () => {
+  const workspace = installWorkspace();
+  // A scoped profile (reviewer) still emits the Tier-1 advisory path.
+  setCodexProfile(workspace, "reviewer");
   const outOfProfile = run(["can", "codex", "commit", "--workspace", workspace]);
   assert.equal(outOfProfile.status, 0, outOfProfile.stderr);
   assert.match(outOfProfile.stdout, /Advisory/);
@@ -94,7 +102,7 @@ test("generated agent session records active profile details", () => {
   const issue = run(["issue", "MAH-4", "--workspace", workspace, "--agent", "codex", "--title", "Profile gate"]);
   assert.equal(issue.status, 0, issue.stderr);
   const session = readFileSync(resolve(workspace, ".harness", "issues", "MAH-4", "AGENT_SESSION.md"), "utf8");
-  assert.match(session, /Profile: implementer/);
-  assert.match(session, /Allowed skills: interview, select-project-issue, work-on-issue, handoff/);
-  assert.match(session, /Denied skills: commit, pr/);
+  assert.match(session, /Profile: orchestrator/);
+  assert.match(session, /Allowed skills: select-project-issue, work-on-issue, interview, review, commit, pr, handoff/);
+  assert.match(session, /Denied skills: \(none\)/);
 });

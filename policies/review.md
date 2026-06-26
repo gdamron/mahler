@@ -4,7 +4,8 @@ Review work focuses on correctness, regressions, missing tests, and workflow ris
 
 Review a local diff and report findings before creating a pull request. This
 applies to review between agents and self-review. Always perform a local review
-before opening a pull request.
+before opening a pull request. Second-agent review is optional (but encouraged)
+unless requested; human sign-off is expected before merge.
 
 When reviewing:
 
@@ -13,6 +14,7 @@ When reviewing:
 - Cite file paths and lines when possible.
 - Separate findings from optional style suggestions.
 - Record review status in `HANDOFF.md`.
+- Document skipped checks and reasons in `HANDOFF.md`.
 - Be direct and respectful in feedback.
 - Do not block progress unless there is a critical issue.
 

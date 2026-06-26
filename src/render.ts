@@ -59,7 +59,11 @@ export function rootAgentBlock(config: HarnessConfig): string {
   return `\n## Mahler Workflow\n\nThis workspace uses Mahler. Bare prompts like \`work on MAH-123\`, \`start MAH-123\`, or \`work on project X in Linear\` should route through Mahler before code changes so the agent has the issue brief and shared policies.\n\nMahler compiles canonical workflow source into native agent artifacts:\n\n- Codex skills: \`.agents/skills/<skill>/SKILL.md\`\n- Codex agents: \`.codex/agents/<profile>.toml\`\n- Claude skills: \`.claude/skills/<skill>/SKILL.md\`\n- Claude agents: \`.claude/agents/<profile>.md\`\n- Shared config and policies: \`.harness/config.json\` and \`.harness/policies/\`\n\nRecommended routing:\n\n- Active profile check: inspect \`.harness/config.json\` and the active profile in \`.harness/agents/profiles/\` (${codexProfile}; ${claudeProfile}) before choosing a skill.\n- Issue prompt: use the native \`work-on-issue\` skill. It fetches Linear metadata, writes \`.harness/tmp/linear/<ISSUE>.json\`, then runs \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>\` to create a brief.\n- Project prompt: use the native \`select-project-issue\` skill. It fetches Linear project metadata, writes \`.harness/tmp/linear/<project>.json\`, then runs \`${config.mahlerCommand} project \"<PROJECT>\" --agent <codex|claude> --linear-file <project.json>\`.\n- For review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.\n- Create git worktrees only for repos needed by the task, preferably under \`${config.workspaceDir}/issues/<ISSUE>/repos/<repo>\`.\n- Choose branch names using \`.harness/policies/branching.md\`; Mahler does not choose branch names for agents.\n- Record deliberate workflow deviations in \`.harness/issues/<ISSUE>/HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide\` to \`.harness/decisions/\`. Read the active ledger (not \`archive/\`) at session start to recover durable decisions.\n- If the requested skill is outside the active profile, treat it as a Tier 1 deviation: you may proceed deliberately, but record the reason (see \`.harness/policies/judgment.md\`). Stop and ask the human if Linear metadata is unavailable.\n\nGuardrails (Tier 3 — declared here so agents anticipate them; enforced by the forge/CI, not Mahler):\n\n${guardrailLines}\n`;
 }
 
-export function taskMarkdown(issue: LinearIssue, source: string): string {
+export function taskMarkdown(
+  issue: LinearIssue,
+  source: string,
+  definitionOfDone: string[] = [],
+): string {
   return `# ${issue.identifier}: ${issue.title}
 
 Linear source: ${source}
@@ -67,6 +71,11 @@ ${issue.url ? `Linear URL: ${issue.url}\n` : ""}
 ## Description
 
 ${issue.description?.trim() || "_No description supplied. If Linear MCP is unavailable, ask the human for missing context before inventing requirements._"}
+${issueContextMarkdown(issue)}
+
+## Definition of Done
+
+${definitionOfDoneChecklist(issue, definitionOfDone)}
 
 ## Required First Steps
 
@@ -86,6 +95,7 @@ export function sessionMarkdown(
   repos: HarnessConfig["repos"],
   profile?: InstalledProfile,
   guardrails: string[] = [],
+  definitionOfDone: string[] = [],
 ): string {
   const repoLines = repos.length === 0
     ? "- (none configured)"
@@ -110,6 +120,10 @@ ${repoLines}
 ## Guardrails (enforced outside Mahler — anticipate them)
 
 ${guardrails.length === 0 ? "- (none declared in .harness/config.json)" : guardrails.map((line) => `- ${line}`).join("\n")}
+
+## Definition of Done
+
+${definitionOfDoneChecklist(issue, definitionOfDone)}
 
 ## Rules
 
@@ -315,4 +329,37 @@ function tomlString(value: string): string {
     .replaceAll("\\", "\\\\")
     .replaceAll('"', '\\"')
     .replaceAll("\n", "\\n");
+}
+
+function definitionOfDoneChecklist(issue: LinearIssue, baseline: string[]): string {
+  const items = uniqueNonEmpty([...(baseline ?? []), ...(issue.acceptanceCriteria ?? [])]);
+  if (items.length === 0) return "- [ ] No Definition of Done configured.";
+  return items.map((item) => `- [ ] ${item}`).join("\n");
+}
+
+function issueContextMarkdown(issue: LinearIssue): string {
+  const sections = [
+    issueListSection("Non-Goals", issue.nonGoals),
+    issueListSection("Protected Areas", issue.protectedAreas),
+    issueListSection("Risk Notes", issue.riskNotes),
+  ].filter(Boolean);
+  return sections.length === 0 ? "" : `\n${sections.join("\n\n")}`;
+}
+
+function issueListSection(title: string, items?: string[]): string {
+  const normalized = uniqueNonEmpty(items ?? []);
+  if (normalized.length === 0) return "";
+  return `## ${title}\n\n${normalized.map((item) => `- ${item}`).join("\n")}`;
+}
+
+function uniqueNonEmpty(items: string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const item of items) {
+    const trimmed = item.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    normalized.push(trimmed);
+  }
+  return normalized;
 }

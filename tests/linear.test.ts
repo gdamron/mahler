@@ -9,7 +9,18 @@ test("linearIssueTemplate has the parseable issue metadata shape", () => {
   assert.equal(template.title, "Issue title");
   assert.deepEqual(template.labels, ["agent"]);
   assert.equal(template.blocked, false);
-  assert.equal(normalizeIssue({ ...template }).identifier, "ISSUE-123");
+  assert.deepEqual(template.acceptanceCriteria, [
+    "User-facing behavior is covered by tests.",
+    "Existing workflows continue to pass."
+  ]);
+  const normalized = normalizeIssue({
+    ...template,
+    acceptanceCriteria: [" Ship it ", ""],
+    nonGoals: [" No redesign "]
+  });
+  assert.equal(normalized.identifier, "ISSUE-123");
+  assert.deepEqual(normalized.acceptanceCriteria, ["Ship it"]);
+  assert.deepEqual(normalized.nonGoals, ["No redesign"]);
 });
 
 test("linearProjectTemplate has the parseable project metadata shape", () => {

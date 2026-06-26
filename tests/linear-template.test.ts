@@ -11,6 +11,10 @@ test("linear-template issue prints parseable issue JSON", () => {
   assert.equal(parsed.identifier, "ISSUE-123");
   assert.equal(parsed.title, "Issue title");
   assert.deepEqual(parsed.labels, ["agent"]);
+  assert.deepEqual(parsed.acceptanceCriteria, [
+    "User-facing behavior is covered by tests.",
+    "Existing workflows continue to pass."
+  ]);
 });
 
 test("linear-template project prints parseable project JSON", () => {

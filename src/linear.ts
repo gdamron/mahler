@@ -14,6 +14,13 @@ export function linearIssueTemplate(): LinearIssue {
     assigneeName: "Agent display name",
     labels: ["agent"],
     blocked: false,
+    acceptanceCriteria: [
+      "User-facing behavior is covered by tests.",
+      "Existing workflows continue to pass."
+    ],
+    nonGoals: ["Out-of-scope follow-up work from the Linear issue"],
+    protectedAreas: ["Files or systems the Linear issue says not to change"],
+    riskNotes: ["Known risks or rollout notes from the Linear issue"],
     updatedAt: "2026-05-22T00:00:00.000Z",
     createdAt: "2026-05-22T00:00:00.000Z",
     url: "https://linear.app/workspace/issue/ISSUE-123"
@@ -67,6 +74,10 @@ export function normalizeIssue(input: Partial<LinearIssue> & { [key: string]: un
     assigneeName: input.assigneeName ? String(input.assigneeName) : null,
     labels,
     blocked: Boolean(input.blocked),
+    acceptanceCriteria: stringList(input.acceptanceCriteria),
+    nonGoals: stringList(input.nonGoals),
+    protectedAreas: stringList(input.protectedAreas),
+    riskNotes: stringList(input.riskNotes),
     updatedAt: input.updatedAt ? String(input.updatedAt) : undefined,
     createdAt: input.createdAt ? String(input.createdAt) : undefined,
     url: input.url ? String(input.url) : undefined
@@ -122,4 +133,10 @@ function timestamp(value?: string): number {
   if (!value) return Number.MAX_SAFE_INTEGER;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
+}
+
+function stringList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const entries = value.map((entry) => String(entry).trim()).filter(Boolean);
+  return entries.length === 0 ? undefined : entries;
 }

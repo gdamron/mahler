@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { defaultConfig } from "../src/config.js";
-import { claudeAgentDefinition, codexAgentDefinition, handoffMarkdown, launchCommand, nativeAdapter, rootAgentBlock, sessionMarkdown, workflowMarkdown } from "../src/render.js";
+import { claudeAgentDefinition, codexAgentDefinition, handoffMarkdown, launchCommand, nativeAdapter, rootAgentBlock, sessionMarkdown, taskMarkdown, workflowMarkdown } from "../src/render.js";
 
 test("workflow names issue prompts and project prompts", () => {
   const workflow = workflowMarkdown();
@@ -72,6 +72,61 @@ test("root agent block and session brief declare Tier 3 guardrails", () => {
   );
   assert.match(session, /## Guardrails \(enforced outside Mahler/);
   assert.match(session, /human-approved PR/);
+});
+
+test("task and session briefs render layered Definition of Done", () => {
+  const config = defaultConfig("/tmp/workspace");
+  const issue = {
+    identifier: "MAH-11",
+    title: "Layered Definition of Done",
+    labels: ["agent"],
+    blocked: false,
+    acceptanceCriteria: [
+      "Acceptance criteria from Linear is satisfied.",
+      config.definitionOfDone[0]
+    ]
+  };
+
+  const task = taskMarkdown(issue, "linear-file", config.definitionOfDone);
+  const session = sessionMarkdown(
+    issue,
+    "codex",
+    "/tmp/workspace/workspaces/issues/MAH-11",
+    config.repos,
+    undefined,
+    config.guardrails,
+    config.definitionOfDone
+  );
+
+  for (const brief of [task, session]) {
+    assert.match(brief, /## Definition of Done/);
+    assert.match(brief, /- \[ \] `mahler check` passes for every touched repo\./);
+    assert.match(brief, /- \[ \] Acceptance criteria from Linear is satisfied\./);
+    assert.equal(brief.match(/`mahler check` passes for every touched repo\./g)?.length, 1);
+  }
+});
+
+test("task brief renders baseline-only Definition of Done and optional issue notes", () => {
+  const config = defaultConfig("/tmp/workspace");
+  const task = taskMarkdown(
+    {
+      identifier: "MAH-12",
+      title: "Baseline only",
+      labels: ["agent"],
+      blocked: false,
+      nonGoals: ["Do not redesign the workflow."],
+      protectedAreas: ["Generated install outputs."],
+      riskNotes: ["Existing configs may not have the new key."]
+    },
+    "linear-file",
+    config.definitionOfDone
+  );
+
+  assert.match(task, /## Definition of Done/);
+  assert.match(task, /- \[ \] Self-review is complete\./);
+  assert.match(task, /## Non-Goals\n\n- Do not redesign the workflow\./);
+  assert.match(task, /## Protected Areas\n\n- Generated install outputs\./);
+  assert.match(task, /## Risk Notes\n\n- Existing configs may not have the new key\./);
 });
 
 test("handoff markdown includes structured status review quality and deviations", () => {

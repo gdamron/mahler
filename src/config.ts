@@ -16,6 +16,13 @@ export function defaultConfig(workspace: string): HarnessConfig {
       "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
       "Required CI checks must pass before merge (enforced by CI)."
     ],
+    definitionOfDone: [
+      "`mahler check` passes for every touched repo.",
+      "Self-review is complete.",
+      "`HANDOFF.md` is current with changed files, checks run, blockers, and next steps.",
+      "The change stays within the Linear issue scope.",
+      "A PR is opened for human review before merge."
+    ],
     agents: {
       codex: {
         runtime: "codex",
@@ -27,6 +34,7 @@ export function defaultConfig(workspace: string): HarnessConfig {
           "workspace-safety",
           "judgment",
           "implementation",
+          "definition-of-done",
           "review",
           "commit",
           "pr",
@@ -43,6 +51,7 @@ export function defaultConfig(workspace: string): HarnessConfig {
           "workspace-safety",
           "judgment",
           "implementation",
+          "definition-of-done",
           "review",
           "commit",
           "pr",
@@ -81,5 +90,10 @@ export function loadConfig(workspace: string): HarnessConfig {
     return defaultConfig(workspace);
   }
   const parsed = JSON.parse(readFileSync(path, "utf8")) as HarnessConfig;
-  return { ...parsed, guardrails: parsed.guardrails ?? [] };
+  const defaults = defaultConfig(workspace);
+  return {
+    ...parsed,
+    guardrails: parsed.guardrails ?? [],
+    definitionOfDone: parsed.definitionOfDone ?? defaults.definitionOfDone
+  };
 }

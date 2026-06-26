@@ -15,6 +15,7 @@ description: Commit completed issue-scoped work after checking tests and staged 
 
 - judgment
 - workspace-safety
+- definition-of-done
 - commit
 - handoff
 
@@ -35,6 +36,7 @@ description: Commit completed issue-scoped work after checking tests and staged 
 
 - Commit on the issue branch
 - Updated `HANDOFF.md`
+- Definition of Done checklist checked against the final diff
 - Commit hash and tests run
 
 ## Stop Conditions

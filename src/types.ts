@@ -26,6 +26,8 @@ export interface HarnessConfig {
   };
   /** Tier 3 hard limits declared for agent anticipation; enforced by the forge/CI, never by Mahler. */
   guardrails: string[];
+  /** Team baseline that every issue must satisfy before handoff/PR. */
+  definitionOfDone: string[];
   agents: Record<string, AgentProfile>;
 }
 
@@ -57,6 +59,10 @@ export interface LinearIssue {
   assigneeName?: string | null;
   labels?: string[];
   blocked?: boolean;
+  acceptanceCriteria?: string[];
+  nonGoals?: string[];
+  protectedAreas?: string[];
+  riskNotes?: string[];
   updatedAt?: string;
   createdAt?: string;
   url?: string;

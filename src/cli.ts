@@ -661,6 +661,7 @@ function createIssue(
     taskMarkdown(
       issue,
       flags["linear-file"] ? "linear-file" : "manual/fallback",
+      config.definitionOfDone,
     ),
   );
   writeFileEnsured(
@@ -672,6 +673,7 @@ function createIssue(
       config.repos,
       active.profile,
       config.guardrails,
+      config.definitionOfDone,
     ),
   );
   writeFileEnsured(resolve(paths.meta, "HANDOFF.md"), handoffMarkdown(issue));

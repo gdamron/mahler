@@ -258,15 +258,16 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 10. Decide which configured repos need worktrees, choose branch names using \`.harness/policies/branching.md\`, and create only those worktrees.
 11. Prefer project-local worktrees under \`workspaces/issues/<ISSUE>/repos/<repo>\`.
 12. Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent codex\` to \`.harness/decisions/\`. At session start, read the active ledger in \`.harness/decisions/\` (not \`archive/\`) to recover durable decisions — the next session never reads a prior issue's HANDOFF.
-13. If the requested skill is outside the active profile, treat it as a deliberate deviation: confirm with the human, then record the reason in \`HANDOFF.md\` and the \`.harness/decisions/\` ledger. Stop and ask if Linear metadata is unavailable.
+13. If the requested skill is outside the active profile, treat it as a Tier 1 deviation: proceed deliberately and record the reason in \`HANDOFF.md\`; add a \`.harness/decisions/\` ledger note only when the reason generalizes beyond this issue. Stop and ask if Linear metadata is unavailable.
 
 ## Confirm Before Outward Actions
 
-Pushing, opening a PR, and using a skill outside the active profile are Tier 2
-actions (see \`.harness/policies/judgment.md\`): outward-facing or hard to
-reverse. Stop and get explicit human go-ahead for the specific action before
-proceeding. Mahler does not perform or block these actions itself; the pause is
-the gate.
+Pushing and opening a PR are Tier 2 actions (see
+\`.harness/policies/judgment.md\`): outward-facing or hard to reverse. Stop and
+get explicit human go-ahead for the specific action before proceeding. Using a
+skill outside the active profile is a Tier 1 role-fit deviation unless the
+underlying action is itself Tier 2. Mahler does not perform or block these
+actions itself; the pause is the gate.
 
 Do not skip the Mahler issue brief just because the product repo is visible from the root directory.
 `;
@@ -293,15 +294,16 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 10. Decide which configured repos need worktrees, choose branch names using \`.harness/policies/branching.md\`, and create only those worktrees.
 11. Prefer project-local worktrees under \`workspaces/issues/<ISSUE>/repos/<repo>\`.
 12. Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent claude\` to \`.harness/decisions/\`. At session start, read the active ledger in \`.harness/decisions/\` (not \`archive/\`) to recover durable decisions — the next session never reads a prior issue's HANDOFF.
-13. If the requested skill is outside the active profile, treat it as a deliberate deviation: confirm with the human, then record the reason in \`HANDOFF.md\` and the \`.harness/decisions/\` ledger. Stop and ask if Linear metadata is unavailable.
+13. If the requested skill is outside the active profile, treat it as a Tier 1 deviation: proceed deliberately and record the reason in \`HANDOFF.md\`; add a \`.harness/decisions/\` ledger note only when the reason generalizes beyond this issue. Stop and ask if Linear metadata is unavailable.
 
 ## Confirm Before Outward Actions
 
-Pushing, opening a PR, and using a skill outside the active profile are Tier 2
-actions (see \`.harness/policies/judgment.md\`): outward-facing or hard to
-reverse. Stop and get explicit human go-ahead for the specific action before
-proceeding. Mahler does not perform or block these actions itself; the pause is
-the gate.
+Pushing and opening a PR are Tier 2 actions (see
+\`.harness/policies/judgment.md\`): outward-facing or hard to reverse. Stop and
+get explicit human go-ahead for the specific action before proceeding. Using a
+skill outside the active profile is a Tier 1 role-fit deviation unless the
+underlying action is itself Tier 2. Mahler does not perform or block these
+actions itself; the pause is the gate.
 
 Project-local Claude instructions in \`CLAUDE.md\` intentionally point back to these canonical installed skills and policies.
 `;
@@ -318,7 +320,7 @@ You are operating with the Mahler ${profile.name} profile.
 Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
 Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
 
-Before choosing a workflow skill, read .harness/config.json and .harness/agents/profiles/${profile.name}.json. Use the native skill under .agents/skills/<skill>/SKILL.md only if this profile allows it. If a requested skill is outside this profile, pause and get explicit human confirmation before using it, then record the deviation and reason in HANDOFF.md (see .harness/policies/judgment.md).
+Before choosing a workflow skill, read .harness/config.json and .harness/agents/profiles/${profile.name}.json. Prefer native skills under .agents/skills/<skill>/SKILL.md that this profile allows. If a requested skill is outside this profile, treat it as a Tier 1 role-fit deviation: proceed deliberately and record the reason in HANDOFF.md (see .harness/policies/judgment.md). Still get explicit human go-ahead for Tier 2 outward actions such as push or opening a PR.
 """
 `;
 }
@@ -336,7 +338,7 @@ Generated by Mahler. Edit \`agents/${profile.name}.json\`, then rerun \`mahler i
 Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
 Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
 
-Before choosing a workflow skill, read \`.harness/config.json\` and \`.harness/agents/profiles/${profile.name}.json\`. Use the native skill under \`.claude/skills/<skill>/SKILL.md\` only if this profile allows it. If a requested skill is outside this profile, pause and get explicit human confirmation before using it, then record the deviation and reason in HANDOFF.md (see .harness/policies/judgment.md).
+Before choosing a workflow skill, read \`.harness/config.json\` and \`.harness/agents/profiles/${profile.name}.json\`. Prefer native skills under \`.claude/skills/<skill>/SKILL.md\` that this profile allows. If a requested skill is outside this profile, treat it as a Tier 1 role-fit deviation: proceed deliberately and record the reason in HANDOFF.md (see .harness/policies/judgment.md). Still get explicit human go-ahead for Tier 2 outward actions such as push or opening a PR.
 `;
 }
 

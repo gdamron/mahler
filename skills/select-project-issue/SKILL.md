@@ -54,4 +54,3 @@ description: Resolve a Linear project prompt to one eligible issue and create it
 - Linear project metadata or issue list is unavailable or incomplete
 - no eligible issue matches configured assignee and label filters
 - selected issue is blocked or already active in another workspace
-- active profile does not allow this skill

@@ -39,4 +39,3 @@ description: Summarize current issue workspace state, blockers, tests, and next 
 ## Stop Conditions
 
 - issue workspace cannot be identified
-- active profile does not allow this skill

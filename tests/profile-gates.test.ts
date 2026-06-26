@@ -55,6 +55,7 @@ test("can advises on out-of-profile skills for scoped profiles", () => {
   assert.match(outOfProfile.stdout, /Advisory/);
   assert.match(outOfProfile.stdout, /Workflow Deviations/);
   assert.match(outOfProfile.stdout, /judgment\.md/);
+  assert.match(outOfProfile.stdout, /only append a durable note/);
 });
 
 test("commit and pr diagnostics are allowed for committer and full-stack profiles", () => {

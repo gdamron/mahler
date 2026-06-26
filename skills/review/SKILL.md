@@ -38,4 +38,3 @@ description: Review an issue-scoped diff and report findings before handoff.
 
 - no issue brief exists
 - review target is ambiguous
-- active profile does not include this skill and the human has not explicitly confirmed the deviation

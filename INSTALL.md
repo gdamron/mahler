@@ -99,6 +99,33 @@ The installed instructions tell the agent to resolve Linear context, create or
 select an issue brief, choose only the repos needed for the task, and create
 project-local worktrees for those repos.
 
+## Customizing This Workspace
+
+Mahler is one canonical workflow source installed into many workspaces. To adapt
+its policies, skills, or profiles for *this* workspace without forking Mahler,
+use the customization overlay under `.harness/custom/`:
+
+- `.harness/custom/policies/<name>.md` — override or add a workflow policy.
+- `.harness/custom/skills/<name>/SKILL.md` — override or add a skill (must start
+  with frontmatter containing `name: <name>` and `description:`).
+- `.harness/custom/agents/<name>.json` — override or add an agent profile.
+
+Rules:
+
+1. A custom file named like a Mahler default **replaces** that default; a custom
+   file with a new name is **added** to the install set.
+2. Rerunning `mahler install` re-composes the canonical defaults but **never
+   overwrites** anything under `.harness/custom/`.
+3. Composed markdown gets a provenance header (for example
+   `> Mahler default was replaced by .harness/custom/policies/review.md`) so an
+   agent reads one file instead of chasing several.
+4. A malformed override (bad profile JSON, a skill missing frontmatter, an empty
+   policy) fails `install` instead of writing a broken workspace.
+
+`mahler doctor` validates the overlay and warns if a profile allows a skill that
+is not installed. See `.harness/custom/README.md` (written on install) for a
+short in-tree reference.
+
 ## Manual Dogfood Checklist
 
 Use this checklist when validating Mahler against a real Linear issue from a

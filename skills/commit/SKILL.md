@@ -43,4 +43,3 @@ description: Commit completed issue-scoped work after checking tests and staged 
 
 - tests fail without explicit human direction
 - staged diff contains unrelated changes
-- active profile does not include this skill and the human has not explicitly confirmed the deviation

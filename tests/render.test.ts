@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
 import { defaultConfig } from "../src/config.js";
 import { claudeAgentDefinition, codexAgentDefinition, handoffMarkdown, launchCommand, nativeAdapter, rootAgentBlock, sessionMarkdown, taskMarkdown, workflowMarkdown } from "../src/render.js";
 
@@ -64,6 +66,15 @@ test("claude adapter points project instructions at canonical installed content"
   const adapter = nativeAdapter("claude");
   assert.match(adapter, /CLAUDE\.md/);
   assert.match(adapter, /canonical installed skills and policies/);
+});
+
+test("native adapters keep profile mismatches advisory and reserve confirmation for outward actions", () => {
+  for (const runtime of ["codex", "claude"] as const) {
+    const adapter = nativeAdapter(runtime);
+    assert.match(adapter, /outside the active profile, treat it as a Tier 1 deviation/);
+    assert.match(adapter, /Pushing and opening a PR are Tier 2 actions/);
+    assert.doesNotMatch(adapter, /using a skill outside the active profile are Tier 2/);
+  }
 });
 
 test("root agent block gives bare prompt path to mahler issue", () => {
@@ -200,8 +211,19 @@ test("native agent definitions include profile permissions", () => {
   };
   assert.match(codexAgentDefinition(profile), /\.agents\/skills\/<skill>\/SKILL\.md/);
   assert.match(codexAgentDefinition(profile), /Allowed skills: work-on-issue, handoff/);
+  assert.match(codexAgentDefinition(profile), /Tier 1 role-fit deviation/);
   assert.match(claudeAgentDefinition(profile), /\.claude\/skills\/<skill>\/SKILL\.md/);
   assert.match(claudeAgentDefinition(profile), /Denied skills: commit, pr/);
+  assert.match(claudeAgentDefinition(profile), /Tier 1 role-fit deviation/);
+});
+
+test("skill stop conditions do not hard-stop on profile mismatch", () => {
+  const skillsDir = resolve(process.cwd(), "skills");
+  for (const skill of readdirSync(skillsDir)) {
+    const body = readFileSync(resolve(skillsDir, skill, "SKILL.md"), "utf8");
+    assert.doesNotMatch(body, /active profile does not/);
+    assert.doesNotMatch(body, /outside the active profile.*confirm/i);
+  }
 });
 
 test("launch commands are agent specific", () => {

@@ -49,7 +49,8 @@ unrecorded deviation is a workflow failure; a recorded one is a review input.
 
 ### Tier 2 — Confirm (get explicit human go-ahead first)
 
-Examples: `git push`, opening a PR, a review-only profile reaching for commit.
+Examples: `git push`, opening a PR, changing issue-tracker state, or modifying
+remote/shared infrastructure.
 
 These actions are outward-facing or hard to reverse. A human developer would
 feel friction before doing them out of role; you do not, so manufacture the

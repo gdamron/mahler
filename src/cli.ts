@@ -981,7 +981,7 @@ function advisoryMessage(
   skill: string,
   reason: string,
 ): string {
-  return `Advisory: agent "${agent}" uses profile "${profile}", which does not include skill "${skill}" (${reason}). This is a Tier 1 norm, not a block: you may proceed deliberately, but record the reason in HANDOFF.md under Workflow Deviations and append a durable note with \`mahler decide --rule skill-outside-profile --reason "..."\` to .harness/decisions/, and ask the human first if this changes scope, ownership, or an outward action (see .harness/policies/judgment.md).`;
+  return `Advisory: agent "${agent}" uses profile "${profile}", which does not include skill "${skill}" (${reason}). This is a Tier 1 norm, not a block: you may proceed deliberately, but record the reason in HANDOFF.md under Workflow Deviations; only append a durable note with \`mahler decide --rule skill-outside-profile --reason "..."\` to .harness/decisions/ when the reason generalizes beyond this issue. Ask the human first if this changes scope, ownership, or an outward action (see .harness/policies/judgment.md).`;
 }
 
 function stringArray(value: unknown): string[] | undefined {

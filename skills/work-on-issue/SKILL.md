@@ -68,4 +68,3 @@ description: Create an issue brief and perform issue-scoped implementation work 
 - Linear MCP lookup fails or returns a different issue identifier
 - no repo is configured
 - requested work is outside the Linear issue scope
-- active profile does not allow this skill

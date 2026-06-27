@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
-import { defaultConfig, loadConfig, withInstallOptions } from "./config.js";
+import { configPath, defaultConfig, loadConfig, withInstallOptions } from "./config.js";
 import {
   adapterRuntimes,
   installedPolicyNames,
@@ -533,7 +533,7 @@ function install(
   const workspace = resolve(workspaceInput);
   ensureDir(workspace);
   const config = withInstallOptions(defaultConfig(workspace), {
-    repos: discoverRepos(workspace),
+    repos: withPreservedChecks(workspace, discoverRepos(workspace)),
     acceptedAssignees: listFlag(flags, "linear-assignee"),
     requiredLabels: listFlag(flags, "linear-label"),
   });
@@ -1188,6 +1188,30 @@ function parseProfileSource(source: Source, name: string): InstalledProfile {
     );
   }
   return normalizeProfile(parsed, name);
+}
+
+/**
+ * Re-running install rediscovers repos from disk, but `detectChecks` only
+ * knows about npm. Preserve any per-repo `checks` a human has set in the
+ * existing config (e.g. cargo commands) so a reinstall does not wipe them.
+ * Discovered checks win only when the existing config has none for that repo.
+ */
+function withPreservedChecks(
+  workspace: string,
+  discovered: HarnessConfig["repos"],
+): HarnessConfig["repos"] {
+  const configFile = configPath(workspace);
+  if (!existsSync(configFile)) return discovered;
+  const existingChecks = new Map<string, RepoChecks | undefined>(
+    loadConfig(workspace).repos.map((repo) => [repo.name, repo.checks]),
+  );
+  return discovered.map((repo) => {
+    const existing = existingChecks.get(repo.name);
+    if (existing && Object.keys(existing).length > 0) {
+      return { ...repo, checks: existing };
+    }
+    return repo;
+  });
 }
 
 function discoverRepos(workspace: string): HarnessConfig["repos"] {

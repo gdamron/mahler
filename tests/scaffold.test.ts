@@ -52,6 +52,32 @@ test("install writes discovered policies, skills, and profiles", () => {
   assert.equal(existsSync(resolve(workspace, ".harness", "custom", "README.md")), true);
 });
 
+test("reinstall preserves human-set per-repo checks that detection cannot infer", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-checks-"));
+  // A child repo with no package.json — detectChecks infers nothing for it.
+  mkdirSync(resolve(workspace, "rustrepo", ".git"), { recursive: true });
+  assert.equal(install(workspace).status, 0);
+
+  const configFile = resolve(workspace, ".harness", "config.json");
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const repo = config.repos.find((r: { name: string }) => r.name === "rustrepo");
+  assert.ok(repo, "rustrepo should be discovered");
+  assert.equal(repo.checks, undefined, "no checks inferred without package.json");
+
+  // Human adds cargo checks by hand.
+  repo.checks = { test: "cargo test --lib --tests", build: "cargo build --lib" };
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(install(workspace).status, 0);
+  const after = JSON.parse(readFileSync(configFile, "utf8"));
+  const repoAfter = after.repos.find((r: { name: string }) => r.name === "rustrepo");
+  assert.deepEqual(
+    repoAfter.checks,
+    { test: "cargo test --lib --tests", build: "cargo build --lib" },
+    "reinstall must not wipe human-set checks"
+  );
+});
+
 test("custom overlay overrides a default and adds custom-only files; reinstall preserves both", () => {
   const workspace = mkdtempSync(resolve(tmpdir(), "mahler-overlay-"));
   assert.equal(install(workspace).status, 0);

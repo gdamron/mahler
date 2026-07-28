@@ -1,7 +1,6 @@
 ---
 name: interview
-description: Interview the user about a plan or design until we reach a shared 
-understanding.
+description: Interview the user about a plan or design until we reach a shared understanding.
 ---
 
 # Interview

@@ -44,10 +44,10 @@ Tie-break by priority first, then oldest update/create timestamp.
 ## Roles
 
 - **Human developer** — the final accountable authority for quality, integration, merge, and release. Owns final review and merge decisions unless a prompt explicitly delegates a narrower action. The human is not modeled as an agent.
-- **Orchestrator agent** — the default coordinating role and the primary interface to the human developer: it surfaces risks to the human, reports synthesis, and asks for direction. It plans agent-level work, delegates scoped slices to sub-agents, coordinates sub-agents, synthesizes their outputs, and runs quality checks within the bounds of the delegated work. It is empowered to take any action directly when delegation is not warranted, pausing at Tier 2 boundaries (push/PR) for human go-ahead.
+- **Orchestrator agent** — the default coordinating role and the primary interface to the human developer: it surfaces risks to the human, reports synthesis, and asks for direction. It plans agent-level work, delegates scoped slices to sub-agents, coordinates sub-agents, synthesizes their outputs, and runs quality checks within the bounds of the delegated work. It is empowered to take any action directly when delegation is not warranted, pausing at Tier 2 boundaries for human go-ahead.
 - **Sub-agents** — scoped specialist agents launched and delegated by the orchestrator for a specific slice of the task. Delegation uses native/runtime agent capabilities and the brief template in \`.harness/policies/sub-agent-delegation.md\`, not Mahler CLI commands.
 
-Tier 2 actions (push, PR) and Tier 3 guardrails (base-branch merge, CI) still apply: the orchestrator pauses for human go-ahead and never bypasses the forge.
+Tier 2 actions and Tier 3 guardrails (base-branch merge, CI) still apply: the orchestrator pauses for human go-ahead and never bypasses the forge.
 `;
 }
 
@@ -60,7 +60,9 @@ export function rootAgentBlock(config: HarnessConfig): string {
   const claudeProfile = claude
     ? `claude: ${claude.profile}`
     : "claude: configured profile";
-  const guardrailLines = (config.guardrails ?? []).map((line) => `- ${line}`).join("\n") || "- (none declared)";
+  const guardrailLines =
+    (config.guardrails ?? []).map((line) => `- ${line}`).join("\n") ||
+    "- (none declared)";
   return `
 ## Mahler Workflow
 
@@ -130,9 +132,15 @@ export function sessionMarkdown(
   guardrails: string[] = [],
   definitionOfDone: string[] = [],
 ): string {
-  const repoLines = repos.length === 0
-    ? "- (none configured)"
-    : repos.map((repo) => `- ${repo.name}: source \`${repo.path}\`, base \`${repo.baseBranch}\`, recommended worktree \`${recommendedWorktreeRoot}/repos/${repo.name}\``).join("\n");
+  const repoLines =
+    repos.length === 0
+      ? "- (none configured)"
+      : repos
+          .map(
+            (repo) =>
+              `- ${repo.name}: source \`${repo.path}\`, base \`${repo.baseBranch}\`, recommended worktree \`${recommendedWorktreeRoot}/repos/${repo.name}\``,
+          )
+          .join("\n");
   return `# Agent Session
 
 - Issue: ${issue.identifier}
@@ -262,12 +270,11 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 
 ## Confirm Before Outward Actions
 
-Pushing and opening a PR are Tier 2 actions (see
-\`.harness/policies/judgment.md\`): outward-facing or hard to reverse. Stop and
-get explicit human go-ahead for the specific action before proceeding. Using a
-skill outside the active profile is a Tier 1 role-fit deviation unless the
-underlying action is itself Tier 2. Mahler does not perform or block these
-actions itself; the pause is the gate.
+Merging a PR is a Tier 2 action (see \`.harness/policies/judgment.md\`): outward-
+facing or hard to reverse. Stop and get explicit human go-ahead for the specific 
+action before proceeding. Using a skill outside the active profile is a Tier 1 
+role-fit deviation unless the underlying action is itself Tier 2. Mahler does not 
+perform or block these actions itself; the pause is the gate.
 
 Do not skip the Mahler issue brief just because the product repo is visible from the root directory.
 `;
@@ -298,12 +305,11 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 
 ## Confirm Before Outward Actions
 
-Pushing and opening a PR are Tier 2 actions (see
-\`.harness/policies/judgment.md\`): outward-facing or hard to reverse. Stop and
-get explicit human go-ahead for the specific action before proceeding. Using a
-skill outside the active profile is a Tier 1 role-fit deviation unless the
-underlying action is itself Tier 2. Mahler does not perform or block these
-actions itself; the pause is the gate.
+Merging a PR is a Tier 2 action (see\`.harness/policies/judgment.md\`): outward-
+facing or hard to reverse. Stop and get explicit human go-ahead for the specific 
+action before proceeding. Using a skill outside the active profile is a Tier 1 
+role-fit deviation unless the underlying action is itself Tier 2. Mahler does not 
+perform or block these actions itself; the pause is the gate.
 
 Project-local Claude instructions in \`CLAUDE.md\` intentionally point back to these canonical installed skills and policies.
 `;
@@ -320,7 +326,7 @@ You are operating with the Mahler ${profile.name} profile.
 Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
 Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
 
-Before choosing a workflow skill, read .harness/config.json and .harness/agents/profiles/${profile.name}.json. Prefer native skills under .agents/skills/<skill>/SKILL.md that this profile allows. If a requested skill is outside this profile, treat it as a Tier 1 role-fit deviation: proceed deliberately and record the reason in HANDOFF.md (see .harness/policies/judgment.md). Still get explicit human go-ahead for Tier 2 outward actions such as push or opening a PR.
+Before choosing a workflow skill, read .harness/config.json and .harness/agents/profiles/${profile.name}.json. Prefer native skills under .agents/skills/<skill>/SKILL.md that this profile allows. If a requested skill is outside this profile, treat it as a Tier 1 role-fit deviation: proceed deliberately and record the reason in HANDOFF.md (see .harness/policies/judgment.md). Still get explicit human go-ahead for Tier 2 outward actions.
 """
 `;
 }
@@ -338,7 +344,7 @@ Generated by Mahler. Edit \`agents/${profile.name}.json\`, then rerun \`mahler i
 Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
 Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
 
-Before choosing a workflow skill, read \`.harness/config.json\` and \`.harness/agents/profiles/${profile.name}.json\`. Prefer native skills under \`.claude/skills/<skill>/SKILL.md\` that this profile allows. If a requested skill is outside this profile, treat it as a Tier 1 role-fit deviation: proceed deliberately and record the reason in HANDOFF.md (see .harness/policies/judgment.md). Still get explicit human go-ahead for Tier 2 outward actions such as push or opening a PR.
+Before choosing a workflow skill, read \`.harness/config.json\` and \`.harness/agents/profiles/${profile.name}.json\`. Prefer native skills under \`.claude/skills/<skill>/SKILL.md\` that this profile allows. If a requested skill is outside this profile, treat it as a Tier 1 role-fit deviation: proceed deliberately and record the reason in HANDOFF.md (see .harness/policies/judgment.md). Still get explicit human go-ahead for Tier 2 outward actions.
 `;
 }
 
@@ -367,8 +373,14 @@ function tomlString(value: string): string {
     .replaceAll("\n", "\\n");
 }
 
-function definitionOfDoneChecklist(issue: LinearIssue, baseline: string[]): string {
-  const items = uniqueNonEmpty([...(baseline ?? []), ...(issue.acceptanceCriteria ?? [])]);
+function definitionOfDoneChecklist(
+  issue: LinearIssue,
+  baseline: string[],
+): string {
+  const items = uniqueNonEmpty([
+    ...(baseline ?? []),
+    ...(issue.acceptanceCriteria ?? []),
+  ]);
   if (items.length === 0) return "- [ ] No Definition of Done configured.";
   return items.map((item) => `- [ ] ${item}`).join("\n");
 }

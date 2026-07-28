@@ -28,13 +28,13 @@ is the record:
 
 1. Always write the reason in the `Workflow Deviations` section of the issue's
    `HANDOFF.md` — what you decided, why, the risk, and any follow-up.
-2. *Only when the reason generalizes beyond this issue* — a decision a future,
+2. _Only when the reason generalizes beyond this issue_ — a decision a future,
    unrelated session should know — also append it to the cross-session ledger
    with `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent
-   <agent>` (writes `.harness/decisions/<date>-<slug>.md`).
+<agent>` (writes `.harness/decisions/<date>-<slug>.md`).
 
-Keep the ledger lean. `HANDOFF.md` is per-issue and a later session never reads a
-*prior* issue's handoff, so the ledger exists to carry forward only the durable
+Keep the ledger lean. `HANDOFF.md` is per-issue and a later session never reads
+a _prior_ issue's handoff, so the ledger exists to carry forward only the durable
 reasons worth re-reading every session. A purely issue-local judgment call stays
 in `HANDOFF.md` only — recording it in the ledger turns the ledger into noise the
 next session must wade through.
@@ -49,8 +49,8 @@ unrecorded deviation is a workflow failure; a recorded one is a review input.
 
 ### Tier 2 — Confirm (get explicit human go-ahead first)
 
-Examples: `git push`, opening a PR, changing issue-tracker state, or modifying
-remote/shared infrastructure.
+Examples: approving a pr, resolving pr comment threads, changing issue-tracker
+state, writing to a production database, or modifying remote/shared infrastructure.
 
 These actions are outward-facing or hard to reverse. A human developer would
 feel friction before doing them out of role; you do not, so manufacture the

@@ -4,8 +4,7 @@
 
 Committing is normally done by a profile that includes the commit skill. Role
 fit is a Tier 1 norm (see the judgment policy): a deliberate, recorded
-deviation is acceptable; an unrecorded one is not. Pushing is a Tier 2 action
-that needs explicit human go-ahead.
+deviation is acceptable; an unrecorded one is not.
 
 ### The Save Point Pattern
 

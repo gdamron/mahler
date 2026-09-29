@@ -80,3 +80,9 @@ export interface IssueSelection {
   issue: LinearIssue;
   reason: string;
 }
+
+/** One line of `mahler doctor` / `mahler check` output. */
+export interface Finding {
+  level: "ok" | "info" | "warn" | "error";
+  message: string;
+}

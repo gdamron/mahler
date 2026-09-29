@@ -99,3 +99,15 @@ export function loadConfig(workspace: string): HarnessConfig {
     definitionOfDone: parsed.definitionOfDone ?? defaults.definitionOfDone
   };
 }
+
+/** Where an issue's brief (`meta`) and its repo worktrees (`worktreeRoot`) live. */
+export function issuePaths(
+  workspace: string,
+  config: HarnessConfig,
+  identifier: string,
+): { meta: string; worktreeRoot: string } {
+  return {
+    meta: resolve(workspace, ".harness", "issues", identifier),
+    worktreeRoot: resolve(workspace, config.workspaceDir, "issues", identifier),
+  };
+}

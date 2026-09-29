@@ -1,3 +1,4 @@
+import { renderTemplate } from "./templates.js";
 import type {
   AgentName,
   HarnessConfig,
@@ -6,92 +7,41 @@ import type {
   LinearProject,
 } from "./types.js";
 
+// Prose lives in templates/*.md; these functions only shape data into
+// template variables.
+
+type Runtime = "codex" | "claude";
+
+const runtimes: Record<
+  Runtime,
+  { label: string; skillsDir: string; rootInstructions: string }
+> = {
+  codex: {
+    label: "Codex",
+    skillsDir: ".agents/skills",
+    rootInstructions: "AGENTS.md",
+  },
+  claude: {
+    label: "Claude",
+    skillsDir: ".claude/skills",
+    rootInstructions: "CLAUDE.md",
+  },
+};
+
 export function workflowMarkdown(): string {
-  return `# Mahler Workflow
-
-This workspace uses Mahler for multi-agent development. An **orchestrator agent** coordinates the work; the **human developer** stays the final accountable authority.
-
-## What To Do When Prompted
-
-- If asked to "work on FUG-123", run the Mahler issue workflow for that issue brief.
-- If asked to "work on project X in Linear", use Linear MCP to inspect the project, select one eligible issue, then create the issue brief.
-- Do not edit code in the product workspace root.
-- Do not edit sibling issue workspaces.
-- Before changing code, read the generated issue brief files: \`TASK.md\`, \`AGENT_SESSION.md\`, and \`HANDOFF.md\`.
-- Create git worktrees only for repos needed by the task.
-- Prefer project-local worktrees under \`workspaces/issues/<ISSUE>/repos/<repo>\`.
-- Choose branch names using \`.harness/policies/branching.md\`; Mahler does not choose branch names for you.
-- At session start, read the active \`.harness/decisions/\` ledger (not \`archive/\`) to recover durable decisions from earlier sessions.
-- If delegating to sub-agents, use \`.harness/policies/sub-agent-delegation.md\`; default sub-agent authority is read-only unless the brief explicitly grants edit scope.
-- Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide\` to \`.harness/decisions/\`.
-- Before stopping, update \`HANDOFF.md\` with changed files, tests run, blockers, and next steps.
-
-## Atomic Unit
-
-Linear issues are the atomic unit for code changes, commits, and PRs. Project prompts are issue-selection prompts.
-
-## Linear Selection Rules
-
-For project prompts, select the highest-priority issue that:
-
-- is open and unblocked,
-- is not already active in a workspace,
-- is assigned to an accepted configured agent user,
-- has all required configured labels.
-
-Tie-break by priority first, then oldest update/create timestamp.
-
-## Roles
-
-- **Human developer** — the final accountable authority for quality, integration, merge, and release. Owns final review and merge decisions unless a prompt explicitly delegates a narrower action. The human is not modeled as an agent.
-- **Orchestrator agent** — the default coordinating role and the primary interface to the human developer: it surfaces risks to the human, reports synthesis, and asks for direction. It plans agent-level work, delegates scoped slices to sub-agents, coordinates sub-agents, synthesizes their outputs, and runs quality checks within the bounds of the delegated work. It is empowered to take any action directly when delegation is not warranted, pausing at Tier 2 boundaries for human go-ahead.
-- **Sub-agents** — scoped specialist agents launched and delegated by the orchestrator for a specific slice of the task. Delegation uses native/runtime agent capabilities and the brief template in \`.harness/policies/sub-agent-delegation.md\`, not Mahler CLI commands.
-
-Tier 2 actions and Tier 3 guardrails (base-branch merge, CI) still apply: the orchestrator pauses for human go-ahead and never bypasses the forge.
-`;
+  return renderTemplate("workflow");
 }
 
 export function rootAgentBlock(config: HarnessConfig): string {
-  const codex = config.agents.codex;
-  const claude = config.agents.claude;
-  const codexProfile = codex
-    ? `codex: ${codex.profile}`
-    : "codex: configured profile";
-  const claudeProfile = claude
-    ? `claude: ${claude.profile}`
-    : "claude: configured profile";
-  const guardrailLines =
-    (config.guardrails ?? []).map((line) => `- ${line}`).join("\n") ||
-    "- (none declared)";
-  return `
-## Mahler Workflow
-
-This workspace uses Mahler. Bare prompts like \`work on MAH-123\`, \`start MAH-123\`, or \`work on project X in Linear\` should route through Mahler before code changes so the agent has the issue brief and shared policies.
-
-Mahler compiles canonical workflow source into native agent artifacts:
-
-- Codex skills: \`.agents/skills/<skill>/SKILL.md\`
-- Codex agents: \`.codex/agents/<profile>.toml\`
-- Claude skills: \`.claude/skills/<skill>/SKILL.md\`
-- Claude agents: \`.claude/agents/<profile>.md\`
-- Shared config and policies: \`.harness/config.json\` and \`.harness/policies/\`
-
-Recommended routing:
-
-- Active profile check: inspect \`.harness/config.json\` and the active profile in \`.harness/agents/profiles/\` (${codexProfile}; ${claudeProfile}) before choosing a skill.
-- Issue prompt: use the native \`work-on-issue\` skill. It fetches Linear metadata, writes \`.harness/tmp/linear/<ISSUE>.json\`, then runs \`${config.mahlerCommand} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>\` to create a brief.
-- Project prompt: use the native \`select-project-issue\` skill. It fetches Linear project metadata, writes \`.harness/tmp/linear/<project>.json\`, then runs \`${config.mahlerCommand} project "<PROJECT>" --agent <codex|claude> --linear-file <project.json>\`.
-- For review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.
-- Sub-agent delegation: use \`.harness/policies/sub-agent-delegation.md\`; prefer configured roles, specialize them in the brief, default to read-only authority, and synthesize results into \`HANDOFF.md\` or working notes. Mahler does not provide \`mahler subagent ...\` commands.
-- Create git worktrees only for repos needed by the task, preferably under \`${config.workspaceDir}/issues/<ISSUE>/repos/<repo>\`.
-- Choose branch names using \`.harness/policies/branching.md\`; Mahler does not choose branch names for agents.
-- Record deliberate workflow deviations in \`.harness/issues/<ISSUE>/HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide\` to \`.harness/decisions/\`. Read the active ledger (not \`archive/\`) at session start to recover durable decisions.
-- If the requested skill is outside the active profile, treat it as a Tier 1 deviation: you may proceed deliberately, but record the reason (see \`.harness/policies/judgment.md\`). Stop and ask the human if Linear metadata is unavailable.
-
-Guardrails (Tier 3 — declared here so agents anticipate them; enforced by the forge/CI, not Mahler):
-
-${guardrailLines}
-`;
+  const profileFor = (runtime: Runtime) =>
+    `${runtime}: ${config.agents[runtime]?.profile ?? "configured profile"}`;
+  return renderTemplate("root-agent-block", {
+    codexProfile: profileFor("codex"),
+    claudeProfile: profileFor("claude"),
+    mahlerCommand: config.mahlerCommand,
+    workspaceDir: config.workspaceDir,
+    guardrails: bulletList(config.guardrails ?? [], "- (none declared)"),
+  });
 }
 
 export function taskMarkdown(
@@ -99,28 +49,17 @@ export function taskMarkdown(
   source: string,
   definitionOfDone: string[] = [],
 ): string {
-  return `# ${issue.identifier}: ${issue.title}
-
-Linear source: ${source}
-${issue.url ? `Linear URL: ${issue.url}\n` : ""}
-## Description
-
-${issue.description?.trim() || "_No description supplied. If Linear MCP is unavailable, ask the human for missing context before inventing requirements._"}
-${issueContextMarkdown(issue)}
-
-## Definition of Done
-
-${definitionOfDoneChecklist(issue, definitionOfDone)}
-
-## Required First Steps
-
-- Read \`AGENT_SESSION.md\`.
-- Read \`HANDOFF.md\`.
-- Inspect the repo before changing code.
-- Decide which configured repos need worktrees for this task.
-- Choose branch names using \`.harness/policies/branching.md\`.
-- Keep work scoped to this Linear issue.
-`;
+  return renderTemplate("task", {
+    identifier: issue.identifier,
+    title: issue.title,
+    source,
+    urlLine: issue.url ? `Linear URL: ${issue.url}\n` : "",
+    description:
+      issue.description?.trim() ||
+      "_No description supplied. If Linear MCP is unavailable, ask the human for missing context before inventing requirements._",
+    context: issueContextMarkdown(issue),
+    definitionOfDone: definitionOfDoneChecklist(issue, definitionOfDone),
+  });
 }
 
 export function sessionMarkdown(
@@ -132,92 +71,34 @@ export function sessionMarkdown(
   guardrails: string[] = [],
   definitionOfDone: string[] = [],
 ): string {
-  const repoLines =
-    repos.length === 0
-      ? "- (none configured)"
-      : repos
-          .map(
-            (repo) =>
-              `- ${repo.name}: source \`${repo.path}\`, base \`${repo.baseBranch}\`, recommended worktree \`${recommendedWorktreeRoot}/repos/${repo.name}\``,
-          )
-          .join("\n");
-  return `# Agent Session
-
-- Issue: ${issue.identifier}
-- Agent: ${agent}
-${
-  profile
+  const profileLines = profile
     ? `- Profile: ${profile.name}
-- Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
-- Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
+- Allowed skills: ${skillList(profile.allowedSkills)}
+- Denied skills: ${skillList(profile.deniedSkills)}
 `
-    : ""
-}- Recommended worktree root: ${recommendedWorktreeRoot}
-
-## Configured Repos
-
-${repoLines}
-
-## Guardrails (enforced outside Mahler — anticipate them)
-
-${guardrails.length === 0 ? "- (none declared in .harness/config.json)" : guardrails.map((line) => `- ${line}`).join("\n")}
-
-## Definition of Done
-
-${definitionOfDoneChecklist(issue, definitionOfDone)}
-
-## Rules
-
-- Create worktrees only for repos needed by this task.
-- Prefer project-local worktrees under the recommended worktree root.
-- Choose short-lived branch names using \`.harness/policies/branching.md\`.
-- Do not edit the product workspace root.
-- Follow the native installed skills for this agent and policies in \`.harness/policies/\`.
-- If delegating to sub-agents, use \`.harness/policies/sub-agent-delegation.md\`; prefer configured roles, specialize as needed, and keep authority read-only unless edit scope is explicit.
-- At session start, read the active \`.harness/decisions/\` ledger (not \`archive/\`) to recover durable decisions from earlier sessions.
-- Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide\` to \`.harness/decisions/\`.
-- Update \`HANDOFF.md\` before stopping.
-`;
+    : "";
+  return renderTemplate("agent-session", {
+    identifier: issue.identifier,
+    agent,
+    profileLines,
+    worktreeRoot: recommendedWorktreeRoot,
+    repos: bulletList(
+      repos.map(
+        (repo) =>
+          `${repo.name}: source \`${repo.path}\`, base \`${repo.baseBranch}\`, recommended worktree \`${recommendedWorktreeRoot}/repos/${repo.name}\``,
+      ),
+      "- (none configured)",
+    ),
+    guardrails: bulletList(
+      guardrails,
+      "- (none declared in .harness/config.json)",
+    ),
+    definitionOfDone: definitionOfDoneChecklist(issue, definitionOfDone),
+  });
 }
 
 export function handoffMarkdown(issue: LinearIssue): string {
-  return `# Handoff: ${issue.identifier}
-
-## Status
-
-- Phase: brief-created
-- State: not started
-- Current owner:
-- Blockers:
-
-## Reviews
-
-- Self-review: not started
-- Agent review: not requested
-- Human review: pending
-
-## Quality
-
-- Relevant tests/checks:
-- Full test suite:
-- Known risks:
-- Skipped checks and reasons:
-
-## Changes
-
--
-
-## Next Steps
-
--
-
-## Workflow Deviations
-
-Record deliberate deviations here. Reference a \`.harness/decisions/\` ledger note when one exists (see \`.harness/policies/judgment.md\`).
-
-| Decision | Reason | Risk | Follow-up |
-|---|---|---|---|
-`;
+  return renderTemplate("handoff", { identifier: issue.identifier });
 }
 
 export function projectMarkdown(
@@ -225,127 +106,51 @@ export function projectMarkdown(
   selected: LinearIssue,
   reason: string,
 ): string {
-  return `# Linear Project: ${project.name}
-
-${project.description?.trim() || "_No project description supplied._"}
-
-## Selected Issue
-
-- ${selected.identifier}: ${selected.title}
-- Reason: ${reason}
-
-## Policy
-
-Project prompts resolve to a single eligible Linear issue before code work begins. Continue from the issue brief for ${selected.identifier}.
-`;
+  return renderTemplate("project", {
+    name: project.name,
+    description:
+      project.description?.trim() || "_No project description supplied._",
+    identifier: selected.identifier,
+    title: selected.title,
+    reason,
+  });
 }
 
-export function nativeAdapter(agent: "codex" | "claude"): string {
-  if (agent === "codex") return codexAdapter();
-  return claudeAdapter();
-}
-
-function codexAdapter(): string {
-  return `# Mahler Native Adapter: Codex
-
-This file is generated from Mahler canonical skills, profiles, and policies.
-
-## Prompt Routing
-
-When the user asks to work on a Linear issue or project, including bare prompts like \`work on MAH-123\`:
-
-1. Read \`WORKFLOW.md\`.
-2. Read \`.harness/config.json\` to identify the active Codex profile.
-3. Read that profile under \`.harness/agents/profiles/\`.
-4. For \`work on ISSUE-123\`, use \`.agents/skills/work-on-issue/SKILL.md\`.
-5. For project prompts, use \`.agents/skills/select-project-issue/SKILL.md\`.
-6. Read every policy named by the selected skill from \`.harness/policies/\`.
-7. Use Linear MCP for issue or project details.
-8. Write Linear metadata JSON under \`.harness/tmp/linear/\` using \`mahler linear-template issue|project\` as the shape.
-9. Run the Mahler command described in \`.harness/config.json\` to create the issue brief.
-10. Decide which configured repos need worktrees, choose branch names using \`.harness/policies/branching.md\`, and create only those worktrees.
-11. Prefer project-local worktrees under \`workspaces/issues/<ISSUE>/repos/<repo>\`.
-12. Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent codex\` to \`.harness/decisions/\`. At session start, read the active ledger in \`.harness/decisions/\` (not \`archive/\`) to recover durable decisions — the next session never reads a prior issue's HANDOFF.
-13. If the requested skill is outside the active profile, treat it as a Tier 1 deviation: proceed deliberately and record the reason in \`HANDOFF.md\`; add a \`.harness/decisions/\` ledger note only when the reason generalizes beyond this issue. Stop and ask if Linear metadata is unavailable.
-
-## Confirm Before Outward Actions
-
-Merging a PR is a Tier 2 action (see \`.harness/policies/judgment.md\`): outward-
-facing or hard to reverse. Stop and get explicit human go-ahead for the specific 
-action before proceeding. Using a skill outside the active profile is a Tier 1 
-role-fit deviation unless the underlying action is itself Tier 2. Mahler does not 
-perform or block these actions itself; the pause is the gate.
-
-Do not skip the Mahler issue brief just because the product repo is visible from the root directory.
-`;
-}
-
-function claudeAdapter(): string {
-  return `# Mahler Native Adapter: Claude
-
-This file is generated from Mahler canonical skills, profiles, and policies.
-
-## Prompt Routing
-
-When the user asks to work on a Linear issue or project, including bare prompts like \`work on MAH-123\`:
-
-1. Read \`WORKFLOW.md\`.
-2. Read \`.harness/config.json\` to identify the active Claude profile.
-3. Read that profile under \`.harness/agents/profiles/\`.
-4. For \`work on ISSUE-123\`, use \`.claude/skills/work-on-issue/SKILL.md\`.
-5. For project prompts, use \`.claude/skills/select-project-issue/SKILL.md\`.
-6. Read every policy named by the selected skill from \`.harness/policies/\`.
-7. Use Linear MCP for issue or project details.
-8. Write Linear metadata JSON under \`.harness/tmp/linear/\` using \`mahler linear-template issue|project\` as the shape.
-9. Run the Mahler command described in \`.harness/config.json\` to create the issue brief.
-10. Decide which configured repos need worktrees, choose branch names using \`.harness/policies/branching.md\`, and create only those worktrees.
-11. Prefer project-local worktrees under \`workspaces/issues/<ISSUE>/repos/<repo>\`.
-12. Record deliberate workflow deviations in \`HANDOFF.md\`; only when the reason generalizes beyond this issue, also append a note with \`mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent claude\` to \`.harness/decisions/\`. At session start, read the active ledger in \`.harness/decisions/\` (not \`archive/\`) to recover durable decisions — the next session never reads a prior issue's HANDOFF.
-13. If the requested skill is outside the active profile, treat it as a Tier 1 deviation: proceed deliberately and record the reason in \`HANDOFF.md\`; add a \`.harness/decisions/\` ledger note only when the reason generalizes beyond this issue. Stop and ask if Linear metadata is unavailable.
-
-## Confirm Before Outward Actions
-
-Merging a PR is a Tier 2 action (see\`.harness/policies/judgment.md\`): outward-
-facing or hard to reverse. Stop and get explicit human go-ahead for the specific 
-action before proceeding. Using a skill outside the active profile is a Tier 1 
-role-fit deviation unless the underlying action is itself Tier 2. Mahler does not 
-perform or block these actions itself; the pause is the gate.
-
-Project-local Claude instructions in \`CLAUDE.md\` intentionally point back to these canonical installed skills and policies.
-`;
+export function nativeAdapter(runtime: Runtime): string {
+  const { label, skillsDir, rootInstructions } = runtimes[runtime];
+  return renderTemplate("adapter", {
+    runtime,
+    runtimeLabel: label,
+    skillsDir,
+    rootInstructions,
+  });
 }
 
 export function codexAgentDefinition(profile: InstalledProfile): string {
   return `# Generated by Mahler. Edit agents/${profile.name}.json, then rerun mahler install.
 name = "${tomlString(profile.name)}"
-description = "${tomlString(profile.description ?? `${profile.name} Mahler profile`)}"
+description = "${tomlString(profileDescription(profile))}"
 
 developer_instructions = """
-You are operating with the Mahler ${profile.name} profile.
-
-Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
-Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
-
-Before choosing a workflow skill, read .harness/config.json and .harness/agents/profiles/${profile.name}.json. Prefer native skills under .agents/skills/<skill>/SKILL.md that this profile allows. If a requested skill is outside this profile, treat it as a Tier 1 role-fit deviation: proceed deliberately and record the reason in HANDOFF.md (see .harness/policies/judgment.md). Still get explicit human go-ahead for Tier 2 outward actions.
-"""
+${agentInstructions(profile, "codex")}"""
 `;
 }
 
 export function claudeAgentDefinition(profile: InstalledProfile): string {
-  return `---
-name: ${profile.name}
-description: ${profile.description ?? `${profile.name} Mahler profile`}
----
+  return renderTemplate("claude-agent", {
+    name: profile.name,
+    description: profileDescription(profile),
+    instructions: agentInstructions(profile, "claude").trimEnd(),
+  });
+}
 
-# Mahler ${profile.name} Profile
-
-Generated by Mahler. Edit \`agents/${profile.name}.json\`, then rerun \`mahler install\`.
-
-Allowed skills: ${profile.allowedSkills.join(", ") || "(none)"}
-Denied skills: ${profile.deniedSkills.join(", ") || "(none)"}
-
-Before choosing a workflow skill, read \`.harness/config.json\` and \`.harness/agents/profiles/${profile.name}.json\`. Prefer native skills under \`.claude/skills/<skill>/SKILL.md\` that this profile allows. If a requested skill is outside this profile, treat it as a Tier 1 role-fit deviation: proceed deliberately and record the reason in HANDOFF.md (see .harness/policies/judgment.md). Still get explicit human go-ahead for Tier 2 outward actions.
-`;
+function agentInstructions(profile: InstalledProfile, runtime: Runtime): string {
+  return renderTemplate("agent-profile", {
+    name: profile.name,
+    allowedSkills: skillList(profile.allowedSkills),
+    deniedSkills: skillList(profile.deniedSkills),
+    skillsDir: runtimes[runtime].skillsDir,
+  });
 }
 
 export function launchCommand(
@@ -360,6 +165,19 @@ export function launchCommand(
     return `claude --add-dir ${shell(metadataPath)} ${shell(repoPath)}`;
   }
   return `<launch ${agent} in ${repoPath} with metadata dir ${metadataPath}>`;
+}
+
+function profileDescription(profile: InstalledProfile): string {
+  return profile.description ?? `${profile.name} Mahler profile`;
+}
+
+function skillList(skills: string[]): string {
+  return skills.join(", ") || "(none)";
+}
+
+function bulletList(items: string[], empty: string): string {
+  if (items.length === 0) return empty;
+  return items.map((item) => `- ${item}`).join("\n");
 }
 
 function shell(value: string): string {
@@ -397,7 +215,7 @@ function issueContextMarkdown(issue: LinearIssue): string {
 function issueListSection(title: string, items?: string[]): string {
   const normalized = uniqueNonEmpty(items ?? []);
   if (normalized.length === 0) return "";
-  return `## ${title}\n\n${normalized.map((item) => `- ${item}`).join("\n")}`;
+  return `## ${title}\n\n${bulletList(normalized, "")}`;
 }
 
 function uniqueNonEmpty(items: string[]): string[] {

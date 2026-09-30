@@ -28,6 +28,10 @@ export function defaultConfig(_workspace: string): HarnessConfig {
       "`HANDOFF.md` is current with changed files, checks run, blockers, and next steps.",
       "The change stays within the Linear issue scope.",
     ],
+    merge: {
+      humanReviewLabels: ["high-risk"],
+      agentMergeLabels: ["agent-merge"],
+    },
     agents: {
       codex: {
         runtime: "codex",
@@ -40,6 +44,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "work-on-issue",
           "interview",
           "pr",
+          "merge",
           "handoff",
         ],
         policies: [
@@ -51,6 +56,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "interview",
           "issue-selection",
           "judgment",
+          "merge",
           "pr",
           "review",
           "sub-agent-delegation",
@@ -68,6 +74,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "work-on-issue",
           "interview",
           "pr",
+          "merge",
           "handoff",
         ],
         policies: [
@@ -79,6 +86,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "interview",
           "issue-selection",
           "judgment",
+          "merge",
           "pr",
           "review",
           "sub-agent-delegation",
@@ -123,6 +131,12 @@ export function loadConfig(workspace: string): HarnessConfig {
     ...parsed,
     guardrails: parsed.guardrails ?? [],
     definitionOfDone: parsed.definitionOfDone ?? defaults.definitionOfDone,
+    merge: {
+      humanReviewLabels:
+        parsed.merge?.humanReviewLabels ?? defaults.merge.humanReviewLabels,
+      agentMergeLabels:
+        parsed.merge?.agentMergeLabels ?? defaults.merge.agentMergeLabels,
+    },
   };
 }
 

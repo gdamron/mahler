@@ -32,13 +32,13 @@ test("profile prints active profile permissions", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Agent: codex/);
   assert.match(result.stdout, /Profile: composer/);
-  assert.match(result.stdout, /Allowed skills: compose, orchestrate, select-project-issue, work-on-issue, interview, pr, handoff/);
+  assert.match(result.stdout, /Allowed skills: compose, orchestrate, select-project-issue, work-on-issue, interview, pr, merge, handoff/);
   assert.match(result.stdout, /Denied skills: \(none\)/);
 });
 
 test("can reports allowed skills for the composer default", () => {
   const workspace = installWorkspace();
-  for (const skill of ["compose", "orchestrate", "pr", "handoff"]) {
+  for (const skill of ["compose", "orchestrate", "pr", "merge", "handoff"]) {
     const allowed = run(["can", "codex", skill, "--workspace", workspace]);
     assert.equal(allowed.status, 0, allowed.stderr);
     assert.match(allowed.stdout, new RegExp(`codex can use ${skill}`));
@@ -105,6 +105,6 @@ test("generated agent session records active profile details", () => {
   assert.equal(issue.status, 0, issue.stderr);
   const session = readFileSync(resolve(workspace, ".harness", "issues", "MAH-4", "AGENT_SESSION.md"), "utf8");
   assert.match(session, /Profile: composer/);
-  assert.match(session, /Allowed skills: compose, orchestrate, select-project-issue, work-on-issue, interview, pr, handoff/);
+  assert.match(session, /Allowed skills: compose, orchestrate, select-project-issue, work-on-issue, interview, pr, merge, handoff/);
   assert.match(session, /Denied skills: \(none\)/);
 });

@@ -12,6 +12,10 @@
 
 {{guardrails}}
 
+## Merge
+
+{{merge}}
+
 ## Definition of Done
 
 {{definitionOfDone}}

@@ -15,11 +15,13 @@ Update `HANDOFF.md` with:
 - status: phase, state, current owner or active agent, and blockers,
 - phase: use a brief orientation value such as `brief-created`, `planning`,
   `implementing`, `self-review`, `agent-review`, `ready-to-commit`,
-  `committed`, `ready-for-pr`, `pr-opened`, `waiting-human-signoff`, `done`, or
+  `committed`, `ready-for-pr`, `pr-opened`, `ready-to-merge`,
+  `waiting-human-signoff`, `merged`, `done`, or
   `blocked`; this is guidance only, not a state machine,
 - slices: each slice's branch, implementer, review round, and PR (when the
   issue has more than one),
 - reviews: self-review, sub-agent review, and human review status,
+- merge: the merge assessment and decision (see the merge policy),
 - quality: relevant tests/checks, full test suite status, known risks, and any
   skipped checks with reasons,
 - changed files,
@@ -32,7 +34,8 @@ Default expectations:
 
 - self-review before pull request,
 - sub-agent review before pull request (see the review policy),
-- human sign-off before merge,
+- merge per the merge policy: a composer may merge low-risk PRs; everything
+  else waits for human sign-off,
 - skipped checks must be documented with reasons.
 
 If work is incomplete, say exactly where to resume.

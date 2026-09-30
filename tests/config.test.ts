@@ -27,6 +27,27 @@ test("defaultConfig includes a team Definition of Done baseline", () => {
   assert.ok(config.definitionOfDone.some((line) => line.includes("PR")));
 });
 
+test("defaultConfig routes merges by label", () => {
+  const config = defaultConfig("/tmp/workspace");
+  assert.deepEqual(config.merge.humanReviewLabels, ["high-risk"]);
+  assert.deepEqual(config.merge.agentMergeLabels, ["agent-merge"]);
+});
+
+test("loadConfig backfills merge labels for older config files", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-config-"));
+  mkdirSync(resolve(workspace, ".harness"));
+  const oldConfig = { ...defaultConfig(workspace) } as Partial<ReturnType<typeof defaultConfig>>;
+  delete oldConfig.merge;
+  writeFileSync(resolve(workspace, ".harness", "config.json"), `${JSON.stringify(oldConfig)}\n`);
+  assert.deepEqual(loadConfig(workspace).merge, defaultConfig(workspace).merge);
+
+  const custom = { ...defaultConfig(workspace), merge: { humanReviewLabels: ["risky"] } };
+  writeFileSync(resolve(workspace, ".harness", "config.json"), `${JSON.stringify(custom)}\n`);
+  const loaded = loadConfig(workspace);
+  assert.deepEqual(loaded.merge.humanReviewLabels, ["risky"]);
+  assert.deepEqual(loaded.merge.agentMergeLabels, ["agent-merge"]);
+});
+
 test("loadConfig backfills Definition of Done for older config files", () => {
   const workspace = mkdtempSync(resolve(tmpdir(), "mahler-config-"));
   mkdirSync(resolve(workspace, ".harness"));

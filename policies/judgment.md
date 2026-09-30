@@ -49,8 +49,9 @@ unrecorded deviation is a workflow failure; a recorded one is a review input.
 
 ### Tier 2 — Confirm (get explicit human go-ahead first)
 
-Examples: approving a pr, resolving pr comment threads, changing issue-tracker
-state, writing to a production database, or modifying remote/shared infrastructure.
+Examples: merging a PR (see the merge policy for who may approve it), approving
+a PR, resolving PR comment threads, changing issue-tracker state, writing to a
+production database, or modifying remote/shared infrastructure.
 
 These actions are outward-facing or hard to reverse. A human developer would
 feel friction before doing them out of role; you do not, so manufacture the
@@ -60,11 +61,15 @@ proceeding. Mahler does not enforce this in code — the norm is the gate.
 When you work under a parent agent, ask the parent instead of the human. A
 composer may approve Tier 2 actions for its orchestrators and records each
 approval in `COMPOSITION.md`; an orchestrator or other sub-agent passes the
-request up rather than approving it.
+request up rather than approving it. For merges, the composer's authority is
+bounded by the merge policy: labels and risk decide whether it may merge or
+must hand the PR to the human.
 
 ### Tier 3 — Hard guardrails (declared by Mahler, enforced elsewhere)
 
-Examples: merging to a base branch, required CI checks.
+Examples: required CI checks, branch protection, and forge-required human
+approvals. A merge that the forge refuses is a guardrail doing its job: never
+bypass it.
 
 Mahler declares these in the workspace config (`guardrails` in
 `.harness/config.json`) and in issue briefs so you can anticipate them. The

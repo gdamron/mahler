@@ -34,9 +34,9 @@ Tie-break by priority first, then oldest update/create timestamp.
 
 ## Roles
 
-- **Human developer** — the final accountable authority for quality, integration, merge, and release. Owns final review and merge decisions unless a prompt explicitly delegates a narrower action. The human is not modeled as an agent.
-- **Composer agent** — the default role and the primary interface to the human for multi-issue work. It plans a project or set of issues in `.harness/projects/<slug>/COMPOSITION.md`, dispatches one orchestrator per issue, answers their escalations (including Tier 2 go-ahead), synthesizes results, and surfaces risks.
-- **Orchestrator agent** — owns one issue, tasked by a composer or directly by the human. It sets the issue up, delegates each slice to an implementer, routes finished slices through a reviewer, iterates on findings, and opens the PRs. It owns the issue's `HANDOFF.md` and pauses at Tier 2 boundaries for its parent's go-ahead.
+- **Human developer** — the final accountable authority for quality, integration, merge, and release. Owns final review and merge decisions for high-risk work and anything labeled for human review; low-risk merges are delegated to the composer under `.harness/policies/merge.md`. The human is not modeled as an agent.
+- **Composer agent** — the default role and the primary interface to the human for multi-issue work. It plans a project or set of issues in `.harness/projects/<slug>/COMPOSITION.md`, dispatches one orchestrator per issue, answers their escalations (including Tier 2 go-ahead), merges PRs the merge policy allows, synthesizes results, and surfaces risks.
+- **Orchestrator agent** — owns one issue, tasked by a composer or directly by the human. It sets the issue up, delegates each slice to an implementer, routes finished slices through a reviewer, iterates on findings, opens the PRs, and reports a merge assessment for each; it does not merge. It owns the issue's `HANDOFF.md` and pauses at Tier 2 boundaries for its parent's go-ahead.
 - **Implementer / reviewer sub-agents** — scoped specialists launched by an orchestrator. Implementers edit, commit, and push their slice branch; reviewers are read-only. Delegation uses native/runtime agent capabilities and the brief template in `.harness/policies/sub-agent-delegation.md`, not Mahler CLI commands.
 - **Full-stack agent** — the lowest-level agent a human tasks directly; it runs the whole issue loop itself without orchestrating.
 

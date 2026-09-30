@@ -57,6 +57,7 @@ export function createIssue(identifier: string, flags: Flags): void {
       active.profile,
       config.guardrails,
       config.definitionOfDone,
+      config.merge,
     ),
   );
   writeFileEnsured(resolve(paths.meta, "HANDOFF.md"), handoffMarkdown(issue));

@@ -11,6 +11,7 @@ import {
   nativeAdapter,
   rootAgentBlock,
   sessionMarkdown,
+  mergeRouting,
   taskMarkdown,
   workflowMarkdown,
 } from "../src/render.js";
@@ -286,4 +287,39 @@ test("launch commands are agent specific", () => {
     launchCommand("claude", "/tmp/repo", "/tmp/meta"),
     /^claude --add-dir/,
   );
+});
+
+test("merge routing reflects issue labels, human review first", () => {
+  const merge = { humanReviewLabels: ["high-risk"], agentMergeLabels: ["agent-merge"] };
+  const issue = (labels: string[]) => ({ identifier: "MAH-2", title: "t", labels, blocked: false });
+
+  const human = mergeRouting(issue(["Agent-Merge", "HIGH-RISK"]), merge);
+  assert.match(human, /Human review required/);
+  assert.match(human, /`HIGH-RISK`/);
+
+  assert.match(mergeRouting(issue(["agent-merge"]), merge), /Agent merge pre-approved/);
+  assert.match(mergeRouting(issue([]), merge), /Issue labels: \(none\)/);
+  assert.match(mergeRouting(issue(["bug"]), merge), /risk rubric/);
+  assert.match(mergeRouting(issue([]), merge), /merge\.md/);
+});
+
+test("session brief and root block declare merge routing", () => {
+  const config = defaultConfig("/tmp/workspace");
+  const session = sessionMarkdown(
+    { identifier: "MAH-3", title: "t", labels: ["high-risk"], blocked: false },
+    "codex",
+    "/tmp/workspace/workspaces/issues/MAH-3",
+    config.repos,
+    undefined,
+    config.guardrails,
+    config.definitionOfDone,
+    config.merge,
+  );
+  assert.match(session, /## Merge/);
+  assert.match(session, /Human review required/);
+
+  const block = rootAgentBlock(config);
+  assert.match(block, /only a composer may take/);
+  assert.match(block, /`high-risk` require human review/);
+  assert.match(block, /`agent-merge` pre-approve/);
 });

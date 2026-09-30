@@ -22,9 +22,12 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 
 ## Confirm Before Outward Actions
 
-Merging a PR is a Tier 2 action (see `.harness/policies/judgment.md`): outward-facing
-or hard to reverse. Stop and get explicit human go-ahead for the specific action
-before proceeding. Using a skill outside the active profile is a Tier 1 role-fit
+Merging a PR is a Tier 2 action (see `.harness/policies/judgment.md` and
+`.harness/policies/merge.md`): outward-facing and hard to reverse. Only a composer
+may merge, and only PRs the merge policy allows; every other agent stops and gets
+explicit human go-ahead for the specific PR. For other Tier 2 actions, get
+explicit go-ahead from your parent agent (a composer) or the human before
+proceeding. Using a skill outside the active profile is a Tier 1 role-fit
 deviation unless the underlying action is itself Tier 2. Mahler does not perform or
 block these actions itself; the pause is the gate.
 

@@ -12,7 +12,8 @@
     "select-project-issue",
     "work-on-issue",
     "pr",
-    "orchestrate"
+    "orchestrate",
+    "merge"
   ],
   "runtimeHints": {
     "codex": "Use interactive Codex in the selected issue worktree.",

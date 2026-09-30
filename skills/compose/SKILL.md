@@ -21,6 +21,7 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 - issue-selection
 - interview
 - sub-agent-delegation
+- merge
 - workspace-safety
 - handoff
 
@@ -79,9 +80,13 @@ does not write code; each issue's work belongs to that issue's orchestrator.
    - Scope changes that affect other issues or the project goal, conflicts
      between orchestrators, or an orchestrator blocked twice on the same
      problem: escalate to the human.
-7. **Advance waves.** When an issue reaches open, reviewed PRs, update its row
-   and decide whether dependents can stack on its branch or must wait for the
-   human to merge. Revise the plan when results change its assumptions.
+7. **Merge and advance waves.** When an orchestrator reports PRs ready to
+   merge, use the merge skill: labels first, then readiness, then your own risk
+   judgment. Merge what the merge policy allows (predecessors first for stacked
+   PRs); hand everything else to the human with its assessment. Start
+   dependent issues once their blockers merge, or stack them on an open PR when
+   waiting would stall the plan. Revise the plan when results change its
+   assumptions.
 8. **Synthesize.** Report to the human: per-issue status and PR links, risks,
    decisions needed, and what the next wave will do. Keep `COMPOSITION.md`
    current so a later session can resume from it.
@@ -102,8 +107,8 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 
 ## Plan
 
-| Wave | Issue | Title | Depends on | Repos | Orchestrator | Status | PRs |
-|---|---|---|---|---|---|---|---|
+| Wave | Issue | Title | Depends on | Repos | Orchestrator | Status | PRs | Merge |
+|---|---|---|---|---|---|---|---|---|
 
 ## Specifications
 
@@ -140,8 +145,10 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 
 - Linear MCP is unavailable or project/issue metadata is incomplete
 - no eligible issues remain
-- the next step crosses a Tier 3 boundary (merge to a base branch, bypassing
-  required CI): pause for the human
+- the next step crosses a Tier 3 boundary (bypassing required CI or branch
+  protection): pause for the human
+- a PR needs human review under the merge policy: hand it off and continue
+  with other work
 - the plan requires scope beyond the requested project or issue set
 - orchestrators conflict over the same code and cannot be serialized without a
   human decision

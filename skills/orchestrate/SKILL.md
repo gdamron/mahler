@@ -26,6 +26,7 @@ dispatched it, or the human who tasked it directly.
 - review
 - definition-of-done
 - pr
+- merge
 - handoff
 
 ## Allowed Commands
@@ -75,9 +76,13 @@ dispatched it, or the human who tasked it directly.
    Definition of Done checklist.
 8. **Open PRs** with the pr skill: one PR per slice branch. A stacked PR
    targets its predecessor's branch and says so in its description.
-9. **Report.** Update `HANDOFF.md` (you own it for this issue; sub-agents
-   report to you rather than editing it) and reply to your parent with PR URLs,
-   checks, review status, risks, and deviations.
+9. **Assess merge readiness.** For each PR, write the merge assessment from the
+   merge policy (labels matched, risk level and reasons, readiness). Do not
+   merge: the composer decides, or the human when you were tasked directly.
+10. **Report.** Update `HANDOFF.md` (you own it for this issue; sub-agents
+    report to you rather than editing it; phase `ready-to-merge`) and reply to
+    your parent with PR URLs, merge assessments, checks, review status, risks,
+    and deviations.
 
 Delegation is the norm, not a capability limit. You may act directly when
 delegating costs more than the action itself, for example fixing a PR
@@ -89,6 +94,7 @@ in `HANDOFF.md`.
 - Issue brief and slice worktrees
 - An implementer brief and a reviewer brief for each slice
 - One open PR per slice, reviewed, with `mahler check` passing
+- A merge assessment per PR
 - Updated `HANDOFF.md` and a synthesis reply to the parent
 
 ## Stop Conditions
@@ -99,3 +105,4 @@ in `HANDOFF.md`.
 - the work requires scope beyond the issue
 - a slice still has unresolved review findings after three rounds
 - an implementer reports a blocker that needs a parent decision
+- the next step is merging: hand the PR to your parent

@@ -8,11 +8,12 @@
     "work-on-issue",
     "interview",
     "pr",
+    "merge",
     "handoff"
   ],
   "deniedSkills": [],
   "runtimeHints": {
-    "codex": "Act as the primary interface to the human: plan a course through a project or multiple issues, write intermediate specifications in COMPOSITION.md, dispatch one orchestrator per issue, answer their escalations, synthesize their results, and surface risks. If the runtime cannot nest sub-agents deeply enough, launch orchestrators as separate sessions or play the orchestrator role yourself per the orchestrate skill. You may approve Tier 2 actions for your orchestrators; pause for human go-ahead before crossing Tier 3 boundaries.",
-    "claude": "Act as the primary interface to the human: plan a course through a project or multiple issues, write intermediate specifications in COMPOSITION.md, dispatch one orchestrator per issue, answer their escalations, synthesize their results, and surface risks. If the runtime cannot nest sub-agents deeply enough, launch orchestrators as separate sessions or play the orchestrator role yourself per the orchestrate skill. You may approve Tier 2 actions for your orchestrators; pause for human go-ahead before crossing Tier 3 boundaries."
+    "codex": "Act as the primary interface to the human: plan a course through a project or multiple issues, write intermediate specifications in COMPOSITION.md, dispatch one orchestrator per issue, answer their escalations, synthesize their results, and surface risks. If the runtime cannot nest sub-agents deeply enough, launch orchestrators as separate sessions or play the orchestrator role yourself per the orchestrate skill. You may approve Tier 2 actions for your orchestrators and merge PRs the merge policy allows (labels first, then readiness, then risk judgment); pause for human go-ahead before crossing Tier 3 boundaries.",
+    "claude": "Act as the primary interface to the human: plan a course through a project or multiple issues, write intermediate specifications in COMPOSITION.md, dispatch one orchestrator per issue, answer their escalations, synthesize their results, and surface risks. If the runtime cannot nest sub-agents deeply enough, launch orchestrators as separate sessions or play the orchestrator role yourself per the orchestrate skill. You may approve Tier 2 actions for your orchestrators and merge PRs the merge policy allows (labels first, then readiness, then risk judgment); pause for human go-ahead before crossing Tier 3 boundaries."
   }
 }

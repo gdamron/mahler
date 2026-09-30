@@ -14,7 +14,7 @@ authority.
 
 ```text
 human
-  └── composer            plans multiple issues; one orchestrator per issue
+  └── composer            plans multiple issues; one orchestrator per issue; merges
         └── orchestrator  owns one issue; one implementer per slice
               ├── implementer  edits, commits, and pushes its slice branch
               └── reviewer     read-only review of a finished slice
@@ -61,7 +61,8 @@ areas. Standard grants by role:
 - **Orchestrator (from a composer):** run the orchestrate skill for its one
   issue, including launching implementers and reviewers and opening PRs.
 
-A sub-agent never merges or bypasses human review. For Tier 2 actions (see the
+Only the composer merges, under the merge policy; sub-agents never merge or
+bypass human review. For Tier 2 actions (see the
 judgment policy) it asks its parent. A composer may give Tier 2 go-ahead to its
 orchestrators; an orchestrator passes Tier 2 requests up to its own parent
 rather than approving them. Tier 3 boundaries always go to the human.

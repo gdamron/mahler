@@ -14,7 +14,7 @@ Before preparing a PR:
 - Confirm the branch corresponds to the Linear issue.
 - Confirm `HANDOFF.md` is current.
 - Summarize user-visible behavior, implementation notes, and tests.
-- Do not merge PRs unless the human explicitly asks.
+- Do not merge PRs yourself; merging follows the merge policy.
 
 ### PR size
 
@@ -67,4 +67,6 @@ you to read comments and address them in the code.
 
 ### Merging
 
-Do not merge yourself. Wait for a human reviewer to review and merge every PR.
+Opening a PR does not grant merge authority. Only a composer merges, and only
+under the merge policy (labels, readiness, and risk). Everyone else reports the
+PR as ready with a merge assessment and waits.

@@ -330,8 +330,9 @@ test("session brief and root block declare merge routing", () => {
 
   const block = rootAgentBlock(config);
   assert.match(block, /only a composer may take/);
-  assert.match(block, /`high-risk` require human review/);
+  assert.match(block, /`high-risk` always require human review/);
   assert.match(block, /`agent-merge` pre-approve/);
+  assert.match(block, /judges high risk always goes to the human, whatever its labels/);
 });
 
 test("merge routing includes project labels", () => {

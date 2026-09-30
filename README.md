@@ -28,11 +28,12 @@ other roles pick one.
   tasks directly and runs the whole issue loop itself. Any agent may act
   directly when warranted — delegation is the common case, not a capability
   limit — and pauses at Tier 2 boundaries for its parent's go-ahead.
-- Merging is a Tier 2 action only the composer takes, and only for PRs that
-  pass readiness checks and are low risk by judgment or pre-approved by label.
-  Labels in `merge.humanReviewLabels` (default `high-risk`) always send a PR to
-  the human; labels in `merge.agentMergeLabels` (default `agent-merge`)
-  pre-approve a composer merge.
+- Merging is a Tier 2 action only the composer takes, and only once readiness
+  checks pass. Labels in `merge.humanReviewLabels` (default `high-risk`) always
+  send a PR to the human; labels in `merge.agentMergeLabels` (default
+  `agent-merge`) pre-approve a composer merge; otherwise the composer merges
+  only what it judges low risk. A PR it judges high risk always goes to the
+  human.
 - Sub-agent delegation uses native/runtime agent capabilities plus the installed
   `sub-agent-delegation` policy and brief template. Sub-agents are read-only by
   default unless their brief explicitly grants scoped edit authority.

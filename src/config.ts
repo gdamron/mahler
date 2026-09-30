@@ -14,7 +14,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
     },
     guardrails: [
       "PRs larger than about 1000 lines should be split into smaller, stacked PRs.",
-      "High-risk PRs (identified by agent judgment or by issue or project labels) must be approved and merged by a human reviewer.",
+      "High-risk PRs (identified by agent judgment or by issue or project labels) must be approved and merged by a human reviewer (see `.harness/policies/merge.md`).",
       "Required CI checks must pass before merge (enforced by CI).",
       "Changes reach main only through a merged PR (enforced by the forge).",
       "Only a human reviewer may merge a PR whose required CI checks are failing.",

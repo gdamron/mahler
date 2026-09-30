@@ -41,7 +41,9 @@ description: Decide whether a reviewed PR may be merged by an agent, then merge 
    since the brief) and apply the merge policy's decision order.
 2. Verify every readiness item yourself; do not rely only on the orchestrator's
    assessment.
-3. If there is no matching label, apply the risk rubric independently.
+3. If there is no matching label, apply the risk rubric independently. With an
+   agent-merge label, skip the rubric, but still hand the PR to the human if
+   you see high risk.
 4. When an agent merge is allowed, merge using the repo's merge method.
    Otherwise, hand the PR to the human with the assessment and continue with
    other work.

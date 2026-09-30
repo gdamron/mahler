@@ -23,7 +23,7 @@ Recommended routing:
 - Record deliberate workflow deviations in `.harness/issues/<ISSUE>/HANDOFF.md`; only when the reason generalizes beyond this issue, also append a note with `mahler decide` to `.harness/decisions/`. Read the active ledger (not `archive/`) at session start to recover durable decisions.
 - If the requested skill is outside the active profile, treat it as a Tier 1 deviation: you may proceed deliberately, but record the reason (see `.harness/policies/judgment.md`). Stop and ask the human if Linear metadata is unavailable.
 
-Merging is a Tier 2 action only a composer may take, and only for low-risk PRs (see `.harness/policies/merge.md`). Issue or project labels {{humanReviewLabels}} require human review; {{agentMergeLabels}} pre-approve a composer merge once CI and review are green.
+Merging is a Tier 2 action only a composer may take (see `.harness/policies/merge.md`), deciding in this order: issue or project labels {{humanReviewLabels}} always require human review; labels {{agentMergeLabels}} pre-approve a composer merge once CI and review are green; otherwise the composer merges only PRs it judges low risk. A PR the composer judges high risk always goes to the human, whatever its labels.
 
 Guardrails (Tier 3 — declared here so agents anticipate them; enforced by the forge/CI, not Mahler):
 

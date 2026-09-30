@@ -34,7 +34,7 @@ Default expectations:
 
 - self-review before pull request,
 - sub-agent review before pull request (see the review policy),
-- merge per the merge policy: a composer may merge low-risk PRs; everything
+- merge per the merge policy: a composer may merge the PRs it allows; everything
   else waits for human sign-off,
 - skipped checks must be documented with reasons.
 

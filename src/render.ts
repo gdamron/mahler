@@ -123,7 +123,7 @@ export function mergeRouting(
     human.length > 0
       ? `Human review required: label ${labelList(human)} matches \`merge.humanReviewLabels\`.`
       : agent.length > 0
-        ? `Agent merge pre-approved: label ${labelList(agent)} matches \`merge.agentMergeLabels\`; a composer may merge once readiness checks pass.`
+        ? `Agent merge pre-approved: label ${labelList(agent)} matches \`merge.agentMergeLabels\`; a composer may merge once readiness checks pass, unless it judges the PR high risk.`
         : "No merge label: a composer decides by the risk rubric; without a composer, the human decides.";
   const projectLine =
     issue.projectLabels === undefined

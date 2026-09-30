@@ -19,7 +19,8 @@ first rule that matches:
    reviews and merges. This always wins.
 2. **Agent-merge label.** Any label in `merge.agentMergeLabels` means the human
    has pre-approved an agent merge: the composer may merge once every readiness
-   check passes. It may still escalate if it sees something alarming.
+   check passes, without applying the risk rubric. If it sees high risk anyway,
+   it must hand the PR to the human; the label never overrides that judgment.
 3. **No matching label.** The composer judges risk with the rubric below. Low
    risk: the composer may merge. Anything else: the human decides.
 

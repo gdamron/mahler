@@ -57,6 +57,16 @@ test("native adapter tells agent to create briefs and choose worktrees", () => {
   assert.match(adapter, /Record deliberate workflow deviations/);
 });
 
+test("native adapters route project prompts by role", () => {
+  for (const runtime of ["codex", "claude"] as const) {
+    const adapter = nativeAdapter(runtime);
+    const skillsDir = runtime === "codex" ? "\\.agents/skills" : "\\.claude/skills";
+    assert.match(adapter, new RegExp(`composer uses \`${skillsDir}/compose/SKILL\\.md\``));
+    assert.match(adapter, new RegExp(`other role uses \`${skillsDir}/select-project-issue/SKILL\\.md\``));
+    assert.match(adapter, new RegExp(`orchestrator uses \`${skillsDir}/orchestrate/SKILL\\.md\``));
+  }
+});
+
 test("native adapters reference routing, profiles, skills, and policies", () => {
   for (const runtime of ["codex", "claude"] as const) {
     const adapter = nativeAdapter(runtime);

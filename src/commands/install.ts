@@ -1,7 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Flags, listFlag } from "../args.js";
-import { defaultConfig, withInstallOptions } from "../config.js";
+import {
+  configPath,
+  defaultConfig,
+  loadConfig,
+  withInstallOptions,
+} from "../config.js";
 import { parseProfileSource } from "../profiles.js";
 import {
   claudeAgentDefinition,
@@ -32,6 +37,10 @@ export function install(workspaceInput: string, flags: Flags): void {
     repos: withPreservedChecks(workspace, discoverRepos(workspace)),
     acceptedAssignees: listFlag(flags, "linear-assignee"),
     requiredLabels: listFlag(flags, "linear-label"),
+    // Merge labels decide who may merge; a reinstall must not reset them.
+    merge: existsSync(configPath(workspace))
+      ? loadConfig(workspace).merge
+      : undefined,
   });
   ensureDir(resolve(workspace, ".harness", "policies"));
   ensureDir(resolve(workspace, ".harness", "agents", "profiles"));

@@ -81,6 +81,20 @@ test("reinstall preserves human-set per-repo checks that detection cannot infer"
   );
 });
 
+test("reinstall preserves human-set merge labels", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-merge-"));
+  assert.equal(install(workspace).status, 0);
+
+  const configFile = resolve(workspace, ".harness", "config.json");
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  config.merge = { humanReviewLabels: ["security"], agentMergeLabels: [] };
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(install(workspace).status, 0);
+  const after = JSON.parse(readFileSync(configFile, "utf8"));
+  assert.deepEqual(after.merge, { humanReviewLabels: ["security"], agentMergeLabels: [] });
+});
+
 test("custom overlay overrides a default and adds custom-only files; reinstall preserves both", () => {
   const workspace = mkdtempSync(resolve(tmpdir(), "mahler-overlay-"));
   assert.equal(install(workspace).status, 0);

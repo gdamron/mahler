@@ -103,11 +103,13 @@ export function withInstallOptions(
     repos?: HarnessConfig["repos"];
     acceptedAssignees?: string[];
     requiredLabels?: string[];
+    merge?: HarnessConfig["merge"];
   },
 ): HarnessConfig {
   return {
     ...config,
     repos: options.repos ?? config.repos,
+    merge: options.merge ?? config.merge,
     linear: {
       acceptedAssignees:
         options.acceptedAssignees ?? config.linear.acceptedAssignees,

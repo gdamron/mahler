@@ -38,7 +38,8 @@ description: Commit a tested increment of issue-scoped work as a save point, and
 
 - Commit on the issue or slice branch
 - Updated `HANDOFF.md`, or, when working as a delegated implementer, the
-  commit reported to the orchestrator that owns it
+  commit reported to the orchestrator that owns it (record your own workflow
+  deviations in `HANDOFF.md` either way)
 - Definition of Done checklist checked against the final diff
 - Commit hash and tests run
 

@@ -6,9 +6,11 @@ At the start of a session, read the active `.harness/decisions/` ledger (not
 `archive/`) to recover durable decisions and intent recorded by earlier
 sessions — `HANDOFF.md` is per-issue and does not carry across issues.
 
-When several agents work on one issue, the orchestrator owns `HANDOFF.md`;
-implementers and reviewers report to it instead of editing the file. A
-composer's cross-issue state lives in `.harness/projects/<slug>/COMPOSITION.md`.
+When several agents work on one issue, the orchestrator owns `HANDOFF.md`:
+implementers and reviewers report status and results to it rather than
+rewriting the file. Any agent may add its own rows to `Workflow Deviations`,
+so a deviation is recorded by the agent that made it. A composer's cross-issue
+state lives in `.harness/projects/<slug>/COMPOSITION.md`.
 
 Update `HANDOFF.md` with:
 

@@ -35,7 +35,8 @@ description: Review an issue-scoped diff and report findings before handoff.
 - File and line references when available
 - A recommended fix for each finding when you have one
 - Updated `HANDOFF.md`, or, when delegated, findings reported to the
-  orchestrator that owns it
+  orchestrator that owns it (record your own workflow deviations in
+  `HANDOFF.md` either way)
 
 ## Stop Conditions
 

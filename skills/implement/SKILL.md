@@ -58,15 +58,15 @@ runs it directly for the whole issue.
    intentionally not touched, potential concerns), the commit list, checks run,
    and the pushed branch.
 
-When delegated, report to the orchestrator; it owns `HANDOFF.md`. When running
-as full-stack, update `HANDOFF.md` yourself.
+When delegated, report status and results to the orchestrator, which owns
+`HANDOFF.md`; you still record your own workflow deviations there. When
+running as full-stack, update `HANDOFF.md` yourself.
 
 ## Required Outputs
 
 - Save-point commits on the assigned branch, pushed
 - A change summary, commit list, and checks run
-- Workflow deviations reported (delegated) or recorded in `HANDOFF.md`
-  (full-stack)
+- Workflow deviations recorded in `HANDOFF.md`
 
 ## Stop Conditions
 

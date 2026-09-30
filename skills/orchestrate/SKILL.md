@@ -80,7 +80,8 @@ dispatched it, or the human who tasked it directly.
    merge policy (labels matched, risk level and reasons, readiness). Do not
    merge: the composer decides, or the human when you were tasked directly.
 10. **Report.** Update `HANDOFF.md` (you own it for this issue; sub-agents
-    report to you rather than editing it; phase `ready-to-merge`) and reply to
+    report status to you but may record their own deviations; phase
+    `ready-to-merge`) and reply to
     your parent with PR URLs, merge assessments, checks, review status, risks,
     and deviations.
 

@@ -24,8 +24,9 @@ human
   human tasks directly: it runs the whole issue loop itself.
 - Each agent reports to its parent. Escalations travel up one level at a time.
 - The orchestrator owns the issue's `HANDOFF.md`; the composer owns
-  `COMPOSITION.md`. Sub-agents report to their parent rather than editing
-  those records.
+  `COMPOSITION.md`. Sub-agents report status and results to their parent
+  rather than rewriting those records, but any agent may record its own
+  workflow deviations (see the judgment policy).
 - If the runtime cannot nest agents as deep as the hierarchy needs, the parent
   either launches the child as an independent top-level session or performs
   the child's role itself, following the child's skill. Record the chosen mode

@@ -13,11 +13,11 @@ export function defaultConfig(_workspace: string): HarnessConfig {
       requiredLabels: [],
     },
     guardrails: [
-      "PRs greater than 1000 lines of code should be broken into smaller, stacked PRs.",
-      "Merging high-risk -- identified through agent judgement or issue labels -- must be approved by a human reviewer.",
+      "PRs larger than about 1000 lines should be split into smaller, stacked PRs.",
+      "High-risk PRs (identified by agent judgment or by issue or project labels) must be approved and merged by a human reviewer.",
       "Required CI checks must pass before merge (enforced by CI).",
-      "Merging to main must be done through a PR (enforced by CI).",
-      "Merging to main with CI failures can only be done by a human reviewer.",
+      "Changes reach main only through a merged PR (enforced by the forge).",
+      "Only a human reviewer may merge a PR whose required CI checks are failing.",
     ],
     definitionOfDone: [
       "`mahler check` passes for every touched repo.",

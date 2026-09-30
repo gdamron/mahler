@@ -1,6 +1,6 @@
 {
   "name": "orchestrator",
-  "description": "Owns one issue end to end: sets it up, delegates each slice to an implementer sub-agent, routes finished slices through a reviewer sub-agent, and opens the PRs. Reports to a composer or directly to the human. Empowered to take any action directly when warranted, pausing at Tier 2 boundaries for its parent's go-ahead.",
+  "description": "Owns one issue end to end: sets it up, delegates each slice to an implementer sub-agent, routes finished slices through a reviewer sub-agent, and opens the PRs. Reports to a composer or directly to the human. Empowered to act directly when delegating would cost more, pausing at Tier 2 boundaries for its parent's go-ahead.",
   "allowedSkills": [
     "orchestrate",
     "select-project-issue",

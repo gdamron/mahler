@@ -1,13 +1,11 @@
 {
   "name": "orchestrator",
-  "description": "Default coordinating agent and primary interface to the human developer: surfaces risks, reports synthesis, and asks for direction; plans issue-scoped work and delegates scoped slices to sub-agents. Empowered to take any action directly when warranted, pausing at Tier 2 boundaries (merge) for human go-ahead.",
+  "description": "The agent resonsible for directly managing scoped work. It is one of the primary interfaces to the human developer. The agent surfaces risks, reports synthesis, and asks for direction; plans issue-scoped work and delegates scoped slices to sub-agents. Empowered to take any action directly when warranted, pausing at Tier 2 boundaries for human or parent agent permission.",
   "allowedSkills": [
+    "orchestrate",
     "select-project-issue",
     "work-on-issue",
     "interview",
-    "review",
-    "commit",
-    "pr",
     "handoff"
   ],
   "deniedSkills": [],

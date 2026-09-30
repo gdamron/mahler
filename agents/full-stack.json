@@ -1,16 +1,17 @@
 {
   "name": "full-stack",
-  "description": "Can perform every v1 Mahler workflow phase.",
+  "description": "Performs core development tasks including issue work, self-review, and PR preparation.",
   "allowedSkills": [
     "select-project-issue",
     "work-on-issue",
     "interview",
-    "review",
+    "implement",
     "commit",
+    "review",
     "pr",
     "handoff"
   ],
-  "deniedSkills": [],
+  "deniedSkills": ["orchestrate"],
   "runtimeHints": {
     "codex": "Use interactive Codex in the selected issue worktree.",
     "claude": "Use interactive Claude in the selected issue worktree."

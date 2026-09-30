@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { HarnessConfig } from "./types.js";
 
-export function defaultConfig(workspace: string): HarnessConfig {
+export function defaultConfig(_workspace: string): HarnessConfig {
   return {
     version: 1,
     mahlerCommand: "mahler",
@@ -10,57 +10,86 @@ export function defaultConfig(workspace: string): HarnessConfig {
     repos: [],
     linear: {
       acceptedAssignees: [],
-      requiredLabels: []
+      requiredLabels: [],
     },
     guardrails: [
-      "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
-      "Required CI checks must pass before merge (enforced by CI)."
+      "PRs greater than 1000 lines of code should be broken into smaller, stacked PRs.",
+      "Merging high-risk -- ideftied through agent judgement or issue labels -- must be approved by a human reviewer.",
+      "Required CI checks must pass before merge (enforced by CI).",
+      "Merging to main must be done through a PR (enforced by CI).",
+      "Mergine to main with CI failures can only be done by a human reviewer.",
     ],
     definitionOfDone: [
       "`mahler check` passes for every touched repo.",
       "Self-review is complete.",
+      "Sub-agent review is complete.",
+      "Sub-agent review comments are addressed.",
+      "A PR is open for every touched repo, with a description of the change and its context.",
       "`HANDOFF.md` is current with changed files, checks run, blockers, and next steps.",
       "The change stays within the Linear issue scope.",
-      "A PR is opened for human review before merge."
     ],
     agents: {
       codex: {
         runtime: "codex",
-        profile: "orchestrator",
-        role: "orchestrator",
-        skills: ["select-project-issue", "work-on-issue", "interview", "review", "commit", "pr", "handoff"],
-        policies: [
-          "issue-selection",
-          "workspace-safety",
-          "sub-agent-delegation",
-          "judgment",
-          "implementation",
-          "definition-of-done",
+        profile: "composer",
+        role: "composer",
+        skills: [
+          "compose",
+          "orchestrate",
+          "select-project-issue",
+          "work-on-issue",
+          "interview",
           "review",
           "commit",
           "pr",
-          "handoff"
-        ]
+          "handoff",
+        ],
+        policies: [
+          "branching",
+          "commit",
+          "definition-of-done",
+          "handoff",
+          "implementation",
+          "interview",
+          "issue-selection",
+          "judgment",
+          "pr",
+          "review",
+          "sub-agent-delegation",
+          "workspace-safety",
+        ],
       },
       claude: {
         runtime: "claude",
-        profile: "orchestrator",
-        role: "orchestrator",
-        skills: ["select-project-issue", "work-on-issue", "interview", "review", "commit", "pr", "handoff"],
-        policies: [
-          "issue-selection",
-          "workspace-safety",
-          "sub-agent-delegation",
-          "judgment",
-          "implementation",
-          "definition-of-done",
+        profile: "composer",
+        role: "composer",
+        skills: [
+          "compose",
+          "orchestrate",
+          "select-project-issue",
+          "work-on-issue",
+          "interview",
           "review",
           "commit",
           "pr",
-          "handoff"
-        ]
-      }
-    }
+          "handoff",
+        ],
+        policies: [
+          "branching",
+          "commit",
+          "definition-of-done",
+          "handoff",
+          "implementation",
+          "interview",
+          "issue-selection",
+          "judgment",
+          "pr",
+          "review",
+          "sub-agent-delegation",
+          "workspace-safety",
+        ],
+      },
+    },
   };
 }
 
@@ -70,15 +99,16 @@ export function withInstallOptions(
     repos?: HarnessConfig["repos"];
     acceptedAssignees?: string[];
     requiredLabels?: string[];
-  }
+  },
 ): HarnessConfig {
   return {
     ...config,
     repos: options.repos ?? config.repos,
     linear: {
-      acceptedAssignees: options.acceptedAssignees ?? config.linear.acceptedAssignees,
-      requiredLabels: options.requiredLabels ?? config.linear.requiredLabels
-    }
+      acceptedAssignees:
+        options.acceptedAssignees ?? config.linear.acceptedAssignees,
+      requiredLabels: options.requiredLabels ?? config.linear.requiredLabels,
+    },
   };
 }
 
@@ -96,7 +126,7 @@ export function loadConfig(workspace: string): HarnessConfig {
   return {
     ...parsed,
     guardrails: parsed.guardrails ?? [],
-    definitionOfDone: parsed.definitionOfDone ?? defaults.definitionOfDone
+    definitionOfDone: parsed.definitionOfDone ?? defaults.definitionOfDone,
   };
 }
 

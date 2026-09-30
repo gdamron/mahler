@@ -103,15 +103,16 @@ export function sessionMarkdown(
 }
 
 /**
- * Describes which merge rule the issue's own labels trigger, so agents can
- * anticipate the decision. Project labels are checked at merge time by the
- * composer (see policies/merge.md) and can still require human review.
+ * Describes which merge rule the issue's and its project's labels trigger, so
+ * agents can anticipate the decision (see policies/merge.md). A human-review
+ * label on either always wins.
  */
 export function mergeRouting(
   issue: LinearIssue,
   merge: MergeConfig = { humanReviewLabels: [], agentMergeLabels: [] },
 ): string {
-  const labels = issue.labels ?? [];
+  const issueLabels = issue.labels ?? [];
+  const labels = uniqueNonEmpty([...issueLabels, ...(issue.projectLabels ?? [])]);
   const matching = (wanted: string[]) =>
     labels.filter((label) =>
       wanted.some((w) => w.toLowerCase() === label.toLowerCase()),
@@ -120,14 +121,21 @@ export function mergeRouting(
   const agent = matching(merge.agentMergeLabels);
   const rule =
     human.length > 0
-      ? `Human review required: issue label ${labelList(human)} matches \`merge.humanReviewLabels\`.`
+      ? `Human review required: label ${labelList(human)} matches \`merge.humanReviewLabels\`.`
       : agent.length > 0
-        ? `Agent merge pre-approved: issue label ${labelList(agent)} matches \`merge.agentMergeLabels\`; a composer may merge once readiness checks pass.`
-        : "No merge label on the issue: a composer decides by the risk rubric; otherwise the human decides.";
+        ? `Agent merge pre-approved: label ${labelList(agent)} matches \`merge.agentMergeLabels\`; a composer may merge once readiness checks pass.`
+        : "No merge label: a composer decides by the risk rubric; without a composer, the human decides.";
+  const projectLine =
+    issue.projectLabels === undefined
+      ? "(unknown; the composer checks the project's labels at merge time)"
+      : issue.projectLabels.length > 0
+        ? labelList(issue.projectLabels)
+        : "(none)";
   return [
-    `- Issue labels: ${labels.length > 0 ? labelList(labels) : "(none)"}`,
+    `- Issue labels: ${issueLabels.length > 0 ? labelList(issueLabels) : "(none)"}`,
+    `- Project labels: ${projectLine}`,
     `- ${rule}`,
-    "- Project labels can change this; the composer checks them at merge time (see `.harness/policies/merge.md`).",
+    "- Labels can change after this brief was written; confirm them at merge time (see `.harness/policies/merge.md`).",
   ].join("\n");
 }
 
@@ -144,6 +152,7 @@ export function projectMarkdown(
     name: project.name,
     description:
       project.description?.trim() || "_No project description supplied._",
+    labels: labelList(project.labels ?? []),
     identifier: selected.identifier,
     title: selected.title,
     reason,

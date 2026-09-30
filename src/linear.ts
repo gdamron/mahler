@@ -13,6 +13,7 @@ export function linearIssueTemplate(): LinearIssue {
     assignee: "agent username",
     assigneeName: "Agent display name",
     labels: ["agent"],
+    projectLabels: ["labels on the issue's Linear project, if any"],
     blocked: false,
     acceptanceCriteria: [
       "User-facing behavior is covered by tests.",
@@ -33,6 +34,7 @@ export function linearProjectTemplate(): LinearProject {
     name: "Project name",
     description: "Project description from Linear",
     url: "https://linear.app/workspace/project/project-slug",
+    labels: ["project label"],
     issues: [linearIssueTemplate()]
   };
 }
@@ -45,9 +47,14 @@ export function readIssueFile(path?: string): LinearIssue | undefined {
 export function readProjectFile(path?: string): LinearProject | undefined {
   if (!path) return undefined;
   const project = JSON.parse(readFileSync(path, "utf8")) as LinearProject;
+  const labels = labelArray(project.labels);
   return {
     ...project,
-    issues: (project.issues ?? []).map((issue) => normalizeIssue(issue as Partial<LinearIssue> & { [key: string]: unknown }))
+    labels,
+    // Each issue inherits its project's labels so merge routing can see them.
+    issues: (project.issues ?? []).map((issue) =>
+      normalizeIssue({ projectLabels: labels, ...(issue as Partial<LinearIssue> & { [key: string]: unknown }) })
+    )
   };
 }
 
@@ -73,6 +80,7 @@ export function normalizeIssue(input: Partial<LinearIssue> & { [key: string]: un
     assignee: input.assignee ? String(input.assignee) : null,
     assigneeName: input.assigneeName ? String(input.assigneeName) : null,
     labels,
+    projectLabels: labelArray(input.projectLabels),
     blocked: Boolean(input.blocked),
     acceptanceCriteria: stringList(input.acceptanceCriteria),
     nonGoals: stringList(input.nonGoals),
@@ -133,6 +141,12 @@ function timestamp(value?: string): number {
   if (!value) return Number.MAX_SAFE_INTEGER;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
+}
+
+/** Like stringList, but keeps an empty array: "no labels" differs from "unknown". */
+function labelArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map((entry) => String(entry).trim()).filter(Boolean);
 }
 
 function stringList(value: unknown): string[] | undefined {

@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import { defaultConfig, withInstallOptions } from "../src/config.js";
-import { linearIssueTemplate, linearProjectTemplate, normalizeIssue, selectProjectIssue } from "../src/linear.js";
+import { linearIssueTemplate, linearProjectTemplate, normalizeIssue, readProjectFile, selectProjectIssue } from "../src/linear.js";
 
 test("linearIssueTemplate has the parseable issue metadata shape", () => {
   const template = linearIssueTemplate();
@@ -89,4 +92,21 @@ test("selectProjectIssue sorts by priority then oldest update", () => {
     new Set()
   );
   assert.equal(selection.issue.identifier, "FUG-1");
+});
+
+test("readProjectFile copies project labels onto issues without their own", () => {
+  const path = resolve(mkdtempSync(resolve(tmpdir(), "mahler-linear-")), "project.json");
+  writeFileSync(path, JSON.stringify({
+    name: "Project",
+    labels: [" high-risk "],
+    issues: [
+      { identifier: "FUG-1", title: "Inherits" },
+      { identifier: "FUG-2", title: "Own labels", projectLabels: [] }
+    ]
+  }));
+  const project = readProjectFile(path);
+  assert.deepEqual(project?.labels, ["high-risk"]);
+  assert.deepEqual(project?.issues[0].projectLabels, ["high-risk"]);
+  assert.deepEqual(project?.issues[1].projectLabels, []);
+  assert.equal(normalizeIssue({ identifier: "FUG-3", title: "t" }).projectLabels, undefined);
 });

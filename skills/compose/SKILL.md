@@ -61,7 +61,8 @@ does not write code; each issue's work belongs to that issue's orchestrator.
    (default 3; adjust by judgment and record why), launch an orchestrator with
    a sub-agent brief: base profile `orchestrator`, authority `edit`, objective
    "carry `<ISSUE>` through the orchestrate skill to open, reviewed PRs",
-   context link to its `Specifications` section, results destination the
+   context link to its `Specifications` section and the project's labels
+   (the orchestrator records them as `projectLabels`), results destination the
    issue's `HANDOFF.md` plus a reply to the composer. Exactly one orchestrator
    owns an issue at a time.
 5. **Choose an execution mode** and record it in `COMPOSITION.md`. Prefer
@@ -98,6 +99,7 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 
 - Composer: <agent>
 - Source: <Linear project URL or issue list>
+- Project labels: <labels, or none>
 - Execution mode: nested sub-agents | separate sessions | composer-as-orchestrator
 - Concurrency cap: 3
 

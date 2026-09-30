@@ -29,14 +29,16 @@ description: Decide whether a reviewed PR may be merged by an agent, then merge 
 
 ## Expected Inputs
 
-- PR URL and the issue brief under `.harness/issues/<ISSUE>/`
+- PR URL and the issue brief under `.harness/issues/<ISSUE>/`, including the
+  issue's `labels` and `projectLabels`
 - The orchestrator's merge assessment
 - `merge.humanReviewLabels` and `merge.agentMergeLabels` from
   `.harness/config.json`
 
 ## Process
 
-1. Gather issue and project labels and apply the merge policy's decision order.
+1. Confirm the issue and project labels with Linear MCP (they may have changed
+   since the brief) and apply the merge policy's decision order.
 2. Verify every readiness item yourself; do not rely only on the orchestrator's
    assessment.
 3. If there is no matching label, apply the risk rubric independently.

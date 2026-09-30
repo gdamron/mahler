@@ -323,3 +323,23 @@ test("session brief and root block declare merge routing", () => {
   assert.match(block, /`high-risk` require human review/);
   assert.match(block, /`agent-merge` pre-approve/);
 });
+
+test("merge routing includes project labels", () => {
+  const merge = { humanReviewLabels: ["high-risk"], agentMergeLabels: ["agent-merge"] };
+  const base = { identifier: "MAH-6", title: "t", blocked: false };
+
+  const unknown = mergeRouting({ ...base, labels: ["agent-merge"] }, merge);
+  assert.match(unknown, /Project labels: \(unknown/);
+  assert.match(unknown, /Agent merge pre-approved/);
+
+  const projectHuman = mergeRouting(
+    { ...base, labels: ["agent-merge"], projectLabels: ["High-Risk"] },
+    merge,
+  );
+  assert.match(projectHuman, /Project labels: `High-Risk`/);
+  assert.match(projectHuman, /Human review required: label `High-Risk`/);
+
+  const projectAgent = mergeRouting({ ...base, labels: [], projectLabels: ["agent-merge"] }, merge);
+  assert.match(projectAgent, /Agent merge pre-approved/);
+  assert.match(mergeRouting({ ...base, labels: [], projectLabels: [] }, merge), /Project labels: \(none\)/);
+});

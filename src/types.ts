@@ -67,6 +67,8 @@ export interface LinearIssue {
   assignee?: string | null;
   assigneeName?: string | null;
   labels?: string[];
+  /** Labels on the issue's Linear project; unset when unknown. Used for merge routing. */
+  projectLabels?: string[];
   blocked?: boolean;
   acceptanceCriteria?: string[];
   nonGoals?: string[];
@@ -82,6 +84,7 @@ export interface LinearProject {
   name: string;
   description?: string;
   url?: string;
+  labels?: string[];
   issues: LinearIssue[];
 }
 

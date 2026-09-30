@@ -42,6 +42,8 @@ description: Create an issue brief and worktrees from Linear issue metadata, the
 3. Map MCP fields into the JSON shape printed by `mahler linear-template issue`.
    Put Linear acceptance criteria or checklist items in `acceptanceCriteria` when present.
    Include `nonGoals`, `protectedAreas`, and `riskNotes` only when the Linear issue provides them.
+   If the issue belongs to a Linear project, use `get_project` and put the
+   project's labels in `projectLabels` so the brief can show merge routing.
 4. Write the metadata to `.harness/tmp/linear/<ISSUE>.json` in the product workspace,
    creating the directory if needed.
 5. Run `mahler issue <ISSUE> --agent <agent> --linear-file .harness/tmp/linear/<ISSUE>.json`.

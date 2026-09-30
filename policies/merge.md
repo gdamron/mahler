@@ -8,9 +8,12 @@ that specific PR.
 
 ## Who Decides
 
-Check labels on both the issue (`linear-issue.json` or Linear MCP `get_issue`)
-and its project (Linear MCP `get_project`). Match labels case-insensitively
-against `merge` in `.harness/config.json`. Apply the first rule that matches:
+Check labels on both the issue and its project. The issue brief records them
+(`labels` and `projectLabels` in `linear-issue.json`, summarized under `## Merge`
+in `AGENT_SESSION.md`), but labels can change after the brief is written, so
+confirm them with Linear MCP `get_issue` and `get_project` before merging. Match
+labels case-insensitively against `merge` in `.harness/config.json`. Apply the
+first rule that matches:
 
 1. **Human-review label.** Any label in `merge.humanReviewLabels` means a human
    reviews and merges. This always wins.

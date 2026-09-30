@@ -2,6 +2,8 @@
 
 {{description}}
 
+- Labels: {{labels}}
+
 ## Selected Issue
 
 - {{identifier}}: {{title}}

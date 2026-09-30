@@ -20,4 +20,12 @@ When asked to work on a Linear project:
 4. Break ties by Linear priority first, then oldest update/create timestamp.
 5. Run the normal issue workflow for the selected issue.
 
+When a composer is asked to work on a Linear project or a set of issues:
+
+1. Apply the same eligibility rules to every open project issue (explicitly
+   named issues are in scope as named).
+2. Order them by blockers, then priority, then oldest update/create timestamp,
+   and group independent issues into waves in `COMPOSITION.md`.
+3. Dispatch one orchestrator per issue; each runs the normal issue workflow.
+
 Do not create code changes directly from a project-level prompt.

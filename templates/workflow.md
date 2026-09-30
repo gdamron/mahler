@@ -1,11 +1,11 @@
 # Mahler Workflow
 
-This workspace uses Mahler for multi-agent development. An **orchestrator agent** coordinates the work; the **human developer** stays the final accountable authority.
+This workspace uses Mahler for multi-agent development. A **composer agent** coordinates **orchestrator agents**, each of which owns one issue; the **human developer** stays the final accountable authority.
 
 ## What To Do When Prompted
 
 - If asked to "work on FUG-123", run the Mahler issue workflow for that issue brief.
-- If asked to "work on project X in Linear", use Linear MCP to inspect the project, select one eligible issue, then create the issue brief.
+- If asked to "work on project X in Linear", use Linear MCP to inspect the project. A composer plans across all eligible issues and dispatches one orchestrator per issue; any other role selects one eligible issue, then creates the issue brief.
 - Do not edit code in the product workspace root.
 - Do not edit sibling issue workspaces.
 - Before changing code, read the generated issue brief files: `TASK.md`, `AGENT_SESSION.md`, and `HANDOFF.md`.
@@ -34,8 +34,10 @@ Tie-break by priority first, then oldest update/create timestamp.
 
 ## Roles
 
-- **Human developer** — the final accountable authority for quality, integration, merge, and release. Owns final review and merge decisions unless a prompt explicitly delegates a narrower action. The human is not modeled as an agent.
-- **Orchestrator agent** — the default coordinating role and the primary interface to the human developer: it surfaces risks to the human, reports synthesis, and asks for direction. It plans agent-level work, delegates scoped slices to sub-agents, coordinates sub-agents, synthesizes their outputs, and runs quality checks within the bounds of the delegated work. It is empowered to take any action directly when delegation is not warranted, pausing at Tier 2 boundaries for human go-ahead.
-- **Sub-agents** — scoped specialist agents launched and delegated by the orchestrator for a specific slice of the task. Delegation uses native/runtime agent capabilities and the brief template in `.harness/policies/sub-agent-delegation.md`, not Mahler CLI commands.
+- **Human developer** — the final accountable authority for quality, integration, merge, and release. Owns final review and merge decisions for high-risk work and anything labeled for human review; other merges are delegated to the composer under `.harness/policies/merge.md`. The human is not modeled as an agent.
+- **Composer agent** — the default role and the primary interface to the human for multi-issue work. It plans a project or set of issues in `.harness/projects/<slug>/COMPOSITION.md`, dispatches one orchestrator per issue, answers their escalations (including Tier 2 go-ahead), merges PRs the merge policy allows, synthesizes results, and surfaces risks.
+- **Orchestrator agent** — owns one issue, tasked by a composer or directly by the human. It sets the issue up, delegates each slice to an implementer, routes finished slices through a reviewer, iterates on findings, opens the PRs, and reports a merge assessment for each; it does not merge. It owns the issue's `HANDOFF.md` and pauses at Tier 2 boundaries for its parent's go-ahead.
+- **Implementer / reviewer sub-agents** — scoped specialists launched by an orchestrator. Implementers edit, commit, and push their slice branch; reviewers are read-only. Delegation uses native/runtime agent capabilities and the brief template in `.harness/policies/sub-agent-delegation.md`, not Mahler CLI commands.
+- **Full-stack agent** — the lowest-level agent a human tasks directly; it runs the whole issue loop itself without orchestrating.
 
-Tier 2 actions and Tier 3 guardrails (base-branch merge, CI) still apply: the orchestrator pauses for human go-ahead and never bypasses the forge.
+Every agent is empowered to take any action directly when delegation is not warranted. Tier 2 actions and Tier 3 guardrails still apply: agents pause for go-ahead from their parent (ultimately the human) and never bypass the forge.

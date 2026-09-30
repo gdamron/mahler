@@ -1,13 +1,36 @@
 # Sub-Agent Delegation Policy
 
-The orchestrator agent may delegate scoped work to sub-agents through the
+Composer and orchestrator agents delegate scoped work to sub-agents through the
 native/runtime agent capabilities available in the current environment. Mahler
 does not launch sub-agents itself and does not provide `mahler subagent ...`
 commands.
 
 Delegation is an aid to investigation, implementation, and review. The
-orchestrator remains responsible for coordination, integration, quality checks,
-and synthesis. The human developer remains the final accountable authority.
+delegating agent remains responsible for coordination, integration, quality
+checks, and synthesis. The human developer remains the final accountable
+authority.
+
+## Delegation Hierarchy
+
+```text
+human
+  └── composer            plans multiple issues; one orchestrator per issue; merges
+        └── orchestrator  owns one issue; one implementer per slice
+              ├── implementer  edits, commits, and pushes its slice branch
+              └── reviewer     read-only review of a finished slice
+```
+
+- A human may task any level directly. `full-stack` is the lowest-level agent a
+  human tasks directly: it runs the whole issue loop itself.
+- Each agent reports to its parent. Escalations travel up one level at a time.
+- The orchestrator owns the issue's `HANDOFF.md`; the composer owns
+  `COMPOSITION.md`. Sub-agents report status and results to their parent
+  rather than rewriting those records, but any agent may record its own
+  workflow deviations (see the judgment policy).
+- If the runtime cannot nest agents as deep as the hierarchy needs, the parent
+  either launches the child as an independent top-level session or performs
+  the child's role itself, following the child's skill. Record the chosen mode
+  where the parent keeps its plan.
 
 ## Role Selection
 
@@ -23,16 +46,27 @@ and synthesis. The human developer remains the final accountable authority.
 
 Sub-agents are read-only by default.
 
-Use `authority mode: read-only` unless the orchestrator explicitly grants edit
-authority in the brief. A read-only sub-agent may inspect files, search code,
+Use `authority mode: read-only` unless the delegating agent explicitly grants
+edit authority in the brief. A read-only sub-agent may inspect files, search code,
 run non-mutating commands, and report findings, but must not modify files,
 create commits, push branches, open PRs, or change issue-tracker state.
 
 If edit authority is granted, the brief must state the exact allowed
 modification scope: repos, files, paths, command classes, and any protected
-areas. The orchestrator must review edited files and integrate the result before
-commit or PR. A sub-agent must never commit, push, open a PR, merge, or bypass
-human review unless the human explicitly delegated that outward action.
+areas. Standard grants by role:
+
+- **Implementer:** edit within its slice worktree, commit, and push its slice
+  branch. It does not open PRs, merge, force-push shared branches, or change
+  issue-tracker state.
+- **Reviewer:** read-only. It may run tests and checks to validate findings.
+- **Orchestrator (from a composer):** run the orchestrate skill for its one
+  issue, including launching implementers and reviewers and opening PRs.
+
+Only the composer merges, under the merge policy; sub-agents never merge or
+bypass human review. For Tier 2 actions (see the
+judgment policy) it asks its parent. A composer may give Tier 2 go-ahead to its
+orchestrators; an orchestrator passes Tier 2 requests up to its own parent
+rather than approving them. Tier 3 boundaries always go to the human.
 
 ## Required Brief Fields
 
@@ -51,8 +85,8 @@ Every delegated task should start from a written brief with these fields:
 - Authority mode: `read-only` or `edit`; default is `read-only`.
 - Expected output format: findings, patch summary, test results, risks, open
   questions, or another explicit format.
-- Results destination: where to report results, such as the orchestrator reply,
-  `HANDOFF.md`, or orchestrator working notes.
+- Results destination: where to report results, such as a reply to the
+  delegating agent, `HANDOFF.md`, or `COMPOSITION.md`.
 
 ## Sub-Agent Brief Template
 
@@ -74,20 +108,22 @@ Every delegated task should start from a written brief with these fields:
 
 - Stay within the allowed repos/files/paths.
 - Treat authority as read-only unless this brief explicitly says `edit`.
-- If authority mode is `edit`, modify only the allowed scope and leave a concise
-  change summary for orchestrator review before commit or PR.
+- If authority mode is `edit`, modify only the allowed scope, take only the
+  outward actions (commit, push, PR) the brief names, and leave a concise change
+  summary for the delegating agent.
 - Stop and report back if required context is missing, scope is unclear, or the
   task appears to require broader authority.
 ```
 
 ## Synthesizing Results
 
-The orchestrator should synthesize sub-agent output into the active work record:
+The delegating agent synthesizes sub-agent output into the active work record:
 
 - Put durable issue status, changed files, checks run, blockers, risks, and next
   steps in `HANDOFF.md`.
-- Keep transient investigation notes in orchestrator working notes when they do
-  not need to survive handoff.
+- Put cross-issue plan, status, and approvals in `COMPOSITION.md`.
+- Keep transient investigation notes in working notes when they do not need to
+  survive handoff.
 - Record workflow deviations in `HANDOFF.md`; if the reason generalizes beyond
   the issue, also add a `.harness/decisions/` ledger note.
 - Do not paste raw sub-agent transcripts unless the detail is necessary for

@@ -28,7 +28,16 @@ export interface HarnessConfig {
   guardrails: string[];
   /** Team baseline that every issue must satisfy before handoff/PR. */
   definitionOfDone: string[];
+  /** Issue/project labels that route merge decisions; see policies/merge.md. */
+  merge: MergeConfig;
   agents: Record<string, AgentProfile>;
+}
+
+export interface MergeConfig {
+  /** Labels that require a human to review and merge. Always wins. */
+  humanReviewLabels: string[];
+  /** Labels that pre-approve a composer merge once readiness checks pass. */
+  agentMergeLabels: string[];
 }
 
 export interface AgentProfile {
@@ -58,6 +67,8 @@ export interface LinearIssue {
   assignee?: string | null;
   assigneeName?: string | null;
   labels?: string[];
+  /** Labels on the issue's Linear project; unset when unknown. Used for merge routing. */
+  projectLabels?: string[];
   blocked?: boolean;
   acceptanceCriteria?: string[];
   nonGoals?: string[];
@@ -73,6 +84,7 @@ export interface LinearProject {
   name: string;
   description?: string;
   url?: string;
+  labels?: string[];
   issues: LinearIssue[];
 }
 

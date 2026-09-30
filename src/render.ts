@@ -5,6 +5,7 @@ import type {
   InstalledProfile,
   LinearIssue,
   LinearProject,
+  MergeConfig,
 } from "./types.js";
 
 // Prose lives in templates/*.md; these functions only shape data into
@@ -41,6 +42,8 @@ export function rootAgentBlock(config: HarnessConfig): string {
     mahlerCommand: config.mahlerCommand,
     workspaceDir: config.workspaceDir,
     guardrails: bulletList(config.guardrails ?? [], "- (none declared)"),
+    humanReviewLabels: labelList(config.merge?.humanReviewLabels ?? []),
+    agentMergeLabels: labelList(config.merge?.agentMergeLabels ?? []),
   });
 }
 
@@ -70,6 +73,7 @@ export function sessionMarkdown(
   profile?: InstalledProfile,
   guardrails: string[] = [],
   definitionOfDone: string[] = [],
+  merge?: MergeConfig,
 ): string {
   const profileLines = profile
     ? `- Profile: ${profile.name}
@@ -94,7 +98,45 @@ export function sessionMarkdown(
       "- (none declared in .harness/config.json)",
     ),
     definitionOfDone: definitionOfDoneChecklist(issue, definitionOfDone),
+    merge: mergeRouting(issue, merge),
   });
+}
+
+/**
+ * Describes which merge rule the issue's and its project's labels trigger, so
+ * agents can anticipate the decision (see policies/merge.md). A human-review
+ * label on either always wins.
+ */
+export function mergeRouting(
+  issue: LinearIssue,
+  merge: MergeConfig = { humanReviewLabels: [], agentMergeLabels: [] },
+): string {
+  const issueLabels = issue.labels ?? [];
+  const labels = uniqueNonEmpty([...issueLabels, ...(issue.projectLabels ?? [])]);
+  const matching = (wanted: string[]) =>
+    labels.filter((label) =>
+      wanted.some((w) => w.toLowerCase() === label.toLowerCase()),
+    );
+  const human = matching(merge.humanReviewLabels);
+  const agent = matching(merge.agentMergeLabels);
+  const rule =
+    human.length > 0
+      ? `Human review required: label ${labelList(human)} matches \`merge.humanReviewLabels\`.`
+      : agent.length > 0
+        ? `Agent merge pre-approved: label ${labelList(agent)} matches \`merge.agentMergeLabels\`; a composer may merge once readiness checks pass, unless it judges the PR high risk.`
+        : "No merge label: a composer decides by the risk rubric; without a composer, the human decides.";
+  const projectLine =
+    issue.projectLabels === undefined
+      ? "(unknown; the composer checks the project's labels at merge time)"
+      : issue.projectLabels.length > 0
+        ? labelList(issue.projectLabels)
+        : "(none)";
+  return [
+    `- Issue labels: ${issueLabels.length > 0 ? labelList(issueLabels) : "(none)"}`,
+    `- Project labels: ${projectLine}`,
+    `- ${rule}`,
+    "- Labels can change after this brief was written; confirm them at merge time (see `.harness/policies/merge.md`).",
+  ].join("\n");
 }
 
 export function handoffMarkdown(issue: LinearIssue): string {
@@ -110,6 +152,7 @@ export function projectMarkdown(
     name: project.name,
     description:
       project.description?.trim() || "_No project description supplied._",
+    labels: labelList(project.labels ?? []),
     identifier: selected.identifier,
     title: selected.title,
     reason,
@@ -173,6 +216,10 @@ function profileDescription(profile: InstalledProfile): string {
 
 function skillList(skills: string[]): string {
   return skills.join(", ") || "(none)";
+}
+
+function labelList(labels: string[]): string {
+  return labels.map((label) => `\`${label}\``).join(", ") || "(none)";
 }
 
 function bulletList(items: string[], empty: string): string {

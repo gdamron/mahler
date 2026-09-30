@@ -1,13 +1,20 @@
 {
   "name": "implementer",
-  "description": "Implements issue-scoped changes and leaves a handoff.",
+  "description": "Implements a delegated slice of issue work in its worktree, committing tested save points and pushing its branch, then reports to the orchestrator.",
   "allowedSkills": [
     "interview",
-    "select-project-issue",
-    "work-on-issue",
+    "implement",
+    "review",
+    "commit",
     "handoff"
   ],
-  "deniedSkills": ["commit", "pr"],
+  "deniedSkills": [
+    "select-project-issue",
+    "work-on-issue",
+    "pr",
+    "orchestrate",
+    "merge"
+  ],
   "runtimeHints": {
     "codex": "Use interactive Codex in the selected issue worktree.",
     "claude": "Use interactive Claude in the selected issue worktree."

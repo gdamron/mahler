@@ -5,6 +5,10 @@ description: Resolve a Linear project prompt to one eligible issue and create it
 
 # Select Project Issue
 
+This skill picks a single issue from a project. Use it when an orchestrator or
+full-stack agent is handed a project directly. A composer plans across all
+eligible issues with the compose skill instead.
+
 ## Triggers
 
 - "work on project X in Linear"
@@ -37,7 +41,8 @@ description: Resolve a Linear project prompt to one eligible issue and create it
 3. If project lookup fails, issue lookup fails, or required fields are missing,
    stop and ask the human for the missing metadata.
 4. Map MCP fields into the JSON shape printed by `mahler linear-template project`;
-   every issue must include `identifier` and `title`.
+   every issue must include `identifier` and `title`. Include the project's
+   `labels`; Mahler copies them onto each issue as `projectLabels`.
 5. Write the metadata to `.harness/tmp/linear/<project-slug>.json` in the product
    workspace, creating the directory if needed.
 6. Run `mahler project <PROJECT> --agent <agent> --linear-file .harness/tmp/linear/<project-slug>.json`.

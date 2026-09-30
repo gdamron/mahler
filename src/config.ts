@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { HarnessConfig } from "./types.js";
 
-export function defaultConfig(workspace: string): HarnessConfig {
+export function defaultConfig(_workspace: string): HarnessConfig {
   return {
     version: 1,
     mahlerCommand: "mahler",
@@ -10,57 +10,90 @@ export function defaultConfig(workspace: string): HarnessConfig {
     repos: [],
     linear: {
       acceptedAssignees: [],
-      requiredLabels: []
+      requiredLabels: [],
     },
     guardrails: [
-      "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
-      "Required CI checks must pass before merge (enforced by CI)."
+      "PRs larger than about 1000 lines should be split into smaller, stacked PRs.",
+      "High-risk PRs (identified by agent judgment or by issue or project labels) must be approved and merged by a human reviewer (see `.harness/policies/merge.md`).",
+      "Required CI checks must pass before merge (enforced by CI).",
+      "Changes reach main only through a merged PR (enforced by the forge).",
+      "Only a human reviewer may merge a PR whose required CI checks are failing.",
     ],
     definitionOfDone: [
       "`mahler check` passes for every touched repo.",
       "Self-review is complete.",
+      "Sub-agent review is complete.",
+      "Sub-agent review comments are addressed.",
+      "A PR is open for every touched repo, with a description of the change and its context.",
       "`HANDOFF.md` is current with changed files, checks run, blockers, and next steps.",
       "The change stays within the Linear issue scope.",
-      "A PR is opened for human review before merge."
     ],
+    merge: {
+      humanReviewLabels: ["high-risk"],
+      agentMergeLabels: ["agent-merge"],
+    },
     agents: {
       codex: {
         runtime: "codex",
-        profile: "orchestrator",
-        role: "orchestrator",
-        skills: ["select-project-issue", "work-on-issue", "interview", "review", "commit", "pr", "handoff"],
-        policies: [
-          "issue-selection",
-          "workspace-safety",
-          "sub-agent-delegation",
-          "judgment",
-          "implementation",
-          "definition-of-done",
-          "review",
-          "commit",
+        profile: "composer",
+        role: "composer",
+        skills: [
+          "compose",
+          "orchestrate",
+          "select-project-issue",
+          "work-on-issue",
+          "interview",
           "pr",
-          "handoff"
-        ]
+          "merge",
+          "handoff",
+        ],
+        policies: [
+          "branching",
+          "commit",
+          "definition-of-done",
+          "handoff",
+          "implementation",
+          "interview",
+          "issue-selection",
+          "judgment",
+          "merge",
+          "pr",
+          "review",
+          "sub-agent-delegation",
+          "workspace-safety",
+        ],
       },
       claude: {
         runtime: "claude",
-        profile: "orchestrator",
-        role: "orchestrator",
-        skills: ["select-project-issue", "work-on-issue", "interview", "review", "commit", "pr", "handoff"],
-        policies: [
-          "issue-selection",
-          "workspace-safety",
-          "sub-agent-delegation",
-          "judgment",
-          "implementation",
-          "definition-of-done",
-          "review",
-          "commit",
+        profile: "composer",
+        role: "composer",
+        skills: [
+          "compose",
+          "orchestrate",
+          "select-project-issue",
+          "work-on-issue",
+          "interview",
           "pr",
-          "handoff"
-        ]
-      }
-    }
+          "merge",
+          "handoff",
+        ],
+        policies: [
+          "branching",
+          "commit",
+          "definition-of-done",
+          "handoff",
+          "implementation",
+          "interview",
+          "issue-selection",
+          "judgment",
+          "merge",
+          "pr",
+          "review",
+          "sub-agent-delegation",
+          "workspace-safety",
+        ],
+      },
+    },
   };
 }
 
@@ -70,15 +103,18 @@ export function withInstallOptions(
     repos?: HarnessConfig["repos"];
     acceptedAssignees?: string[];
     requiredLabels?: string[];
-  }
+    merge?: HarnessConfig["merge"];
+  },
 ): HarnessConfig {
   return {
     ...config,
     repos: options.repos ?? config.repos,
+    merge: options.merge ?? config.merge,
     linear: {
-      acceptedAssignees: options.acceptedAssignees ?? config.linear.acceptedAssignees,
-      requiredLabels: options.requiredLabels ?? config.linear.requiredLabels
-    }
+      acceptedAssignees:
+        options.acceptedAssignees ?? config.linear.acceptedAssignees,
+      requiredLabels: options.requiredLabels ?? config.linear.requiredLabels,
+    },
   };
 }
 
@@ -96,7 +132,13 @@ export function loadConfig(workspace: string): HarnessConfig {
   return {
     ...parsed,
     guardrails: parsed.guardrails ?? [],
-    definitionOfDone: parsed.definitionOfDone ?? defaults.definitionOfDone
+    definitionOfDone: parsed.definitionOfDone ?? defaults.definitionOfDone,
+    merge: {
+      humanReviewLabels:
+        parsed.merge?.humanReviewLabels ?? defaults.merge.humanReviewLabels,
+      agentMergeLabels:
+        parsed.merge?.agentMergeLabels ?? defaults.merge.agentMergeLabels,
+    },
   };
 }
 

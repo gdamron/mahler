@@ -1,8 +1,20 @@
 {
   "name": "reviewer",
   "description": "Reviews issue-scoped diffs and records findings.",
-  "allowedSkills": ["review", "handoff"],
-  "deniedSkills": ["commit", "pr", "work-on-issue"],
+  "allowedSkills": [
+    "interview",
+    "review",
+    "handoff"
+  ],
+  "deniedSkills": [
+    "orchestrate",
+    "select-project-issue",
+    "work-on-issue",
+    "implement",
+    "commit",
+    "pr",
+    "merge"
+  ],
   "runtimeHints": {
     "codex": "Use Codex review/inspection behavior without editing unless explicitly asked.",
     "claude": "Use Claude review/inspection behavior without editing unless explicitly asked."

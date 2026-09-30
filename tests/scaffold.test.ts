@@ -19,7 +19,10 @@ test("discovery scans canonical source, including branching and interview", () =
   assert.ok(policyNames().includes("interview"), "interview policy should be discovered");
   assert.ok(policyNames().includes("sub-agent-delegation"), "sub-agent delegation policy should be discovered");
   assert.ok(skillNames().includes("interview"), "interview skill should be discovered");
-  for (const profile of ["implementer", "reviewer", "committer", "full-stack"]) {
+  for (const skill of ["compose", "orchestrate", "implement"]) {
+    assert.ok(skillNames().includes(skill), `missing skill ${skill}`);
+  }
+  for (const profile of ["composer", "orchestrator", "implementer", "reviewer", "full-stack"]) {
     assert.ok(profileNames().includes(profile), `missing profile ${profile}`);
   }
 });
@@ -76,6 +79,20 @@ test("reinstall preserves human-set per-repo checks that detection cannot infer"
     { test: "cargo test --lib --tests", build: "cargo build --lib" },
     "reinstall must not wipe human-set checks"
   );
+});
+
+test("reinstall preserves human-set merge labels", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-merge-"));
+  assert.equal(install(workspace).status, 0);
+
+  const configFile = resolve(workspace, ".harness", "config.json");
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  config.merge = { humanReviewLabels: ["security"], agentMergeLabels: [] };
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(install(workspace).status, 0);
+  const after = JSON.parse(readFileSync(configFile, "utf8"));
+  assert.deepEqual(after.merge, { humanReviewLabels: ["security"], agentMergeLabels: [] });
 });
 
 test("custom overlay overrides a default and adds custom-only files; reinstall preserves both", () => {

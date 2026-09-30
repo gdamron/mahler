@@ -11,6 +11,7 @@ import {
   nativeAdapter,
   rootAgentBlock,
   sessionMarkdown,
+  mergeRouting,
   taskMarkdown,
   workflowMarkdown,
 } from "../src/render.js";
@@ -21,14 +22,17 @@ test("workflow names issue prompts and project prompts", () => {
   assert.match(workflow, /work on project X in Linear/);
 });
 
-test("workflow distinguishes the orchestrator agent from the human authority", () => {
+test("workflow distinguishes the agent hierarchy from the human authority", () => {
   const workflow = workflowMarkdown();
-  // Orchestrator is an agent role that coordinates sub-agents, not the human.
+  // Composer coordinates orchestrators; each orchestrator owns one issue and
+  // delegates to implementers and reviewers. None of them is the human.
+  assert.match(workflow, /[Cc]omposer agent/);
+  assert.match(workflow, /dispatches one orchestrator per issue/i);
   assert.match(workflow, /[Oo]rchestrator agent/);
-  assert.match(workflow, /coordinates sub-agents/i);
-  assert.match(workflow, /synthesizes their outputs/i);
-  assert.match(workflow, /surfaces risks to the human/i);
-  // It is the primary interface to the human and empowered to act directly.
+  assert.match(workflow, /delegates each slice to an implementer/i);
+  assert.match(workflow, /synthesizes results/i);
+  assert.match(workflow, /[Ff]ull-stack agent/);
+  // The composer is the primary interface to the human; agents may act directly.
   assert.match(workflow, /primary interface to the human/i);
   assert.match(workflow, /empowered to take any action/i);
   // Human stays the final accountable authority for review and merge.
@@ -51,6 +55,16 @@ test("native adapter tells agent to create briefs and choose worktrees", () => {
   assert.match(adapter, /create the issue brief/);
   assert.match(adapter, /Decide which configured repos need worktrees/);
   assert.match(adapter, /Record deliberate workflow deviations/);
+});
+
+test("native adapters route project prompts by role", () => {
+  for (const runtime of ["codex", "claude"] as const) {
+    const adapter = nativeAdapter(runtime);
+    const skillsDir = runtime === "codex" ? "\\.agents/skills" : "\\.claude/skills";
+    assert.match(adapter, new RegExp(`composer uses \`${skillsDir}/compose/SKILL\\.md\``));
+    assert.match(adapter, new RegExp(`other role uses \`${skillsDir}/select-project-issue/SKILL\\.md\``));
+    assert.match(adapter, new RegExp(`orchestrator uses \`${skillsDir}/orchestrate/SKILL\\.md\``));
+  }
 });
 
 test("native adapters reference routing, profiles, skills, and policies", () => {
@@ -124,7 +138,7 @@ test("root agent block and session brief declare Tier 3 guardrails", () => {
   const block = rootAgentBlock(config);
   assert.match(block, /Guardrails \(Tier 3/);
   assert.match(block, /enforced by the forge\/CI, not Mahler/);
-  assert.match(block, /human-approved PR/);
+  assert.match(block, /human reviewer/);
 
   const session = sessionMarkdown(
     { identifier: "MAH-1", title: "t", labels: [], blocked: false },
@@ -135,7 +149,7 @@ test("root agent block and session brief declare Tier 3 guardrails", () => {
     config.guardrails,
   );
   assert.match(session, /## Guardrails \(enforced outside Mahler/);
-  assert.match(session, /human-approved PR/);
+  assert.match(session, /human reviewer/);
 });
 
 test("session brief points orchestrators to sub-agent delegation policy", () => {
@@ -283,4 +297,60 @@ test("launch commands are agent specific", () => {
     launchCommand("claude", "/tmp/repo", "/tmp/meta"),
     /^claude --add-dir/,
   );
+});
+
+test("merge routing reflects issue labels, human review first", () => {
+  const merge = { humanReviewLabels: ["high-risk"], agentMergeLabels: ["agent-merge"] };
+  const issue = (labels: string[]) => ({ identifier: "MAH-2", title: "t", labels, blocked: false });
+
+  const human = mergeRouting(issue(["Agent-Merge", "HIGH-RISK"]), merge);
+  assert.match(human, /Human review required/);
+  assert.match(human, /`HIGH-RISK`/);
+
+  assert.match(mergeRouting(issue(["agent-merge"]), merge), /Agent merge pre-approved/);
+  assert.match(mergeRouting(issue([]), merge), /Issue labels: \(none\)/);
+  assert.match(mergeRouting(issue(["bug"]), merge), /risk rubric/);
+  assert.match(mergeRouting(issue([]), merge), /merge\.md/);
+});
+
+test("session brief and root block declare merge routing", () => {
+  const config = defaultConfig("/tmp/workspace");
+  const session = sessionMarkdown(
+    { identifier: "MAH-3", title: "t", labels: ["high-risk"], blocked: false },
+    "codex",
+    "/tmp/workspace/workspaces/issues/MAH-3",
+    config.repos,
+    undefined,
+    config.guardrails,
+    config.definitionOfDone,
+    config.merge,
+  );
+  assert.match(session, /## Merge/);
+  assert.match(session, /Human review required/);
+
+  const block = rootAgentBlock(config);
+  assert.match(block, /only a composer may take/);
+  assert.match(block, /`high-risk` always require human review/);
+  assert.match(block, /`agent-merge` pre-approve/);
+  assert.match(block, /judges high risk always goes to the human, whatever its labels/);
+});
+
+test("merge routing includes project labels", () => {
+  const merge = { humanReviewLabels: ["high-risk"], agentMergeLabels: ["agent-merge"] };
+  const base = { identifier: "MAH-6", title: "t", blocked: false };
+
+  const unknown = mergeRouting({ ...base, labels: ["agent-merge"] }, merge);
+  assert.match(unknown, /Project labels: \(unknown/);
+  assert.match(unknown, /Agent merge pre-approved/);
+
+  const projectHuman = mergeRouting(
+    { ...base, labels: ["agent-merge"], projectLabels: ["High-Risk"] },
+    merge,
+  );
+  assert.match(projectHuman, /Project labels: `High-Risk`/);
+  assert.match(projectHuman, /Human review required: label `High-Risk`/);
+
+  const projectAgent = mergeRouting({ ...base, labels: [], projectLabels: ["agent-merge"] }, merge);
+  assert.match(projectAgent, /Agent merge pre-approved/);
+  assert.match(mergeRouting({ ...base, labels: [], projectLabels: [] }, merge), /Project labels: \(none\)/);
 });

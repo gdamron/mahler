@@ -1,6 +1,6 @@
 ---
 name: work-on-issue
-description: Create an issue brief and perform issue-scoped implementation work from Linear issue metadata.
+description: Create an issue brief and worktrees from Linear issue metadata, then route the work by role.
 ---
 
 # Work On Issue
@@ -17,8 +17,7 @@ description: Create an issue brief and perform issue-scoped implementation work 
 - issue-selection
 - interview
 - workspace-safety
-- sub-agent-delegation
-- implementation
+- branching
 - definition-of-done
 - handoff
 
@@ -43,6 +42,8 @@ description: Create an issue brief and perform issue-scoped implementation work 
 3. Map MCP fields into the JSON shape printed by `mahler linear-template issue`.
    Put Linear acceptance criteria or checklist items in `acceptanceCriteria` when present.
    Include `nonGoals`, `protectedAreas`, and `riskNotes` only when the Linear issue provides them.
+   If the issue belongs to a Linear project, use `get_project` and put the
+   project's labels in `projectLabels` so the brief can show merge routing.
 4. Write the metadata to `.harness/tmp/linear/<ISSUE>.json` in the product workspace,
    creating the directory if needed.
 5. Run `mahler issue <ISSUE> --agent <agent> --linear-file .harness/tmp/linear/<ISSUE>.json`.
@@ -50,17 +51,27 @@ description: Create an issue brief and perform issue-scoped implementation work 
    active `.harness/decisions/` ledger (not `archive/`) to recover durable
    decisions and intent from earlier sessions (record a new deviation with
    `mahler decide` only when its reason generalizes beyond this issue).
-7. Decide which configured repos need worktrees for the task.
+7. Decide which configured repos need worktrees for the task. An orchestrator
+   also decides how to slice the work here (see the orchestrate skill); each
+   slice gets its own branch and worktree.
 8. Choose short-lived branch names using `.harness/policies/branching.md`.
 9. Create only the needed repo worktrees, preferably under `workspaces/issues/<ISSUE>/repos/<repo>`.
+
+## Route By Role
+
+Setup is shared; what happens next depends on the active profile:
+
+- **orchestrator** (or a composer acting as orchestrator): continue with the
+  orchestrate skill. Delegate implementation to implementer sub-agents rather
+  than writing the code yourself.
+- **full-stack**: do the loop yourself: implement, then review (self-review
+  plus a reviewer sub-agent when available), then pr, then handoff.
 
 ## Required Outputs
 
 - Generated issue brief
 - Repo worktrees only where needed
-- Updated `HANDOFF.md`
-- Definition of Done checklist satisfied or explicitly blocked
-- Summary of changes and tests run
+- Updated `HANDOFF.md` with the chosen repos, branches, and slices
 
 ## Stop Conditions
 

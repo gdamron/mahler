@@ -12,6 +12,7 @@
 - Self-review: not started
 - Agent review: not requested
 - Human review: pending
+- Merge decision: pending (see `.harness/policies/merge.md`)
 
 ## Quality
 

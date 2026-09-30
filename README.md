@@ -34,6 +34,9 @@ issue before any code workspace is created.
   workspace-local Claude/Codex instruction surfaces.
 - Skills compose policies into named workflows, and agent profiles declare
   which skills each role can use.
+- Generated markdown (`WORKFLOW.md`, issue briefs, runtime adapters, agent
+  definitions, installed READMEs) is rendered from `templates/*.md`; the
+  TypeScript only fills `{{placeholders}}`.
 - Linear MCP is the preferred source of issue and project context. If an agent
   lacks Linear MCP access, it must ask for missing metadata instead of
   inventing it.

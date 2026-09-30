@@ -8,7 +8,7 @@ import { listDirectories, listFilesWithExtension, repoRoot } from "./util.js";
 // The install set is derived by scanning the canonical source directories, not
 // a hardcoded list. New files (policies, skills, profiles) install automatically
 // and `doctor` follows. `adapterRuntimes` stays hardcoded — adapters are
-// code-generated (see render.ts::nativeAdapter), not read from disk.
+// rendered from templates/adapter.md per runtime (see render.ts::nativeAdapter).
 // ---------------------------------------------------------------------------
 
 export function policyNames(): string[] {
@@ -127,4 +127,11 @@ export function readProfileSource(workspace: string, name: string): Source {
     resolve(customDir(workspace, "agents"), `${name}.json`),
     `.harness/custom/agents/${name}.json`
   );
+}
+
+/** Workspace-relative label for a source — the custom overlay path when overridden, else the canonical path. */
+export function sourceLabel(source: Source, canonicalLabel: string): string {
+  return source.custom
+    ? (source.customRelPath ?? canonicalLabel)
+    : canonicalLabel;
 }

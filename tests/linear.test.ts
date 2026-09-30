@@ -110,3 +110,10 @@ test("readProjectFile copies project labels onto issues without their own", () =
   assert.deepEqual(project?.issues[1].projectLabels, []);
   assert.equal(normalizeIssue({ identifier: "FUG-3", title: "t" }).projectLabels, undefined);
 });
+
+test("project template issues inherit the project's labels", () => {
+  const path = resolve(mkdtempSync(resolve(tmpdir(), "mahler-linear-")), "project.json");
+  const template = linearProjectTemplate();
+  writeFileSync(path, JSON.stringify({ ...template, labels: ["high-risk"] }));
+  assert.deepEqual(readProjectFile(path)?.issues[0].projectLabels, ["high-risk"]);
+});

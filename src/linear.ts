@@ -35,7 +35,8 @@ export function linearProjectTemplate(): LinearProject {
     description: "Project description from Linear",
     url: "https://linear.app/workspace/project/project-slug",
     labels: ["project label"],
-    issues: [linearIssueTemplate()]
+    // Issues inherit the project's labels; a nested placeholder would override them.
+    issues: [{ ...linearIssueTemplate(), projectLabels: undefined }]
   };
 }
 

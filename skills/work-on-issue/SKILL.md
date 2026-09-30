@@ -55,7 +55,8 @@ description: Create an issue brief and worktrees from Linear issue metadata, the
    also decides how to slice the work here (see the orchestrate skill); each
    slice gets its own branch and worktree.
 8. Choose short-lived branch names using `.harness/policies/branching.md`.
-9. Create only the needed repo worktrees, preferably under `workspaces/issues/<ISSUE>/repos/<repo>`.
+9. Create only the needed repo worktrees, preferably under `workspaces/issues/<ISSUE>/repos/<repo>`
+   (`repos/<repo>-<slice>` for additional slices in the same repo).
 
 ## Route By Role
 

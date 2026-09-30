@@ -28,7 +28,7 @@ runs it directly for the whole issue.
 ## Allowed Commands
 
 - repo-local build, test, and inspection commands inside the assigned worktree
-- `mahler check --workspace <workspace> --issue <ISSUE>`
+- `mahler check --workspace <workspace> --path <worktree>` for your worktree
 - `git status`, `git diff`, `git add`, `git commit` (via the commit skill)
 - `git push` for the assigned branch only; never force-push a shared branch or
   push to a base branch
@@ -52,7 +52,7 @@ runs it directly for the whole issue.
 4. When addressing review findings, fix each accepted one in its own commit
    where practical. If you disagree with a finding, say why in your report
    instead of silently skipping it.
-5. Run `mahler check` for the touched repo, then push the branch
+5. Run `mahler check --path <worktree>` for your worktree, then push the branch
    (`git push -u origin <branch>`).
 6. Report the implementation policy's change summary (changes made, things
    intentionally not touched, potential concerns), the commit list, checks run,

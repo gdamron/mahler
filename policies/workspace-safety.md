@@ -9,7 +9,8 @@ Rules:
 - Do not reuse an issue workspace already owned by another active agent.
 - Read `TASK.md`, `AGENT_SESSION.md`, and `HANDOFF.md` before changing code.
 - Create git worktrees only for repos needed by the task.
-- Prefer repo worktrees under `workspaces/issues/<ISSUE>/repos/<repo>`.
+- Prefer repo worktrees under `workspaces/issues/<ISSUE>/repos/<repo>`; when an
+  issue has several slices in one repo, name the others `repos/<repo>-<slice>`.
 - Record deliberate workflow deviations in `HANDOFF.md`.
 - Stop and ask the human if the issue brief is missing or inconsistent.
 

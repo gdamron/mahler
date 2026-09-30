@@ -52,7 +52,8 @@ dispatched it, or the human who tasked it directly.
 2. **Plan slices.** One implementer is the default. Split into more slices when
    the issue spans repos or would produce a change too large to review (see the
    commit policy's size guidance). Each slice gets its own branch and worktree
-   so parallel implementers never share a working tree; a slice that depends on
+   so parallel implementers never share a working tree: `repos/<repo>` for the
+   first slice in a repo, `repos/<repo>-<slice>` for the rest. A slice that depends on
    another branches from it and becomes a stacked PR. Record the slices in
    `HANDOFF.md`.
 3. **Delegate implementation.** For each slice, launch an implementer with a
@@ -72,8 +73,9 @@ dispatched it, or the human who tasked it directly.
    re-review. Use judgment on optional findings per the review policy. After
    three review rounds on one slice, stop and escalate the outstanding findings
    to your parent.
-7. **Verify.** Run `mahler check` for every touched repo and walk the
-   Definition of Done checklist.
+7. **Verify.** Run `mahler check --issue <ISSUE>`, which checks every worktree
+   under the issue's `repos/` dir, slices included, and walk the Definition of
+   Done checklist.
 8. **Open PRs** with the pr skill: one PR per slice branch. A stacked PR
    targets its predecessor's branch and says so in its description.
 9. **Assess merge readiness.** For each PR, write the merge assessment from the

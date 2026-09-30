@@ -13,9 +13,10 @@ Mahler compiles canonical workflow source into native agent artifacts:
 Recommended routing:
 
 - Active profile check: inspect `.harness/config.json` and the active profile in `.harness/agents/profiles/` ({{codexProfile}}; {{claudeProfile}}) before choosing a skill.
-- Issue prompt: use the native `work-on-issue` skill. It fetches Linear metadata, writes `.harness/tmp/linear/<ISSUE>.json`, then runs `{{mahlerCommand}} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>` to create a brief.
-- Project prompt: use the native `select-project-issue` skill. It fetches Linear project metadata, writes `.harness/tmp/linear/<project>.json`, then runs `{{mahlerCommand}} project "<PROJECT>" --agent <codex|claude> --linear-file <project.json>`.
-- For review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.
+- Multi-issue or project prompt for a composer: use the native `compose` skill. It plans every eligible issue in `.harness/projects/<slug>/COMPOSITION.md` and dispatches one orchestrator per issue.
+- Issue prompt: an orchestrator uses the native `orchestrate` skill, which starts with `work-on-issue` and delegates slices to implementers and reviewers; a full-stack agent uses `work-on-issue` and then `implement` itself. `work-on-issue` fetches Linear metadata, writes `.harness/tmp/linear/<ISSUE>.json`, then runs `{{mahlerCommand}} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>` to create a brief.
+- Project prompt for any other role: use the native `select-project-issue` skill to pick one issue. It fetches Linear project metadata, writes `.harness/tmp/linear/<project>.json`, then runs `{{mahlerCommand}} project "<PROJECT>" --agent <codex|claude> --linear-file <project.json>`.
+- For implement, review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.
 - Sub-agent delegation: use `.harness/policies/sub-agent-delegation.md`; prefer configured roles, specialize them in the brief, default to read-only authority, and synthesize results into `HANDOFF.md` or working notes. Mahler does not provide `mahler subagent ...` commands.
 - Create git worktrees only for repos needed by the task, preferably under `{{workspaceDir}}/issues/<ISSUE>/repos/<repo>`.
 - Choose branch names using `.harness/policies/branching.md`; Mahler does not choose branch names for agents.

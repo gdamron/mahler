@@ -1,7 +1,13 @@
 {
   "name": "implementer",
-  "description": "Implements issue-scoped changes and leaves a handoff.",
-  "allowedSkills": ["interview", "implement", "review", "commit", "handoff"],
+  "description": "Implements a delegated slice of issue work in its worktree, committing tested save points and pushing its branch, then reports to the orchestrator.",
+  "allowedSkills": [
+    "interview",
+    "implement",
+    "review",
+    "commit",
+    "handoff"
+  ],
   "deniedSkills": [
     "select-project-issue",
     "work-on-issue",

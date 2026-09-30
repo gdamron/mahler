@@ -21,16 +21,19 @@ description: Prepare or open a pull request for committed issue-scoped work.
 ## Allowed Commands
 
 - git status and log commands
+- `git push` for the issue or slice branch when it has not been pushed yet
 - configured GitHub or forge command for PR creation when available
 
 ## Expected Inputs
 
-- Issue branch with committed changes
+- Issue or slice branch with committed changes that have passed review
 - Current `HANDOFF.md`
+- For a stacked slice: the predecessor branch to target
 
 ## Required Outputs
 
-- PR summary or created PR URL
+- PR summary or created PR URL (one PR per slice branch; a stacked PR targets
+  its predecessor's branch and says so in its description)
 - Tests run
 - Updated `HANDOFF.md`
 
@@ -38,4 +41,4 @@ description: Prepare or open a pull request for committed issue-scoped work.
 
 - branch has uncommitted changes
 - no remote is configured
-- the human has not given explicit go-ahead to push or open the PR for this change (Tier 2 — see the judgment policy)
+- review findings on the branch are unresolved

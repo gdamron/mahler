@@ -19,7 +19,10 @@ test("discovery scans canonical source, including branching and interview", () =
   assert.ok(policyNames().includes("interview"), "interview policy should be discovered");
   assert.ok(policyNames().includes("sub-agent-delegation"), "sub-agent delegation policy should be discovered");
   assert.ok(skillNames().includes("interview"), "interview skill should be discovered");
-  for (const profile of ["implementer", "reviewer", "committer", "full-stack"]) {
+  for (const skill of ["compose", "orchestrate", "implement"]) {
+    assert.ok(skillNames().includes(skill), `missing skill ${skill}`);
+  }
+  for (const profile of ["composer", "orchestrator", "implementer", "reviewer", "full-stack"]) {
     assert.ok(profileNames().includes(profile), `missing profile ${profile}`);
   }
 });

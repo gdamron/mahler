@@ -57,6 +57,11 @@ feel friction before doing them out of role; you do not, so manufacture the
 pause: stop and get explicit human confirmation for the specific action before
 proceeding. Mahler does not enforce this in code — the norm is the gate.
 
+When you work under a parent agent, ask the parent instead of the human. A
+composer may approve Tier 2 actions for its orchestrators and records each
+approval in `COMPOSITION.md`; an orchestrator or other sub-agent passes the
+request up rather than approving it.
+
 ### Tier 3 — Hard guardrails (declared by Mahler, enforced elsewhere)
 
 Examples: merging to a base branch, required CI checks.

@@ -1,6 +1,6 @@
 {
   "name": "full-stack",
-  "description": "Performs core development tasks including issue work, self-review, and PR preparation.",
+  "description": "The lowest-level agent a human tasks directly: runs the whole issue loop itself, from setup through implementation, commits, review, and PR preparation.",
   "allowedSkills": [
     "select-project-issue",
     "work-on-issue",
@@ -11,7 +11,10 @@
     "pr",
     "handoff"
   ],
-  "deniedSkills": ["orchestrate"],
+  "deniedSkills": [
+    "compose",
+    "orchestrate"
+  ],
   "runtimeHints": {
     "codex": "Use interactive Codex in the selected issue worktree.",
     "claude": "Use interactive Claude in the selected issue worktree."

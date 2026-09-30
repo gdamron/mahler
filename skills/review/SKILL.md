@@ -26,13 +26,16 @@ description: Review an issue-scoped diff and report findings before handoff.
 ## Expected Inputs
 
 - Existing issue brief and selected worktree
-- Diff or branch to review
+- Diff or branch to review, and the base it should be compared against
+- When delegated: the reviewer brief from the orchestrator
 
 ## Required Outputs
 
 - Findings first, ordered by severity
 - File and line references when available
-- Updated `HANDOFF.md`
+- A recommended fix for each finding when you have one
+- Updated `HANDOFF.md`, or, when delegated, findings reported to the
+  orchestrator that owns it
 
 ## Stop Conditions
 

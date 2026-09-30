@@ -5,6 +5,10 @@ description: Resolve a Linear project prompt to one eligible issue and create it
 
 # Select Project Issue
 
+This skill picks a single issue from a project. Use it when an orchestrator or
+full-stack agent is handed a project directly. A composer plans across all
+eligible issues with the compose skill instead.
+
 ## Triggers
 
 - "work on project X in Linear"

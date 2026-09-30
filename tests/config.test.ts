@@ -15,7 +15,7 @@ test("defaultConfig does not assume repos or Linear assignees", () => {
 test("defaultConfig declares Tier 3 guardrails", () => {
   const config = defaultConfig("/tmp/workspace");
   assert.ok(config.guardrails.length >= 2);
-  assert.ok(config.guardrails.some((line) => line.includes("human-approved PR")));
+  assert.ok(config.guardrails.some((line) => line.includes("human reviewer")));
   assert.ok(config.guardrails.some((line) => line.includes("CI")));
 });
 

@@ -21,14 +21,17 @@ test("workflow names issue prompts and project prompts", () => {
   assert.match(workflow, /work on project X in Linear/);
 });
 
-test("workflow distinguishes the orchestrator agent from the human authority", () => {
+test("workflow distinguishes the agent hierarchy from the human authority", () => {
   const workflow = workflowMarkdown();
-  // Orchestrator is an agent role that coordinates sub-agents, not the human.
+  // Composer coordinates orchestrators; each orchestrator owns one issue and
+  // delegates to implementers and reviewers. None of them is the human.
+  assert.match(workflow, /[Cc]omposer agent/);
+  assert.match(workflow, /dispatches one orchestrator per issue/i);
   assert.match(workflow, /[Oo]rchestrator agent/);
-  assert.match(workflow, /coordinates sub-agents/i);
-  assert.match(workflow, /synthesizes their outputs/i);
-  assert.match(workflow, /surfaces risks to the human/i);
-  // It is the primary interface to the human and empowered to act directly.
+  assert.match(workflow, /delegates each slice to an implementer/i);
+  assert.match(workflow, /synthesizes results/i);
+  assert.match(workflow, /[Ff]ull-stack agent/);
+  // The composer is the primary interface to the human; agents may act directly.
   assert.match(workflow, /primary interface to the human/i);
   assert.match(workflow, /empowered to take any action/i);
   // Human stays the final accountable authority for review and merge.
@@ -124,7 +127,7 @@ test("root agent block and session brief declare Tier 3 guardrails", () => {
   const block = rootAgentBlock(config);
   assert.match(block, /Guardrails \(Tier 3/);
   assert.match(block, /enforced by the forge\/CI, not Mahler/);
-  assert.match(block, /human-approved PR/);
+  assert.match(block, /human reviewer/);
 
   const session = sessionMarkdown(
     { identifier: "MAH-1", title: "t", labels: [], blocked: false },
@@ -135,7 +138,7 @@ test("root agent block and session brief declare Tier 3 guardrails", () => {
     config.guardrails,
   );
   assert.match(session, /## Guardrails \(enforced outside Mahler/);
-  assert.match(session, /human-approved PR/);
+  assert.match(session, /human reviewer/);
 });
 
 test("session brief points orchestrators to sub-agent delegation policy", () => {

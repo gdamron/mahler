@@ -1,8 +1,9 @@
 # Mahler
 
 Mahler (as in Gustav, everyone's favorite composer/conductor) is a workflow
-tool for multi-agent software work. An orchestrator agent coordinates the work
-under a human developer who stays the final accountable authority. It installs
+tool for multi-agent software work. A composer agent coordinates orchestrator
+agents, each owning one issue, under a human developer who stays the final
+accountable authority. It installs
 project-scoped instructions, policies, and helpers so agents can be prompted
 with small requests such as:
 
@@ -11,21 +12,25 @@ work on ISSUE-123
 work on project "My Project" in issue tracking
 ```
 
-Mahler keeps code work task-scoped. Project prompts resolve to one task or
-issue before any code workspace is created.
+Mahler keeps code work task-scoped. Project prompts resolve to individual
+issues before any code workspace is created: a composer plans all of them, and
+other roles pick one.
 
 ## Principles
 
 - The human developer is the final accountable authority for quality,
   integration, merge, and release — not modeled as an agent.
-- The orchestrator agent is the default coordinating role and the primary
-  interface to the human: it plans, delegates to sub-agents, synthesizes their
-  output, and surfaces risks. It is empowered to take any action directly when
-  warranted — delegation is the common case, not a capability limit — and pauses
-  at Tier 2 boundaries for human go-ahead.
+- Agents form a hierarchy: a **composer** (the default role and primary
+  interface to the human) plans multi-issue work and dispatches one
+  **orchestrator** per issue; each orchestrator delegates slices to
+  **implementers** (which edit, commit, and push) and **reviewers** (read-only),
+  then opens the PRs. A **full-stack** agent is the lowest-level agent a human
+  tasks directly and runs the whole issue loop itself. Any agent may act
+  directly when warranted — delegation is the common case, not a capability
+  limit — and pauses at Tier 2 boundaries for its parent's go-ahead.
 - Sub-agent delegation uses native/runtime agent capabilities plus the installed
   `sub-agent-delegation` policy and brief template. Sub-agents are read-only by
-  default unless an orchestrator brief explicitly grants scoped edit authority.
+  default unless their brief explicitly grants scoped edit authority.
 - Tasks (such as Linear issues) are the atomic unit for code changes, commits,
   and PRs.
 - Agents create dedicated git worktrees only for the repos needed by a task,

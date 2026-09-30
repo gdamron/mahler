@@ -131,7 +131,7 @@ test("dogfood issue prompt workflow installs native artifacts and creates an iss
   assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-5", "repos", "app")), false);
   assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-5", "repos", "api")), false);
   assert.match(readFileSync(resolve(issueBrief, "TASK.md"), "utf8"), /Linear source: linear-file/);
-  assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /Profile: orchestrator/);
+  assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /Profile: composer/);
   assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /api: source `api`, base `main`/);
   assert.match(readFileSync(resolve(issueBrief, "AGENT_SESSION.md"), "utf8"), /app: source `app`, base `main`/);
   assert.match(readFileSync(resolve(issueBrief, "HANDOFF.md"), "utf8"), /State: not started/);

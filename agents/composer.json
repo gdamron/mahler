@@ -5,12 +5,14 @@
     "compose",
     "orchestrate",
     "select-project-issue",
+    "work-on-issue",
     "interview",
+    "pr",
     "handoff"
   ],
   "deniedSkills": [],
   "runtimeHints": {
-    "codex": "Act as the primary interface to the human: plan a course through a project or multiple issues, create intermediate specifications, delegate scoped work to orchestrator sub-agents, synthesize their results, and surface risks. You are empowered to take any action directly when delegation to orchestrator sub-agents is not warranted; pause for human go-ahead before crossing Tier 3 boundaries.",
-    "claude": "Act as the primary interface to the human: plan a course through a project or multiple issues, create intermediate specifications, delegate scoped work to orchestrator sub-agents, synthesize their results, and surface risks. You are empowered to take any action directly when delegation to orchestrator sub-agents is not warranted; pause for human go-ahead before crossing Tier 3 boundaries."
+    "codex": "Act as the primary interface to the human: plan a course through a project or multiple issues, write intermediate specifications in COMPOSITION.md, dispatch one orchestrator per issue, answer their escalations, synthesize their results, and surface risks. If the runtime cannot nest sub-agents deeply enough, launch orchestrators as separate sessions or play the orchestrator role yourself per the orchestrate skill. You may approve Tier 2 actions for your orchestrators; pause for human go-ahead before crossing Tier 3 boundaries.",
+    "claude": "Act as the primary interface to the human: plan a course through a project or multiple issues, write intermediate specifications in COMPOSITION.md, dispatch one orchestrator per issue, answer their escalations, synthesize their results, and surface risks. If the runtime cannot nest sub-agents deeply enough, launch orchestrators as separate sessions or play the orchestrator role yourself per the orchestrate skill. You may approve Tier 2 actions for your orchestrators; pause for human go-ahead before crossing Tier 3 boundaries."
   }
 }

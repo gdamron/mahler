@@ -65,7 +65,7 @@ mahler profile codex --workspace /path/to/product-workspace
 mahler can codex commit --workspace /path/to/product-workspace
 mahler handoff FUG-123 --workspace /path/to/product-workspace --agent codex
 mahler decide --rule scope --reason "expanded to fix adjacent bug" --issue FUG-123 --agent codex --workspace /path/to/product-workspace
-mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue FUG-123]
+mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue FUG-123 | --path <worktree>]
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project
@@ -78,8 +78,10 @@ has a `package.json`, install pre-populates per-repo `checks` (test/lint/build
 commands) from its scripts; edit `.harness/config.json` to adjust them.
 
 `mahler check` is a local mirror of CI: it runs each repo's configured check
-commands (in the issue worktree when `--issue` is given, otherwise the source
-repo) and reports ok/fail per command. It is feedback, not a gate — the
+commands and reports ok/fail per command. With `--issue` it checks every
+worktree under the issue's `repos/` dir, including slice worktrees such as
+`repos/<repo>-<slice>`, and fails if there are none; with `--path` it checks a
+single worktree; otherwise it checks each source repo. It is feedback, not a gate — the
 forge/CI remains the Tier 3 authority.
 
 `mahler decide` appends a note to the decisions ledger

@@ -85,7 +85,7 @@ function usage(): void {
   mahler can <agent> <skill> --workspace <path>
   mahler handoff <ISSUE> --workspace <path> --agent codex|claude
   mahler decide --rule <rule> --reason "<why>" [--issue <ISSUE>] [--agent codex|claude] [--slug <slug>] [--workspace <path>]
-  mahler check --workspace <path> [--repo <name>] [--issue <ISSUE>]
+  mahler check --workspace <path> [--repo <name>] [--issue <ISSUE> | --path <worktree>]
   mahler doctor <workspace>
   mahler linear-template issue|project
 `);

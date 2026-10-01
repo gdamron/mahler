@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -82,14 +82,73 @@ test("check errors on an unknown --repo", () => {
   assert.match(stderr, /Unknown repo "nope"/);
 });
 
-test("check with --issue runs in the issue worktree and skips missing dirs", () => {
+const gitEnv = {
+  ...process.env,
+  GIT_AUTHOR_NAME: "t",
+  GIT_AUTHOR_EMAIL: "t@t",
+  GIT_COMMITTER_NAME: "t",
+  GIT_COMMITTER_EMAIL: "t@t"
+};
+
+// Fails when a FAIL marker file exists in the working dir, so one worktree can fail alone.
+const markerCheck = "node -e \"process.exit(require('fs').existsSync('FAIL') ? 1 : 0)\"";
+
+/** Installs a workspace whose `app` repo has two slice worktrees for MAH-1. */
+function workspaceWithSlices(): { workspace: string; repos: string } {
+  const workspace = installWorkspaceWithRepo(undefined);
+  const config = loadConfig(workspace);
+  config.repos[0].checks = { test: markerCheck };
+  saveConfig(workspace, config);
+  const app = resolve(workspace, "app");
+  spawnSync("git", ["-C", app, "commit", "--allow-empty", "-q", "-m", "init"], { env: gitEnv });
+  const repos = resolve(workspace, "workspaces", "issues", "MAH-1", "repos");
+  for (const [dir, branch] of [["app", "t/mah-1-api"], ["app-parser", "t/mah-1-parser"]]) {
+    const added = spawnSync("git", ["-C", app, "worktree", "add", "-q", "-b", branch, resolve(repos, dir)], { encoding: "utf8" });
+    assert.equal(added.status, 0, added.stderr);
+  }
+  return { workspace, repos };
+}
+
+test("check with --issue fails when the issue has no worktrees", () => {
   const workspace = installWorkspaceWithRepo(undefined);
   const config = loadConfig(workspace);
   config.repos[0].checks = { test: "node -e \"process.exit(0)\"" };
   saveConfig(workspace, config);
+  const { status, stderr } = runCheck(workspace, ["--issue", "MAH-1"]);
+  assert.notEqual(status, 0);
+  assert.match(stderr, /No worktrees to check/);
+});
+
+test("check with --issue runs every slice worktree of a repo", () => {
+  const { workspace, repos } = workspaceWithSlices();
+  mkdirSync(resolve(repos, "scratch"));
   const { status, stdout } = runCheck(workspace, ["--issue", "MAH-1"]);
   assert.equal(status, 0, stdout);
-  assert.match(stdout, /warn app: skipped — no working dir/);
+  assert.match(stdout, /ok {2}\s*app\/test/);
+  assert.match(stdout, /ok {2}\s*app \(app-parser\)\/test/);
+  assert.match(stdout, /warn scratch: skipped — not a worktree of a configured repo/);
+});
+
+test("check with --issue fails when any slice worktree fails", () => {
+  const { workspace, repos } = workspaceWithSlices();
+  writeFileSync(resolve(repos, "app-parser", "FAIL"), "");
+  const { status, stdout } = runCheck(workspace, ["--issue", "MAH-1"]);
+  assert.notEqual(status, 0);
+  assert.match(stdout, /ok {2}\s*app\/test/);
+  assert.match(stdout, /fail app \(app-parser\)\/test/);
+});
+
+test("check with --path runs only that worktree and infers its repo", () => {
+  const { workspace, repos } = workspaceWithSlices();
+  writeFileSync(resolve(repos, "app", "FAIL"), "");
+  const { status, stdout } = runCheck(workspace, ["--path", resolve(repos, "app-parser")]);
+  assert.equal(status, 0, stdout);
+  assert.match(stdout, /ok {2}\s*app \(app-parser\)\/test/);
+  assert.doesNotMatch(stdout, /app\/test/);
+
+  const missing = runCheck(workspace, ["--path", resolve(repos, "nope")]);
+  assert.notEqual(missing.status, 0);
+  assert.match(missing.stderr, /No working dir/);
 });
 
 test("doctor warns when a configured repo has no checks", () => {

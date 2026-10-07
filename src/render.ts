@@ -238,6 +238,7 @@ export function modelsMarkdown(models: ModelsConfig, profiles: string[]): string
   const cell = (choice?: TierChoice) => {
     if (!choice) return "inherit";
     if (choice.skill) return `skill: \`${choice.skill}\``;
+    if (choice.command) return `command: \`${choice.command.replaceAll("|", "\\|")}\``;
     const agent = choice.agent ? `agent: \`${choice.agent}\`` : "";
     return [agent, tierSummary(choice)].filter(Boolean).join(", ") || "inherit";
   };
@@ -258,7 +259,9 @@ export function modelsMarkdown(models: ModelsConfig, profiles: string[]): string
             const route = tierChoice(models, tier, runtime);
             const name = route?.skill
               ? `skill \`${route.skill}\``
-              : route?.agent
+              : route?.command
+                ? "command (see Tiers)"
+                : route?.agent
                 ? `agent \`${route.agent}\``
                 : `\`${variants.get(tier) ?? profile}\``;
             return `${tier}: ${name}`;

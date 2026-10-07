@@ -161,23 +161,31 @@ default. `.harness/MODELS.md` (generated on install) shows the result.
   tier from `allowed` and reinstalling removes its agents. A tier entry left
   empty for a runtime runs on the launching session's model there.
 - A tier may hand the role to something else instead of a model: `skill`
-  invokes a runtime skill, `agent` launches a runtime agent type. For example,
-  to route Claude reviews to Codex while Codex sessions review natively:
+  invokes a runtime skill agents can call, `agent` launches a runtime agent
+  type, and `command` runs a shell command whose output is the role's result
+  (`<worktree>` and `<base>` placeholders are filled from the brief). A
+  user-only slash command such as `/codex:review` can't be a `skill` route;
+  call what it runs instead. For example, to have Claude sessions get their
+  reviews from Codex through the Codex plugin's companion script, while Codex
+  sessions review natively:
 
   ```json
   "tiers": {
     "cross-check": {
-      "claude": { "skill": "codex:review" },
-      "codex": { "effort": "high" }
+      "claude": {
+        "command": "node \"$(ls -d ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)\" review --wait --cwd <worktree> --base <base>"
+      },
+      "codex": { "model": "gpt-6.1-sol", "effort": "high" }
     }
   },
   "profiles": {
-    "reviewer": { "default": "cross-check", "allowed": ["light", "standard", "cross-check"] }
+    "reviewer": { "default": "cross-check", "allowed": ["trivial", "light", "standard", "deep", "cross-check"] }
   }
   ```
 
-  The tier applies only to profiles that list it, so no review-skill override
-  is needed.
+  The tier applies only to profiles that list it, so no review-policy override
+  is needed. If the command can't run, the delegate skill falls back to another
+  allowed tier.
 
 `mahler doctor` warns about undefined tiers and invalid effort values.
 

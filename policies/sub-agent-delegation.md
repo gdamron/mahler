@@ -76,8 +76,8 @@ rather than approving them. Tier 3 boundaries always go to the human.
 
 Each install defines named tiers (Mahler's defaults plus the `models`
 overrides in `.harness/config.json`, listed in `.harness/MODELS.md`): a
-model and reasoning effort per runtime, or a hand-off to another skill or agent
-(for example a cross-model review). Each profile has a default tier, baked into
+model and reasoning effort per runtime, or a hand-off to another skill, agent
+type, or shell command (for example a cross-model review). Each profile has a default tier, baked into
 its generated agent definition, and a list of tiers a parent may pick per
 launch. Neither runtime reliably applies a launch-time effort (Claude's agent
 tool can't set one; Codex applies an agent's own settings over spawn values),

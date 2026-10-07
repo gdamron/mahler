@@ -97,11 +97,21 @@ Find the chosen tier for your runtime in `.harness/MODELS.md`:
   Pass no model or effort overrides: Claude's agent tool can't set effort at
   launch, and Codex applies the agent's own settings over spawn values, so an
   override either fakes the tier or is ignored.
-- `skill`: invoke that skill instead of launching a Mahler sub-agent (for
-  example `codex:review` for a cross-model review). Pass the brief's
-  objective, base branch, and scope as its arguments or focus text, then
-  translate its output into the format the brief expects — for review, the
-  review policy's findings — before acting on it.
+- `skill`: invoke that skill instead of launching a Mahler sub-agent. Pass the
+  brief's objective, base branch, and scope as its arguments, then translate
+  its output into the format the brief expects — for review, the review
+  policy's findings — before acting on it. Only skills agents may invoke work
+  here; a user-only slash command such as `/codex:review` fails, so tiers use
+  `command` for those.
+- `command`: run that shell command instead of launching a sub-agent (for
+  example a cross-model review through the Codex plugin's companion script).
+  Fill each `<placeholder>` from the brief — `<worktree>` is the slice
+  worktree, `<base>` its base branch — and commit first when the command
+  reads the branch diff. Commands can take minutes: use a long timeout or run
+  it in the background and wait. Treat its output as the role's result and
+  translate it as for `skill`. If the command can't run (tool missing, not
+  set up), fall back to another allowed tier (the reviewer's `light`, say)
+  and record the deviation in `HANDOFF.md`.
 - `agent`: launch that runtime agent type instead of the Mahler profile, with
   the same brief plus any `model` / `effort` the entry sets.
 

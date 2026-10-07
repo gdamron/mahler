@@ -94,6 +94,11 @@ function same(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** True when the entry hands the role to a skill, agent type, or command instead of a Mahler agent. */
+export function isRoute(choice?: TierChoice): boolean {
+  return Boolean(choice?.skill || choice?.agent || choice?.command);
+}
+
 /** A tier's entry for `runtime`, with `inherit` resolved to "pin nothing" (Claude: `model: inherit`). */
 export function tierChoice(
   models: ModelsConfig,
@@ -109,7 +114,8 @@ export function tierChoice(
 /**
  * What an agent definition pins for `tier` on `runtime`. An empty or absent
  * entry inherits the launching session's model (Claude: `model: inherit`;
- * Codex: nothing pinned). Undefined when the tier routes to a skill or agent.
+ * Codex: nothing pinned). Undefined when the tier routes to a skill, agent
+ * type, or command.
  */
 export function pinnedChoice(
   models: ModelsConfig,
@@ -117,7 +123,7 @@ export function pinnedChoice(
   runtime: Runtime,
 ): TierChoice | undefined {
   const choice = tierChoice(models, tier, runtime);
-  if (choice?.skill || choice?.agent) return undefined;
+  if (isRoute(choice)) return undefined;
   if (!choice?.model && !choice?.effort) {
     return runtime === "claude" ? { model: "inherit" } : {};
   }
@@ -222,14 +228,15 @@ export function modelConfigProblems(
         problems.push(`models.tiers.${tier} names unknown runtime "${runtime}"`);
         continue;
       }
-      if (choice?.skill && choice.agent) {
+      const routes = (["skill", "agent", "command"] as const).filter((key) => choice?.[key]);
+      if (routes.length > 1) {
         problems.push(
-          `models.tiers.${tier}.${runtime} sets both skill and agent; pick one`,
+          `models.tiers.${tier}.${runtime} sets ${routes.join(" and ")}; pick one`,
         );
       }
-      if (choice?.skill && (choice.model || choice.effort)) {
+      if ((choice?.skill || choice?.command) && (choice.model || choice.effort)) {
         problems.push(
-          `models.tiers.${tier}.${runtime} routes to skill "${choice.skill}", which ignores model and effort`,
+          `models.tiers.${tier}.${runtime} routes to a ${choice.skill ? "skill" : "command"}, which ignores model and effort`,
         );
       }
       if (choice?.effort && !allowed.includes(choice.effort)) {

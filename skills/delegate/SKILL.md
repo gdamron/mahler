@@ -1,0 +1,130 @@
+---
+name: delegate
+description: Decide whether to delegate, which agent to use, and which model tier to launch it on — balancing output quality against token cost and machine load. Use before launching any sub-agent.
+---
+
+# Delegate
+
+Every sub-agent costs a fresh context: it re-reads its brief, the workspace
+instructions, and the policies its skill names before doing any work. Spend
+that cost only where it buys something. Run this skill before each launch.
+
+## Required Policies
+
+- judgment
+- sub-agent-delegation
+
+## Allowed Commands
+
+- `mahler capacity --workspace <workspace>`
+- `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
+- runtime-native sub-agent launch, skill invocation, and agent messaging
+
+## 1. Delegate or do it yourself?
+
+Delegate when at least one holds:
+
+- **Parallelism:** independent work that can run at the same time.
+- **Context protection:** wide searches, long logs, or big diffs you need the
+  conclusion of, not the contents.
+- **Cheaper tier:** a lower tier can do the work as well as you.
+- **Independence:** review must come from an agent that did not write the code.
+
+Do it yourself when the work is small, when the brief would be longer than the
+work, when you would have to re-explain context you already hold, or when the
+result needs your own judgment anyway. Tweaking a PR description, rerunning a
+check, or a one-file fix almost never earns a sub-agent.
+
+## 2. Pick the agent
+
+| Need | Agent |
+|---|---|
+| One issue, from a composer | `conductor`, issue mode |
+| One slice, from a conductor | `conductor`, slice mode |
+| Review of a finished diff | `reviewer` |
+| Read-only lookup or codebase search | the runtime's built-in explore agent, or an ad hoc read-only brief |
+
+## 3. Pick the tier
+
+Tiers are defined per install in `.harness/config.json` under `models`:
+`models.tiers` maps each tier to a model and effort per runtime, and
+`models.profiles.<profile>` names the default tier and the tiers you may pick.
+The generated agent definition already uses the default; you only act when you
+pick a different tier. With the default config:
+
+| Tier | Claude | Codex | Use for |
+|---|---|---|---|
+| `light` | haiku | low effort | lookups, search, summarizing logs, fully specified mechanical edits, docs-only review |
+| `standard` | sonnet, high effort | medium effort | well-specified implementation that follows existing patterns, routine review, fixing accepted findings |
+| `deep` | opus, medium effort | high effort | ambiguous or underspecified work, cross-repo interfaces, security, concurrency, data migrations, unknown-cause debugging, review of high-risk PRs |
+
+Effort and model trade differently. Raise **effort** on a mid-size model when
+the work is clear but must be careful and thorough. Choose the **larger model**
+at moderate effort when the work needs judgment: design choices, ambiguity, or
+reading intent from sparse context.
+
+Rules of thumb:
+
+- Start at the profile's default. Go below it only when the work is plainly
+  mechanical; go above it only for the `deep` signals above.
+- Escalate one tier after a failed attempt, after a second review round with
+  substantive (non-style) findings, or when the sub-agent reports the task is
+  ambiguous. Say why in the brief.
+- Review a high-risk diff (merge policy) at `deep` or with a cross-model tier.
+  Otherwise the reviewer's tier need not match the author's.
+- A tier outside the profile's `allowed` list is a Tier 1 deviation: record
+  the reason in `HANDOFF.md`.
+
+## 4. Launch it
+
+Read the chosen tier's entry for your runtime, `models.tiers.<tier>.<runtime>`:
+
+- `model` / `effort`: launch the profile's agent and pass them as the launch's
+  model and effort overrides (Claude: the agent tool's `model` and `effort`;
+  Codex: the spawn's model and reasoning effort). Omitted fields inherit. If
+  the runtime cannot override per launch, use the default and note it.
+- `skill`: invoke that skill instead of launching a Mahler sub-agent (for
+  example `codex:review` for a cross-model review). Pass the brief's
+  objective, base branch, and scope as its arguments or focus text, then
+  translate its output into the format the brief expects — for review, the
+  review policy's findings — before acting on it.
+- `agent`: launch that runtime agent type instead of the Mahler profile, with
+  the same brief plus any `model` / `effort` the entry sets.
+
+## 5. Respect capacity
+
+Run `mahler capacity` before launching agents in parallel or starting a full
+test suite, build, or `mahler check`:
+
+- `busy`: launch nothing new. Finish or wait on running work, and prefer
+  focused tests over full suites.
+- `ok`: stay within `concurrency` in `.harness/config.json` —
+  `maxIssueAgents` conductors per composer, `maxSliceAgents` slice conductors
+  per conductor, and `maxHeavyCommands` heavy commands at once across your
+  agents. Sub-agents ask their parent before starting another heavy command.
+
+Raising a cap for a run is a Tier 1 deviation: record why.
+
+## 6. Keep the brief cheap
+
+- Link files and sections; do not paste their contents.
+- Name the policies the sub-agent must read; a slice conductor reads only the
+  slice-mode set in the conduct skill.
+- Ask for compact output: the change summary, findings, or answer — never a
+  transcript.
+- Reuse a sub-agent that already holds the context: send a reviewer the fix
+  commits to re-review (Claude: message the same agent) instead of launching a
+  new one.
+- Fill the brief's `Agent and tier` field with the tier and a one-line reason.
+
+## Required Outputs
+
+- A decision to delegate or not; when delegating, a brief with agent, tier,
+  and reason
+- Deviations from the profile's allowed tiers or the concurrency caps recorded
+  in `HANDOFF.md` (or `COMPOSITION.md` for a composer)
+
+## Stop Conditions
+
+- `mahler capacity` reports `busy` and the work cannot wait: ask your parent
+- the task needs a tier or authority your parent has not allowed

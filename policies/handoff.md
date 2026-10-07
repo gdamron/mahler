@@ -6,8 +6,8 @@ At the start of a session, read the active `.harness/decisions/` ledger (not
 `archive/`) to recover durable decisions and intent recorded by earlier
 sessions — `HANDOFF.md` is per-issue and does not carry across issues.
 
-When several agents work on one issue, the orchestrator owns `HANDOFF.md`:
-implementers and reviewers report status and results to it rather than
+When several agents work on one issue, the issue's conductor owns
+`HANDOFF.md`: slice conductors and reviewers report status and results to it rather than
 rewriting the file. Any agent may add its own rows to `Workflow Deviations`,
 so a deviation is recorded by the agent that made it. A composer's cross-issue
 state lives in `.harness/projects/<slug>/COMPOSITION.md`.
@@ -20,7 +20,7 @@ Update `HANDOFF.md` with:
   `committed`, `ready-for-pr`, `pr-opened`, `ready-to-merge`,
   `waiting-human-signoff`, `merged`, `done`, or
   `blocked`; this is guidance only, not a state machine,
-- slices: each slice's branch, implementer, review round, and PR (when the
+- slices: each slice's branch, owner, tier, review round, and PR (when the
   issue has more than one),
 - reviews: self-review, sub-agent review, and human review status,
 - merge: the merge assessment and decision (see the merge policy),

@@ -1,6 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { HarnessConfig } from "./types.js";
+import type {
+  ConcurrencyConfig,
+  HarnessConfig,
+  ModelsConfig,
+} from "./types.js";
 
 export function defaultConfig(_workspace: string): HarnessConfig {
   return {
@@ -32,6 +36,8 @@ export function defaultConfig(_workspace: string): HarnessConfig {
       humanReviewLabels: ["high-risk"],
       agentMergeLabels: ["agent-merge"],
     },
+    models: defaultModels(),
+    concurrency: defaultConcurrency(),
     agents: {
       codex: {
         runtime: "codex",
@@ -39,7 +45,8 @@ export function defaultConfig(_workspace: string): HarnessConfig {
         role: "composer",
         skills: [
           "compose",
-          "orchestrate",
+          "conduct",
+          "delegate",
           "select-project-issue",
           "work-on-issue",
           "interview",
@@ -69,7 +76,8 @@ export function defaultConfig(_workspace: string): HarnessConfig {
         role: "composer",
         skills: [
           "compose",
-          "orchestrate",
+          "conduct",
+          "delegate",
           "select-project-issue",
           "work-on-issue",
           "interview",
@@ -97,6 +105,50 @@ export function defaultConfig(_workspace: string): HarnessConfig {
   };
 }
 
+/**
+ * Claude tiers use model aliases so they track the latest release. Codex tiers
+ * set effort only and inherit the session model; add `model` per tier to route
+ * Codex to a smaller model.
+ */
+export function defaultModels(): ModelsConfig {
+  return {
+    tiers: {
+      light: {
+        claude: { model: "haiku" },
+        codex: { effort: "low" },
+      },
+      standard: {
+        claude: { model: "sonnet", effort: "high" },
+        codex: { effort: "medium" },
+      },
+      deep: {
+        claude: { model: "opus", effort: "medium" },
+        codex: { effort: "high" },
+      },
+    },
+    profiles: {
+      composer: { default: "deep", allowed: ["deep"] },
+      conductor: {
+        default: "standard",
+        allowed: ["light", "standard", "deep"],
+      },
+      reviewer: {
+        default: "standard",
+        allowed: ["light", "standard", "deep"],
+      },
+    },
+  };
+}
+
+export function defaultConcurrency(): ConcurrencyConfig {
+  return {
+    maxIssueAgents: 3,
+    maxSliceAgents: 2,
+    maxHeavyCommands: 2,
+    loadPerCore: 0.8,
+  };
+}
+
 export function withInstallOptions(
   config: HarnessConfig,
   options: {
@@ -104,12 +156,16 @@ export function withInstallOptions(
     acceptedAssignees?: string[];
     requiredLabels?: string[];
     merge?: HarnessConfig["merge"];
+    models?: HarnessConfig["models"];
+    concurrency?: HarnessConfig["concurrency"];
   },
 ): HarnessConfig {
   return {
     ...config,
     repos: options.repos ?? config.repos,
     merge: options.merge ?? config.merge,
+    models: options.models ?? config.models,
+    concurrency: options.concurrency ?? config.concurrency,
     linear: {
       acceptedAssignees:
         options.acceptedAssignees ?? config.linear.acceptedAssignees,
@@ -139,6 +195,11 @@ export function loadConfig(workspace: string): HarnessConfig {
       agentMergeLabels:
         parsed.merge?.agentMergeLabels ?? defaults.merge.agentMergeLabels,
     },
+    models: {
+      tiers: parsed.models?.tiers ?? defaults.models.tiers,
+      profiles: parsed.models?.profiles ?? defaults.models.profiles,
+    },
+    concurrency: { ...defaults.concurrency, ...parsed.concurrency },
   };
 }
 

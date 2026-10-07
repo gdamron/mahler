@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
+import { modelConfigProblems } from "../models.js";
 import {
   adapterRuntimes,
   installedPolicyNames,
@@ -104,6 +105,16 @@ export function doctor(workspaceInput: string): void {
     ".claude",
     "Claude",
     installedSkillNames(workspace),
+  );
+
+  const modelProblems = modelConfigProblems(
+    config.models,
+    installedProfileNames(workspace),
+  );
+  results.push(
+    ...(modelProblems.length === 0
+      ? [{ level: "ok" as const, message: "models config is consistent" }]
+      : modelProblems.map((message) => ({ level: "warn" as const, message }))),
   );
 
   for (const profile of installedProfileNames(workspace)) {

@@ -30,7 +30,52 @@ export interface HarnessConfig {
   definitionOfDone: string[];
   /** Issue/project labels that route merge decisions; see policies/merge.md. */
   merge: MergeConfig;
+  /** Named model tiers and each profile's default tier; see skills/delegate. */
+  models: ModelsConfig;
+  /** Caps on parallel agents and heavy commands; reported by `mahler capacity`. */
+  concurrency: ConcurrencyConfig;
   agents: Record<string, AgentProfile>;
+}
+
+export type Runtime = "codex" | "claude";
+
+/**
+ * How one runtime executes a tier. `model`/`effort` tune a Mahler sub-agent;
+ * unset fields inherit from the parent session. `skill` or `agent` hands the
+ * role to something else instead: invoke that runtime skill (e.g.
+ * `codex:review`) or launch that runtime agent type in place of the Mahler
+ * profile's agent.
+ */
+export interface TierChoice {
+  model?: string;
+  effort?: string;
+  skill?: string;
+  agent?: string;
+}
+
+export interface ModelsConfig {
+  /** Tier name mapped to the model and effort each runtime uses for it. */
+  tiers: Record<string, Partial<Record<Runtime, TierChoice>>>;
+  /** Profile name mapped to its default tier and the tiers a parent may pick for it. */
+  profiles: Record<string, ProfileTiers>;
+}
+
+export interface ProfileTiers {
+  /** Baked into the generated agent definition. */
+  default: string;
+  /** Tiers a parent may choose per launch; picking another is a recorded Tier 1 deviation. */
+  allowed: string[];
+}
+
+export interface ConcurrencyConfig {
+  /** Conductors a composer runs at once. */
+  maxIssueAgents: number;
+  /** Slice conductors one conductor runs at once. */
+  maxSliceAgents: number;
+  /** Full test suites, builds, or `mahler check` runs at once across the workspace. */
+  maxHeavyCommands: number;
+  /** 1-minute load average per CPU core above which agents hold new launches and heavy commands. */
+  loadPerCore: number;
 }
 
 export interface MergeConfig {

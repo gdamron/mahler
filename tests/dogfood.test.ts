@@ -54,14 +54,14 @@ test("dogfood issue prompt workflow installs native artifacts and creates an iss
 
   for (const path of [
     ".harness/policies/implementation.md",
-    ".harness/agents/profiles/orchestrator.json",
-    ".harness/agents/profiles/implementer.json",
+    ".harness/agents/profiles/conductor.json",
+    ".harness/agents/profiles/reviewer.json",
     ".agents/skills/work-on-issue/SKILL.md",
-    ".codex/agents/orchestrator.toml",
-    ".codex/agents/implementer.toml",
+    ".codex/agents/conductor.toml",
+    ".codex/agents/reviewer.toml",
     ".claude/skills/work-on-issue/SKILL.md",
-    ".claude/agents/orchestrator.md",
-    ".claude/agents/implementer.md",
+    ".claude/agents/conductor.md",
+    ".claude/agents/reviewer.md",
     "AGENTS.md",
     "CLAUDE.md",
     "WORKFLOW.md"

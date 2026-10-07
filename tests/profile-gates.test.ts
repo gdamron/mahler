@@ -32,13 +32,13 @@ test("profile prints active profile permissions", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Agent: codex/);
   assert.match(result.stdout, /Profile: composer/);
-  assert.match(result.stdout, /Allowed skills: compose, orchestrate, select-project-issue, work-on-issue, interview, pr, merge, handoff/);
+  assert.match(result.stdout, /Allowed skills: compose, conduct, delegate, select-project-issue, work-on-issue, interview, pr, merge, handoff/);
   assert.match(result.stdout, /Denied skills: \(none\)/);
 });
 
 test("can reports allowed skills for the composer default", () => {
   const workspace = installWorkspace();
-  for (const skill of ["compose", "orchestrate", "pr", "merge", "handoff"]) {
+  for (const skill of ["compose", "conduct", "delegate", "pr", "merge", "handoff"]) {
     const allowed = run(["can", "codex", skill, "--workspace", workspace]);
     assert.equal(allowed.status, 0, allowed.stderr);
     assert.match(allowed.stdout, new RegExp(`codex can use ${skill}`));
@@ -57,19 +57,13 @@ test("can advises on out-of-profile skills for scoped profiles", () => {
   assert.match(outOfProfile.stdout, /only append a durable note/);
 });
 
-test("commit and pr diagnostics are allowed for implementer, orchestrator, and full-stack profiles", () => {
+test("the conductor profile may implement, commit, review, delegate, and open PRs", () => {
   const workspace = installWorkspace();
-
-  setCodexProfile(workspace, "implementer");
-  const commit = run(["can", "codex", "commit", "--workspace", workspace]);
-  assert.equal(commit.status, 0, commit.stderr);
-  assert.match(commit.stdout, /codex can use commit/);
-
-  for (const profile of ["orchestrator", "full-stack"]) {
-    setCodexProfile(workspace, profile);
-    const pr = run(["can", "codex", "pr", "--workspace", workspace]);
-    assert.equal(pr.status, 0, pr.stderr);
-    assert.match(pr.stdout, /codex can use pr/);
+  setCodexProfile(workspace, "conductor");
+  for (const skill of ["implement", "commit", "review", "delegate", "pr"]) {
+    const result = run(["can", "codex", skill, "--workspace", workspace]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, new RegExp(`codex can use ${skill}`));
   }
 });
 
@@ -105,6 +99,6 @@ test("generated agent session records active profile details", () => {
   assert.equal(issue.status, 0, issue.stderr);
   const session = readFileSync(resolve(workspace, ".harness", "issues", "MAH-4", "AGENT_SESSION.md"), "utf8");
   assert.match(session, /Profile: composer/);
-  assert.match(session, /Allowed skills: compose, orchestrate, select-project-issue, work-on-issue, interview, pr, merge, handoff/);
+  assert.match(session, /Allowed skills: compose, conduct, delegate, select-project-issue, work-on-issue, interview, pr, merge, handoff/);
   assert.match(session, /Denied skills: \(none\)/);
 });

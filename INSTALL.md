@@ -126,6 +126,50 @@ Rules:
 is not installed. See `.harness/custom/README.md` (written on install) for a
 short in-tree reference.
 
+### Model tiers
+
+`models` in `.harness/config.json` controls which model and reasoning effort
+each agent runs on, per runtime. Reinstall preserves it.
+
+- `models.tiers.<tier>.<claude|codex>` sets `model` and/or `effort`; unset
+  fields inherit the parent session. Defaults: `light` (Claude haiku; Codex
+  low effort), `standard` (sonnet, high; Codex medium), `deep` (opus, medium;
+  Codex high). Codex tiers inherit the session model; add `model` to route a
+  tier to a smaller Codex model.
+- `models.profiles.<profile>` sets `default` (written into the generated agent
+  definition) and `allowed` (tiers a parent may pick per launch with the
+  `delegate` skill).
+- A tier may hand the role to something else instead of a model: `skill`
+  invokes a runtime skill, `agent` launches a runtime agent type. For example,
+  to route Claude reviews to Codex while Codex sessions review natively:
+
+  ```json
+  "tiers": {
+    "cross-check": {
+      "claude": { "skill": "codex:review" },
+      "codex": { "effort": "high" }
+    }
+  },
+  "profiles": {
+    "reviewer": { "default": "cross-check", "allowed": ["light", "standard", "cross-check"] }
+  }
+  ```
+
+  The tier applies only to profiles that list it, so no review-skill override
+  is needed.
+
+`mahler doctor` warns about undefined tiers and invalid effort values.
+
+### Concurrency
+
+`concurrency` in `.harness/config.json` caps parallel work on this machine:
+`maxIssueAgents` (conductors per composer), `maxSliceAgents` (slice conductors
+per conductor), `maxHeavyCommands` (full test suites, builds, or `mahler check`
+at once), and `loadPerCore` (the 1-minute load per core above which agents hold
+new work). `mahler capacity` prints the caps, the current load, and an
+ok/busy verdict; agents run it before launching parallel work. Reinstall
+preserves these values.
+
 ## Manual Dogfood Checklist
 
 Use this checklist when validating Mahler against a real Linear issue from a

@@ -5,13 +5,13 @@ description: Implement a scoped slice of issue work in its worktree with test-ve
 
 # Implement
 
-Implementation is a loop of small, tested, committed increments. An implementer
-runs this skill for a slice delegated by an orchestrator; a full-stack agent
-runs it directly for the whole issue.
+Implementation is a loop of small, tested, committed increments. A conductor
+runs this skill for its own slice of an issue, or, in slice mode, for a slice
+delegated by another conductor.
 
 ## Triggers
 
-- an orchestrator's implementer brief
+- a conductor's slice brief
 - "implement this slice"
 - "address these review findings"
 
@@ -37,13 +37,13 @@ runs it directly for the whole issue.
 ## Expected Inputs
 
 - The issue brief: `TASK.md`, `AGENT_SESSION.md`, `HANDOFF.md`
-- When delegated: the implementer brief (objective, worktree, branch, allowed
+- When delegated: the slice brief (objective, worktree, branch, allowed
   paths, constraints)
 - When iterating: the review findings to address
 
 ## Process
 
-1. Read the issue brief and implementer brief. Confirm the worktree and branch
+1. Read the issue brief and, when delegated, the slice brief. Confirm the worktree and branch
    match the brief; stop if they do not.
 2. Inspect the relevant code and tests before editing (implementation policy).
 3. Work in save points: implement a small increment, run focused tests, commit
@@ -58,9 +58,9 @@ runs it directly for the whole issue.
    intentionally not touched, potential concerns), the commit list, checks run,
    and the pushed branch.
 
-When delegated, report status and results to the orchestrator, which owns
-`HANDOFF.md`; you still record your own workflow deviations there. When
-running as full-stack, update `HANDOFF.md` yourself.
+In slice mode, report status and results to the conductor that owns
+`HANDOFF.md`; you still record your own workflow deviations there. When you own
+the issue, update `HANDOFF.md` yourself.
 
 ## Required Outputs
 

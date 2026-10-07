@@ -24,14 +24,16 @@ test("workflow names issue prompts and project prompts", () => {
 
 test("workflow distinguishes the agent hierarchy from the human authority", () => {
   const workflow = workflowMarkdown();
-  // Composer coordinates orchestrators; each orchestrator owns one issue and
-  // delegates to implementers and reviewers. None of them is the human.
+  // Composer coordinates conductors; each conductor owns one issue, works
+  // directly by default, and delegates slices to other conductors in slice
+  // mode. None of them is the human.
   assert.match(workflow, /[Cc]omposer agent/);
-  assert.match(workflow, /dispatches one orchestrator per issue/i);
-  assert.match(workflow, /[Oo]rchestrator agent/);
-  assert.match(workflow, /delegates each slice to an implementer/i);
+  assert.match(workflow, /dispatches one conductor per issue/i);
+  assert.match(workflow, /[Cc]onductor agent/);
+  assert.match(workflow, /does the work itself by default/i);
+  assert.match(workflow, /slice mode/i);
   assert.match(workflow, /synthesizes results/i);
-  assert.match(workflow, /[Ff]ull-stack agent/);
+  assert.doesNotMatch(workflow, /orchestrator|implementer|full-stack/i);
   // The composer is the primary interface to the human; agents may act directly.
   assert.match(workflow, /primary interface to the human/i);
   assert.match(workflow, /empowered to take any action/i);
@@ -48,6 +50,8 @@ test("workflow documents sub-agent delegation policy defaults", () => {
   assert.match(workflow, /default sub-agent authority is read-only/i);
   assert.match(workflow, /native\/runtime agent capabilities/i);
   assert.match(workflow, /not Mahler CLI commands/i);
+  assert.match(workflow, /`delegate` skill/);
+  assert.match(workflow, /mahler capacity/);
 });
 
 test("native adapter tells agent to create briefs and choose worktrees", () => {
@@ -63,7 +67,8 @@ test("native adapters route project prompts by role", () => {
     const skillsDir = runtime === "codex" ? "\\.agents/skills" : "\\.claude/skills";
     assert.match(adapter, new RegExp(`composer uses \`${skillsDir}/compose/SKILL\\.md\``));
     assert.match(adapter, new RegExp(`other role uses \`${skillsDir}/select-project-issue/SKILL\\.md\``));
-    assert.match(adapter, new RegExp(`orchestrator uses \`${skillsDir}/orchestrate/SKILL\\.md\``));
+    assert.match(adapter, new RegExp(`use \`${skillsDir}/conduct/SKILL\\.md\``));
+    assert.match(adapter, new RegExp(`\`${skillsDir}/delegate/SKILL\\.md\``));
   }
 });
 
@@ -152,7 +157,7 @@ test("root agent block and session brief declare Tier 3 guardrails", () => {
   assert.match(session, /human reviewer/);
 });
 
-test("session brief points orchestrators to sub-agent delegation policy", () => {
+test("session brief points conductors to sub-agent delegation policy", () => {
   const config = defaultConfig("/tmp/workspace");
   const session = sessionMarkdown(
     { identifier: "MAH-15", title: "t", labels: [], blocked: false },
@@ -260,7 +265,7 @@ test("handoff markdown includes structured status review quality and deviations"
 
 test("native agent definitions include profile permissions", () => {
   const profile = {
-    name: "implementer",
+    name: "conductor",
     description: "Implements issue-scoped changes and leaves a handoff.",
     allowedSkills: ["work-on-issue", "handoff"],
     deniedSkills: ["commit", "pr"],
@@ -280,6 +285,22 @@ test("native agent definitions include profile permissions", () => {
   );
   assert.match(claudeAgentDefinition(profile), /Denied skills: commit, pr/);
   assert.match(claudeAgentDefinition(profile), /Tier 1 role-fit deviation/);
+  // Without a tier, nothing is pinned and the parent's model is inherited.
+  assert.doesNotMatch(claudeAgentDefinition(profile), /^(model|effort):/m);
+  assert.doesNotMatch(codexAgentDefinition(profile), /^model/m);
+});
+
+test("native agent definitions pin the profile's default tier", () => {
+  const profile = {
+    name: "reviewer",
+    allowedSkills: ["review"],
+    deniedSkills: [],
+  };
+  const claude = claudeAgentDefinition(profile, { model: "sonnet", effort: "high" });
+  assert.match(claude, /^---\nname: reviewer\ndescription: .*\nmodel: sonnet\neffort: high\n---\n/);
+  const codex = codexAgentDefinition(profile, { model: "gpt-x", effort: "medium" });
+  assert.match(codex, /^model = "gpt-x"$/m);
+  assert.match(codex, /^model_reasoning_effort = "medium"$/m);
 });
 
 test("skill stop conditions do not hard-stop on profile mismatch", () => {

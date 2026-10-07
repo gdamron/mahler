@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs, required, workspaceFlag } from "./args.js";
+import { capacity } from "./commands/capacity.js";
 import { check } from "./commands/check.js";
 import { decide } from "./commands/decide.js";
 import { doctor } from "./commands/doctor.js";
@@ -62,6 +63,9 @@ function main(): void {
     case "check":
       check(args.flags);
       break;
+    case "capacity":
+      capacity(workspaceFlag(args.flags));
+      break;
     case "doctor":
       doctor(required(args.rest[0], "workspace path is required"));
       break;
@@ -86,6 +90,7 @@ function usage(): void {
   mahler handoff <ISSUE> --workspace <path> --agent codex|claude
   mahler decide --rule <rule> --reason "<why>" [--issue <ISSUE>] [--agent codex|claude] [--slug <slug>] [--workspace <path>]
   mahler check --workspace <path> [--repo <name>] [--issue <ISSUE> | --path <worktree>]
+  mahler capacity --workspace <path>
   mahler doctor <workspace>
   mahler linear-template issue|project
 `);

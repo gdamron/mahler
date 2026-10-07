@@ -7,15 +7,21 @@ directory.
 
 Install a tagged release globally. npm copies it into the global
 `node_modules`, so it doesn't change when someone works in a Mahler checkout,
-and every workspace can use `mahler` as its command.
+and every workspace can use `mahler` as its command. Each release on GitHub
+carries the built CLI as a tarball (attached by the Release workflow when a
+`v*` tag is pushed):
 
 ```sh
-npm install -g github:gdamron/mahler#v0.2.0
+npm install -g https://github.com/gdamron/mahler/releases/download/v0.2.0/mahler-0.2.0.tgz
 mahler --version
 ```
 
-The install builds the CLI from source (`prepare`), so it needs Node and
-network access to GitHub. Then install into each product workspace and verify:
+Don't use `npm install -g github:gdamron/mahler#<tag>`: npm installs a global
+git dependency's build tools in the wrong place, so its build fails with
+`tsc: command not found`. Without a release asset, build the tarball first:
+`npm pack github:gdamron/mahler#<tag>`, then `npm install -g ./mahler-<version>.tgz`.
+
+Then install into each product workspace and verify:
 
 ```sh
 mahler install /path/to/product-workspace --linear-assignee <username> --linear-label agent
@@ -31,9 +37,14 @@ Install the new tag, then reinstall every workspace so its skills, policies,
 and agents match the CLI:
 
 ```sh
-npm install -g github:gdamron/mahler#<new-tag>
+npm install -g https://github.com/gdamron/mahler/releases/download/<tag>/mahler-<version>.tgz
 mahler install /path/to/product-workspace
 ```
+
+To cut a release, bump `version` in `package.json`, merge, then push a
+matching tag (`git tag v0.2.1 && git push origin v0.2.1`). The Release
+workflow runs the tests, checks the tag matches the version, and attaches the
+tarball.
 
 Install records the generating version in `.harness/install.json`;
 `mahler doctor` warns when it differs from the running CLI, which catches a

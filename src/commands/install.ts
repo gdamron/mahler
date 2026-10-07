@@ -31,7 +31,7 @@ import {
   type Source,
 } from "../scaffold.js";
 import { renderTemplate } from "../templates.js";
-import { ensureDir, writeFileEnsured } from "../util.js";
+import { ensureDir, mahlerVersion, writeFileEnsured } from "../util.js";
 
 export function install(workspaceInput: string, flags: Flags): void {
   const workspace = resolve(workspaceInput);
@@ -90,6 +90,12 @@ export function install(workspaceInput: string, flags: Flags): void {
   writeFileEnsured(
     resolve(workspace, ".harness", "config.json"),
     serializeConfig(config),
+  );
+  // Which Mahler generated this workspace, so doctor can spot a CLI upgrade
+  // that hasn't been reinstalled yet.
+  writeFileEnsured(
+    resolve(workspace, ".harness", "install.json"),
+    `${JSON.stringify({ mahlerVersion: mahlerVersion() }, null, 2)}\n`,
   );
   writeFileEnsured(
     resolve(workspace, ".harness", "README.md"),

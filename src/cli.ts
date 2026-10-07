@@ -10,6 +10,7 @@ import { createIssue, createProject, handoff } from "./commands/issue.js";
 import { printLinearTemplate } from "./commands/linear-template.js";
 import { canUseSkill, printProfile } from "./commands/profile.js";
 import { status } from "./commands/status.js";
+import { mahlerVersion } from "./util.js";
 
 try {
   main();
@@ -21,6 +22,10 @@ try {
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
   switch (args.command) {
+    case "--version":
+    case "version":
+      console.log(mahlerVersion());
+      break;
     case "install":
       install(required(args.rest[0], "workspace path is required"), args.flags);
       break;
@@ -85,6 +90,7 @@ function main(): void {
 
 function usage(): void {
   console.log(`Usage:
+  mahler --version
   mahler install <workspace> [--linear-assignee user[,user...]] [--linear-label label[,label...]]
   mahler issue <ISSUE> --workspace <path> --agent codex|claude [--linear-file issue.json]
   mahler project <PROJECT> --workspace <path> --agent codex|claude --linear-file project.json

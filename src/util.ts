@@ -1,7 +1,15 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+
+/** The running CLI's version, from its package.json. */
+export function mahlerVersion(): string {
+  const pkg = JSON.parse(readFileSync(resolve(repoRoot(), "package.json"), "utf8")) as {
+    version?: string;
+  };
+  return pkg.version ?? "unknown";
+}
 
 /** Absolute path to the canonical Mahler source root (two levels up from compiled dist/src/). */
 export function repoRoot(): string {

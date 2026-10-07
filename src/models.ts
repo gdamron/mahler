@@ -1,4 +1,10 @@
-import type { TierChoice, ModelsConfig, Runtime } from "./types.js";
+import type {
+  ModelsConfig,
+  ModelsOverrides,
+  ProfileTiers,
+  Runtime,
+  TierChoice,
+} from "./types.js";
 
 /** Reasoning-effort values each runtime accepts in agent definitions and spawn calls. */
 export const effortValues: Record<Runtime, string[]> = {
@@ -12,6 +18,76 @@ export const effortValues: Record<Runtime, string[]> = {
  * human's choice.
  */
 export const INHERIT_TIER = "inherit";
+
+/** The effective models config: Mahler's defaults with an install's overrides applied. */
+export function resolveModels(
+  defaults: ModelsConfig,
+  overrides: ModelsOverrides = {},
+): ModelsConfig {
+  const tiers: ModelsConfig["tiers"] = {};
+  for (const name of union(defaults.tiers, overrides.tiers)) {
+    const override = overrides.tiers?.[name];
+    if (override === null) continue;
+    const entry: Partial<Record<Runtime, TierChoice>> = { ...defaults.tiers[name] };
+    for (const [runtime, choice] of Object.entries(override ?? {})) {
+      if (choice === null) delete entry[runtime as Runtime];
+      else if (choice) entry[runtime as Runtime] = choice;
+    }
+    tiers[name] = entry;
+  }
+  const profiles: ModelsConfig["profiles"] = {};
+  for (const name of union(defaults.profiles, overrides.profiles)) {
+    const override = overrides.profiles?.[name];
+    if (override === null) continue;
+    const merged = { ...defaults.profiles[name], ...override };
+    if (merged.default === undefined) continue;
+    profiles[name] = { default: merged.default, allowed: merged.allowed ?? [merged.default] };
+  }
+  return { tiers, profiles };
+}
+
+/** The smallest overrides that turn `defaults` into `models`; what install writes to config.json. */
+export function modelOverrides(
+  defaults: ModelsConfig,
+  models: ModelsConfig,
+): ModelsOverrides {
+  const tiers: NonNullable<ModelsOverrides["tiers"]> = {};
+  for (const name of union(defaults.tiers, models.tiers)) {
+    const want = models.tiers[name];
+    const base = defaults.tiers[name];
+    if (!want) {
+      tiers[name] = null;
+      continue;
+    }
+    const diff: Partial<Record<Runtime, TierChoice | null>> = {};
+    for (const runtime of union(base ?? {}, want) as Runtime[]) {
+      if (!same(base?.[runtime], want[runtime])) diff[runtime] = want[runtime] ?? null;
+    }
+    if (Object.keys(diff).length > 0) tiers[name] = diff;
+  }
+  const profiles: NonNullable<ModelsOverrides["profiles"]> = {};
+  for (const name of union(defaults.profiles, models.profiles)) {
+    const want = models.profiles[name];
+    const base = defaults.profiles[name];
+    if (!want) {
+      profiles[name] = null;
+      continue;
+    }
+    const diff: Partial<ProfileTiers> = {};
+    if (want.default !== base?.default) diff.default = want.default;
+    if (!same(want.allowed, base?.allowed)) diff.allowed = want.allowed;
+    if (Object.keys(diff).length > 0) profiles[name] = diff;
+  }
+  return { tiers, profiles };
+}
+
+function union(...records: Array<object | null | undefined>): string[] {
+  return Array.from(new Set(records.flatMap((record) => Object.keys(record ?? {}))));
+}
+
+function same(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 /** A tier's entry for `runtime`, with `inherit` resolved to "pin nothing" (Claude: `model: inherit`). */
 export function tierChoice(

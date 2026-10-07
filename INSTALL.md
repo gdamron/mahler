@@ -129,10 +129,15 @@ short in-tree reference.
 ### Model tiers
 
 `models` in `.harness/config.json` controls which model and reasoning effort
-each agent runs on, per runtime. Reinstall preserves it.
+each agent runs on, per runtime. It holds only this install's **changes** to
+Mahler's defaults, so later default changes (a new model, say) still reach the
+install; reinstall keeps your changes and drops any entry identical to a
+default. `.harness/MODELS.md` (generated on install) shows the result.
 
 - `models.tiers.<tier>.<claude|codex>` sets `model` and/or `effort`; unset
-  fields inherit the parent session. Defaults:
+  fields inherit the parent session. An entry you write for a runtime replaces
+  that runtime's default entry; `null` removes a default tier or a runtime's
+  entry. Defaults:
 
   | Tier | Claude | Codex |
   |---|---|---|
@@ -147,7 +152,8 @@ each agent runs on, per runtime. Reinstall preserves it.
   `light`.
 - `models.profiles.<profile>` sets `default` (written into the generated agent
   definition) and `allowed` (tiers a parent may pick per launch with the
-  `delegate` skill). Codex sets model and effort on each spawn, so it needs one
+  `delegate` skill); either field replaces the default's, and `null` removes
+  the profile's tiers. Codex sets model and effort on each spawn, so it needs one
   agent per profile. Claude can't set effort at launch, so install also writes
   `.claude/agents/<profile>-<tier>.md` for each other allowed tier (for
   example `conductor-deep`); removing a tier from `allowed` and reinstalling
@@ -176,7 +182,8 @@ each agent runs on, per runtime. Reinstall preserves it.
 
 ### Concurrency
 
-`concurrency` in `.harness/config.json` caps parallel work on this machine:
+`concurrency` in `.harness/config.json` caps parallel work on this machine (like
+`models`, it stores only your changes to the defaults):
 `maxIssueAgents` (conductors per composer), `maxSliceAgents` (slice conductors
 per conductor), `maxHeavyCommands` (full test suites, builds, or `mahler check`
 at once), and `loadPerCore` (the 1-minute load per core above which agents hold

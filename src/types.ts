@@ -60,6 +60,17 @@ export interface ModelsConfig {
   profiles: Record<string, ProfileTiers>;
 }
 
+/**
+ * What `.harness/config.json` stores under `models`: only the install's
+ * changes to Mahler's defaults, so new defaults still reach the install. A
+ * tier's runtime entry replaces the default's; a profile's fields replace the
+ * default's fields; `null` removes a default tier, runtime entry, or profile.
+ */
+export interface ModelsOverrides {
+  tiers?: Record<string, Partial<Record<Runtime, TierChoice | null>> | null>;
+  profiles?: Record<string, Partial<ProfileTiers> | null>;
+}
+
 export interface ProfileTiers {
   /** Baked into the generated agent definition. */
   default: string;

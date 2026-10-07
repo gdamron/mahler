@@ -46,17 +46,19 @@ check, or a one-file fix almost never earns a sub-agent.
 
 ## 3. Pick the tier
 
-Tiers are defined per install in `.harness/config.json` under `models`:
-`models.tiers` maps each tier to a model and effort per runtime, and
-`models.profiles.<profile>` names the default tier and the tiers you may pick.
-With the default config:
+`.harness/MODELS.md` lists this install's tiers: the model and effort each
+runtime uses, each profile's default and allowed tiers, and the Claude agent to
+launch for each. Read it before choosing. The default tiers, from lightest to
+heaviest:
 
-| Tier | Claude | Codex | Use for |
-|---|---|---|---|
-| `trivial` | haiku, high | gpt-6-luna, high | lookups, search, summarizing logs, fully specified mechanical edits (renames, formatting) |
-| `light` | sonnet, high | gpt-6.1-sol, medium | well-specified implementation that follows existing patterns, routine review, fixing accepted findings |
-| `standard` | opus, medium | gpt-6.1-sol, high | work that needs judgment: design choices inside one repo, moderate ambiguity, debugging with a likely cause |
-| `deep` | opus, high | gpt-6-astra, high | underspecified work, cross-repo interfaces, security, concurrency, data migrations, unknown-cause debugging, review of high-risk PRs |
+| Tier | Use for |
+|---|---|
+| `trivial` | lookups, search, summarizing logs, fully specified mechanical edits (renames, formatting) |
+| `light` | well-specified implementation that follows existing patterns, routine review, fixing accepted findings |
+| `standard` | work that needs judgment: design choices inside one repo, moderate ambiguity, debugging with a likely cause |
+| `deep` | underspecified work, cross-repo interfaces, security, concurrency, data migrations, unknown-cause debugging, review of high-risk PRs |
+
+An install may add tiers (such as a cross-model review); `MODELS.md` shows them.
 
 `inherit` is a reserved tier: the sub-agent runs on your own model and effort.
 Profiles a human may talk to directly (`composer`, `conductor`) default to it,
@@ -86,7 +88,7 @@ Rules of thumb:
 
 ## 4. Launch it
 
-Read the chosen tier's entry for your runtime, `models.tiers.<tier>.<runtime>`:
+Find the chosen tier for your runtime in `.harness/MODELS.md`:
 
 - `model` / `effort`, in **Claude**: launch the agent named for the tier.
   The default tier is the profile's own agent (`conductor`); each other

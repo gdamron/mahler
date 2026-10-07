@@ -8,7 +8,7 @@ import {
   serializeConfig,
   withInstallOptions,
 } from "../config.js";
-import { defaultModelFor, tierVariants } from "../models.js";
+import { agentNameCollisions, defaultModelFor, tierVariants } from "../models.js";
 import { parseProfileSource } from "../profiles.js";
 import {
   claudeAgentDefinition,
@@ -49,6 +49,15 @@ export function install(workspaceInput: string, flags: Flags): void {
     models: previous?.models,
     concurrency: previous?.concurrency,
   });
+  // Fail before writing anything: a tier agent and a profile sharing a name
+  // would overwrite each other.
+  const collisions = agentNameCollisions(
+    config.models,
+    installedProfileNames(workspace),
+  );
+  if (collisions.length > 0) {
+    throw new Error(`Cannot install: ${collisions.join("; ")}.`);
+  }
   ensureDir(resolve(workspace, ".harness", "policies"));
   ensureDir(resolve(workspace, ".harness", "agents", "profiles"));
   ensureDir(resolve(workspace, ".harness", "decisions"));

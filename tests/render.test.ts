@@ -297,7 +297,7 @@ test("native agent definitions pin the profile's default tier", () => {
     deniedSkills: [],
   };
   const claude = claudeAgentDefinition(profile, { model: "sonnet", effort: "high" });
-  assert.match(claude, /^---\nname: reviewer\ndescription: .*\nmodel: sonnet\neffort: high\n---\n/);
+  assert.match(claude, /^---\nname: reviewer\ndescription: ".*"\nmodel: sonnet\neffort: high\n---\n/);
   const codex = codexAgentDefinition(profile, { model: "gpt-x", effort: "medium" });
   assert.match(codex, /^model = "gpt-x"$/m);
   assert.match(codex, /^model_reasoning_effort = "medium"$/m);

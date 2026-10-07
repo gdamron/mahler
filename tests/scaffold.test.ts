@@ -260,6 +260,71 @@ test("reinstall keeps the Mahler command, worktree root, and Linear filters unle
   assert.deepEqual(after.linear, { acceptedAssignees: ["kermit"], requiredLabels: ["agent"] });
 });
 
+test("reinstall keeps guardrail and Definition of Done changes as overrides on Mahler's defaults", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-keep-lists-"));
+  assert.equal(install(workspace).status, 0);
+  const configFile = resolve(workspace, ".harness", "config.json");
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  assert.deepEqual(config.guardrails, { add: [], remove: [] });
+  const sizeRule = "PRs larger than about 1000 lines should be split into smaller, stacked PRs.";
+  config.guardrails = { add: ["Deploys need on-call sign-off (enforced by the deploy tool)."], remove: [sizeRule] };
+  config.definitionOfDone = { add: ["Release notes are drafted."] };
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(install(workspace).status, 0);
+  const after = JSON.parse(readFileSync(configFile, "utf8"));
+  assert.deepEqual(after.guardrails, { add: ["Deploys need on-call sign-off (enforced by the deploy tool)."], remove: [sizeRule] });
+  assert.deepEqual(after.definitionOfDone, { add: ["Release notes are drafted."], remove: [] });
+  const block = readFileSync(resolve(workspace, "CLAUDE.md"), "utf8");
+  assert.match(block, /- Deploys need on-call sign-off/);
+  assert.match(block, /- Required CI checks must pass before merge/);
+  assert.doesNotMatch(block, /1000 lines/);
+});
+
+test("reinstall turns an older whole-list config into additions so new defaults still arrive", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-keep-legacy-"));
+  assert.equal(install(workspace).status, 0);
+  const configFile = resolve(workspace, ".harness", "config.json");
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  // As written by an older Mahler: the whole list, including a retired default.
+  config.guardrails = [
+    "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
+    "Required CI checks must pass before merge (enforced by CI).",
+    "Deploys need on-call sign-off (enforced by the deploy tool).",
+  ];
+  config.definitionOfDone = ["`mahler check` passes for every touched repo.", "A PR is opened for human review before merge."];
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(install(workspace).status, 0);
+  const after = JSON.parse(readFileSync(configFile, "utf8"));
+  assert.deepEqual(after.guardrails, { add: ["Deploys need on-call sign-off (enforced by the deploy tool)."], remove: [] });
+  assert.deepEqual(after.definitionOfDone, { add: [], remove: [] });
+  const block = readFileSync(resolve(workspace, "CLAUDE.md"), "utf8");
+  assert.match(block, /- Only a human reviewer may merge a PR whose required CI checks are failing\./);
+  assert.doesNotMatch(block, /requires a human-approved PR/);
+});
+
+test("reinstall keeps each runtime's profile and refreshes its skill and policy lists", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-keep-agents-"));
+  assert.equal(install(workspace).status, 0);
+  const configFile = resolve(workspace, ".harness", "config.json");
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  const defaultSkills = config.agents.claude.skills;
+  config.agents.claude = { ...config.agents.claude, profile: "conductor", role: "conductor", skills: ["retired-skill"], policies: [] };
+  config.agents.cursor = { runtime: "cursor", profile: "reviewer", role: "reviewer", skills: ["review"], policies: ["review"] };
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(install(workspace).status, 0);
+  const after = JSON.parse(readFileSync(configFile, "utf8"));
+  assert.equal(after.agents.claude.profile, "conductor");
+  assert.equal(after.agents.claude.role, "conductor");
+  assert.deepEqual(after.agents.claude.skills, defaultSkills);
+  assert.ok(after.agents.claude.policies.includes("merge"));
+  assert.equal(after.agents.codex.profile, "composer");
+  assert.deepEqual(after.agents.cursor, config.agents.cursor);
+  assert.match(readFileSync(resolve(workspace, "CLAUDE.md"), "utf8"), /claude: conductor/);
+});
+
 test("custom overlay overrides a default and adds custom-only files; reinstall preserves both", () => {
   const workspace = mkdtempSync(resolve(tmpdir(), "mahler-overlay-"));
   assert.equal(install(workspace).status, 0);

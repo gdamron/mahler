@@ -36,7 +36,8 @@ that does not rely on any global setup such as `npm link`.
    leave the filters empty until they can be configured. Re-running install
    is safe: it overwrites Mahler-managed files but preserves any user
    content in `AGENTS.md` / `CLAUDE.md` outside the `<!-- HARNESS:START -->`
-   block.
+   block, and the human-set parts of `.harness/config.json` (see
+   [What reinstall keeps](#what-reinstall-keeps)).
 
 4. Verify the install with `mahler doctor`.
 
@@ -199,6 +200,43 @@ at once), and `loadPerCore` (the 1-minute load per core above which agents hold
 new work). `mahler capacity` prints the caps, the current load, and an
 ok/busy verdict; agents run it before launching parallel work. Reinstall
 preserves these values.
+
+### Guardrails and Definition of Done
+
+`guardrails` (Tier 3 limits the forge and CI enforce, declared so agents can
+anticipate them) and `definitionOfDone` (the team baseline every issue meets)
+in `.harness/config.json` also store only your changes to Mahler's defaults,
+so a guardrail or checklist item Mahler adds later still reaches the install:
+
+```json
+"guardrails": {
+  "add": ["Deploys need on-call sign-off (enforced by the deploy tool)."],
+  "remove": ["PRs larger than about 1000 lines should be split into smaller, stacked PRs."]
+},
+"definitionOfDone": { "add": ["Release notes are drafted."], "remove": [] }
+```
+
+`add` entries follow the defaults; `remove` drops a default by its exact text.
+The effective lists appear in the `AGENTS.md` / `CLAUDE.md` block and in each
+issue's `TASK.md` and `AGENT_SESSION.md`. A config from before this format,
+which holds the whole list, is read as additions: entries that aren't current
+defaults are kept, retired defaults are dropped, and newer defaults are added.
+
+### What reinstall keeps
+
+`mahler install` regenerates `.harness/config.json` on every run. It keeps:
+
+- `mahlerCommand`, `workspaceDir`, and the Linear filters (a
+  `--linear-assignee` or `--linear-label` flag replaces its filter);
+- each repo's `checks`, `merge` labels, and the `models`, `concurrency`,
+  `guardrails`, and `definitionOfDone` overrides;
+- each runtime's `profile` and `role` under `agents` (for example, switching
+  Claude's default profile from `composer` to `conductor`), plus whole entries
+  for runtimes Mahler doesn't define. Each runtime's `skills` and `policies`
+  lists are refreshed from Mahler's defaults; use the custom overlay to change
+  what a profile may do.
+
+The repo list itself is rediscovered on every run.
 
 ## Manual Dogfood Checklist
 

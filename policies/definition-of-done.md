@@ -2,7 +2,8 @@
 
 Definition of Done is layered:
 
-1. Team baseline from `.harness/config.json` `definitionOfDone`.
+1. Team baseline: Mahler's defaults plus the workspace's `definitionOfDone`
+   changes in `.harness/config.json`.
 2. Issue-specific acceptance criteria from the Linear issue brief.
 
 An issue is done only when both layers are satisfied. Treat the rendered

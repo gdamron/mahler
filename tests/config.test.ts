@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { defaultConfig, loadConfig, withInstallOptions } from "../src/config.js";
+import { defaultConfig, listOverrides, loadConfig, resolveList, withInstallOptions } from "../src/config.js";
 
 test("defaultConfig does not assume repos or Linear assignees", () => {
   const config = defaultConfig("/tmp/workspace");
@@ -57,6 +57,15 @@ test("loadConfig backfills Definition of Done for older config files", () => {
 
   const config = loadConfig(workspace);
   assert.ok(config.definitionOfDone.some((line) => line.includes("mahler check")));
+});
+
+test("list overrides record only an install's changes to the defaults", () => {
+  const defaults = ["a", "b", "c"];
+  const overrides = listOverrides(defaults, ["a", "c", "x"]);
+  assert.deepEqual(overrides, { add: ["x"], remove: ["b"] });
+  assert.deepEqual(resolveList([...defaults, "d"], overrides), ["a", "c", "d", "x"]);
+  assert.deepEqual(resolveList(defaults, ["old", "a", "x"], ["old"]), ["a", "b", "c", "x"]);
+  assert.deepEqual(resolveList(defaults), defaults);
 });
 
 test("withInstallOptions applies discovered repos and Linear filters", () => {

@@ -34,6 +34,7 @@ export interface HarnessConfig {
   models: ModelsConfig;
   /** Caps on parallel agents and heavy commands; reported by `mahler capacity`. */
   concurrency: ConcurrencyConfig;
+  /** Each runtime's profile; a reinstall keeps `profile` and `role` and refreshes the skill and policy lists. */
   agents: Record<string, AgentProfile>;
 }
 
@@ -72,6 +73,17 @@ export interface ModelsConfig {
 export interface ModelsOverrides {
   tiers?: Record<string, Partial<Record<Runtime, TierChoice | null>> | null>;
   profiles?: Record<string, Partial<ProfileTiers> | null>;
+}
+
+/**
+ * What `.harness/config.json` stores for a list Mahler ships defaults for
+ * (`guardrails`, `definitionOfDone`): only the install's changes, so new
+ * defaults still reach the install. `add` entries follow the defaults;
+ * `remove` drops a default by its exact text.
+ */
+export interface ListOverrides {
+  add?: string[];
+  remove?: string[];
 }
 
 export interface ProfileTiers {

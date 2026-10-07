@@ -239,7 +239,8 @@ export function launchCommand(
 }
 
 function tierSummary(choice: TierChoice): string {
-  return [choice.model, choice.effort && `${choice.effort} effort`]
+  const model = choice.model === "inherit" ? "the launching agent's model" : choice.model;
+  return [model, choice.effort && `${choice.effort} effort`]
     .filter(Boolean)
     .join(", ");
 }

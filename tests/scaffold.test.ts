@@ -355,7 +355,11 @@ test("install fails hard on a malformed custom source", () => {
   const customSkill = resolve(workspace, ".harness", "custom", "skills", "broken");
   mkdirSync(customSkill, { recursive: true });
   writeFileSync(resolve(customSkill, "SKILL.md"), "no frontmatter here\n");
+  const stamp = resolve(workspace, ".harness", "install.json");
+  writeFileSync(stamp, `${JSON.stringify({ mahlerVersion: "2000.1.0" })}\n`);
   const result = install(workspace);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /malformed/);
+  // A failed install keeps the previous version on record, so doctor still warns.
+  assert.deepEqual(JSON.parse(readFileSync(stamp, "utf8")), { mahlerVersion: "2000.1.0" });
 });

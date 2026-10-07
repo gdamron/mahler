@@ -31,7 +31,7 @@ import {
   type Source,
 } from "../scaffold.js";
 import { renderTemplate } from "../templates.js";
-import { ensureDir, writeFileEnsured } from "../util.js";
+import { ensureDir, mahlerVersion, writeFileEnsured } from "../util.js";
 
 export function install(workspaceInput: string, flags: Flags): void {
   const workspace = resolve(workspaceInput);
@@ -182,6 +182,13 @@ export function install(workspaceInput: string, flags: Flags): void {
   }
   mergeRootInstruction(resolve(workspace, "AGENTS.md"), rootAgentBlock(config));
   mergeRootInstruction(resolve(workspace, "CLAUDE.md"), rootAgentBlock(config));
+  // Which Mahler generated this workspace, so doctor can spot a CLI upgrade
+  // that hasn't been reinstalled yet. Written last: a failed install must
+  // leave the previous version on record.
+  writeFileEnsured(
+    resolve(workspace, ".harness", "install.json"),
+    `${JSON.stringify({ mahlerVersion: mahlerVersion() }, null, 2)}\n`,
+  );
   console.log(`Installed Mahler workflow into ${workspace}`);
   console.log(
     `Configured ${config.repos.length} repo(s): ${config.repos.map((repo) => repo.name).join(", ") || "(none)"}`,

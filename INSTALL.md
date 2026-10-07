@@ -1,10 +1,68 @@
 # Installing Mahler Into a Product Workspace
 
 These instructions are written for an agent asked to install Mahler in a
-directory. They use a deterministic command path (`node dist/src/cli.js`)
-that does not rely on any global setup such as `npm link`.
+directory.
 
-## Steps
+## Recommended: a pinned global install
+
+Install a tagged release globally. npm copies it into the global
+`node_modules`, so it doesn't change when someone works in a Mahler checkout,
+and every workspace can use `mahler` as its command. Each release on GitHub
+carries the built CLI as a tarball (attached by the Release workflow when a
+`v*` tag is pushed):
+
+```sh
+npm install -g https://github.com/gdamron/mahler/releases/download/v2026.10.0/mahler-2026.10.0.tgz
+mahler --version
+```
+
+Don't use `npm install -g github:gdamron/mahler#<tag>`: npm installs a global
+git dependency's build tools in the wrong place, so its build fails with
+`tsc: command not found`. Without a release asset, build the tarball first:
+`npm pack github:gdamron/mahler#<tag>`, then `npm install -g ./mahler-<version>.tgz`.
+
+Then install into each product workspace and verify:
+
+```sh
+mahler install /path/to/product-workspace --linear-assignee <username> --linear-label agent
+mahler doctor /path/to/product-workspace
+```
+
+`mahlerCommand` in `.harness/config.json` defaults to `mahler`, which is what
+generated instructions tell agents to run.
+
+### Upgrading
+
+Install the new tag, then reinstall every workspace so its skills, policies,
+and agents match the CLI:
+
+```sh
+npm install -g https://github.com/gdamron/mahler/releases/download/<tag>/mahler-<version>.tgz
+mahler install /path/to/product-workspace
+```
+
+Versions are date-based, `<year>.<month>.<n>`: `n` counts releases within the
+month from 0, and the month has no leading zero (npm rejects one), so January
+2027's first release is `2027.1.0`. To cut a release, set `version` in
+`package.json`, merge, then push a matching tag
+(`git tag v2026.10.1 && git push origin v2026.10.1`). The Release
+workflow runs the tests, checks the tag matches the version, and attaches the
+tarball.
+
+Install records the generating version in `.harness/install.json`;
+`mahler doctor` warns when it differs from the running CLI, which catches a
+CLI upgrade whose workspaces weren't reinstalled. Reinstall keeps the
+human-set parts of `.harness/config.json` (see
+[What reinstall keeps](#what-reinstall-keeps)).
+
+## Alternative: run from a checkout
+
+Use this when developing Mahler, or when a global install isn't allowed. A
+workspace then runs whatever that checkout has built, so pointing a long-lived
+workspace at a checkout you also develop in will change its behavior as you
+switch branches.
+
+### Steps
 
 1. Clone the `mahler` repository into a tools or temporary location.
 
@@ -49,18 +107,11 @@ that does not rely on any global setup such as `npm link`.
    policies, skills, profiles, or adapter docs are missing. Treat a zero
    exit as the install gate.
 
-5. (Optional) Expose the `mahler` command globally.
-
-   If you have permission to run `npm link`, do so:
-
-   ```sh
-   npm link
-   ```
-
-   Otherwise, record the absolute command path in the product workspace
-   config so future agent sessions can invoke Mahler without searching for
-   it: edit `/path/to/product-workspace/.harness/config.json` and set
-   `mahlerCommand` to `node /absolute/path/to/mahler/dist/src/cli.js`.
+5. Tell agents how to run this checkout's CLI: edit
+   `/path/to/product-workspace/.harness/config.json`, set `mahlerCommand` to
+   `node /absolute/path/to/mahler/dist/src/cli.js`, and rerun install so the
+   generated instructions use it. (`npm link` also puts `mahler` on `PATH`,
+   but as a link to the checkout, so it has the same drift.)
 
 6. Keep only operational files in the product workspace.
 

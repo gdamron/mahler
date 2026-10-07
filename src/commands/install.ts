@@ -37,8 +37,9 @@ export function install(workspaceInput: string, flags: Flags): void {
   const workspace = resolve(workspaceInput);
   ensureDir(workspace);
   // Human-tuned settings survive a reinstall: the Mahler command, worktree
-  // root, Linear filters (unless a flag sets them again), merge labels, model
-  // tiers, and concurrency caps.
+  // root, Linear filters (unless a flag sets them again), guardrail and
+  // Definition of Done changes, merge labels, model tiers, concurrency caps,
+  // and each runtime's profile.
   const previous = existsSync(configPath(workspace))
     ? loadConfig(workspace)
     : undefined;
@@ -51,9 +52,12 @@ export function install(workspaceInput: string, flags: Flags): void {
     acceptedAssignees:
       flagList("linear-assignee") ?? previous?.linear.acceptedAssignees,
     requiredLabels: flagList("linear-label") ?? previous?.linear.requiredLabels,
+    guardrails: previous?.guardrails,
+    definitionOfDone: previous?.definitionOfDone,
     merge: previous?.merge,
     models: previous?.models,
     concurrency: previous?.concurrency,
+    agents: previous?.agents,
   });
   // Fail before writing anything: a tier agent and a profile sharing a name
   // would overwrite each other.

@@ -4,6 +4,7 @@ import { INHERIT_TIER, modelOverrides, resolveModels } from "./models.js";
 import type {
   ConcurrencyConfig,
   HarnessConfig,
+  ListOverrides,
   ModelsConfig,
   ModelsOverrides,
 } from "./types.js";
@@ -169,9 +170,12 @@ export function withInstallOptions(
     workspaceDir?: string;
     acceptedAssignees?: string[];
     requiredLabels?: string[];
+    guardrails?: string[];
+    definitionOfDone?: string[];
     merge?: HarnessConfig["merge"];
     models?: HarnessConfig["models"];
     concurrency?: HarnessConfig["concurrency"];
+    agents?: HarnessConfig["agents"];
   },
 ): HarnessConfig {
   return {
@@ -179,9 +183,12 @@ export function withInstallOptions(
     repos: options.repos ?? config.repos,
     mahlerCommand: options.mahlerCommand ?? config.mahlerCommand,
     workspaceDir: options.workspaceDir ?? config.workspaceDir,
+    guardrails: options.guardrails ?? config.guardrails,
+    definitionOfDone: options.definitionOfDone ?? config.definitionOfDone,
     merge: options.merge ?? config.merge,
     models: options.models ?? config.models,
     concurrency: options.concurrency ?? config.concurrency,
+    agents: withPreservedAgents(config.agents, options.agents),
     linear: {
       acceptedAssignees:
         options.acceptedAssignees ?? config.linear.acceptedAssignees,
@@ -199,12 +206,26 @@ export function loadConfig(workspace: string): HarnessConfig {
   if (!existsSync(path)) {
     return defaultConfig(workspace);
   }
-  const parsed = JSON.parse(readFileSync(path, "utf8")) as HarnessConfig;
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as Omit<
+    HarnessConfig,
+    "guardrails" | "definitionOfDone"
+  > & {
+    guardrails?: ListOverrides | string[];
+    definitionOfDone?: ListOverrides | string[];
+  };
   const defaults = defaultConfig(workspace);
   return {
     ...parsed,
-    guardrails: parsed.guardrails ?? [],
-    definitionOfDone: parsed.definitionOfDone ?? defaults.definitionOfDone,
+    guardrails: resolveList(
+      defaults.guardrails,
+      parsed.guardrails,
+      retiredDefaults.guardrails,
+    ),
+    definitionOfDone: resolveList(
+      defaults.definitionOfDone,
+      parsed.definitionOfDone,
+      retiredDefaults.definitionOfDone,
+    ),
     merge: {
       humanReviewLabels:
         parsed.merge?.humanReviewLabels ?? defaults.merge.humanReviewLabels,
@@ -217,9 +238,10 @@ export function loadConfig(workspace: string): HarnessConfig {
 }
 
 /**
- * The config as written to disk: `models` and `concurrency` keep only the
- * install's changes to Mahler's defaults, so later default changes still
- * reach this install. Entries equal to a default are dropped.
+ * The config as written to disk: `guardrails`, `definitionOfDone`, `models`,
+ * and `concurrency` keep only the install's changes to Mahler's defaults, so
+ * later default changes still reach this install. Entries equal to a default
+ * are dropped.
  */
 export function serializeConfig(config: HarnessConfig): string {
   const defaults = defaultConfig("");
@@ -231,12 +253,80 @@ export function serializeConfig(config: HarnessConfig): string {
   return `${JSON.stringify(
     {
       ...config,
+      guardrails: listOverrides(defaults.guardrails, config.guardrails),
+      definitionOfDone: listOverrides(
+        defaults.definitionOfDone,
+        config.definitionOfDone,
+      ),
       models: modelOverrides(defaults.models, config.models),
       concurrency,
     },
     null,
     2,
   )}\n`;
+}
+
+/**
+ * Defaults Mahler no longer ships. A config written before these lists were
+ * stored as overrides holds the whole list; its retired defaults are dropped
+ * instead of being kept as the install's additions.
+ */
+const retiredDefaults = {
+  guardrails: [
+    "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
+  ],
+  definitionOfDone: ["A PR is opened for human review before merge."],
+};
+
+/** The effective list: Mahler's defaults minus `remove`, then `add`. */
+export function resolveList(
+  defaults: string[],
+  overrides: ListOverrides | string[] = {},
+  retired: string[] = [],
+): string[] {
+  if (Array.isArray(overrides)) {
+    // A whole list from an older install: keep its additions. A default it
+    // lacks was added since, so it is not treated as removed.
+    return resolveList(defaults, {
+      add: overrides.filter((item) => !retired.includes(item)),
+    });
+  }
+  const remove = overrides.remove ?? [];
+  return Array.from(
+    new Set([
+      ...defaults.filter((item) => !remove.includes(item)),
+      ...(overrides.add ?? []),
+    ]),
+  );
+}
+
+/** The smallest overrides that turn `defaults` into `list`; default order is not recorded. */
+export function listOverrides(defaults: string[], list: string[]): ListOverrides {
+  return {
+    add: list.filter((item) => !defaults.includes(item)),
+    remove: defaults.filter((item) => !list.includes(item)),
+  };
+}
+
+/**
+ * Mahler's agent entries with each runtime's `profile` and `role` kept from
+ * `previous`; skill and policy lists track Mahler's. Runtimes Mahler has no
+ * entry for are kept whole.
+ */
+export function withPreservedAgents(
+  defaults: HarnessConfig["agents"],
+  previous: HarnessConfig["agents"] = {},
+): HarnessConfig["agents"] {
+  const agents = { ...previous };
+  for (const [name, agent] of Object.entries(defaults)) {
+    const kept = previous[name];
+    agents[name] = {
+      ...agent,
+      profile: kept?.profile ?? agent.profile,
+      role: kept?.role ?? agent.role,
+    };
+  }
+  return agents;
 }
 
 /** Where an issue's brief (`meta`) and its repo worktrees (`worktreeRoot`) live. */

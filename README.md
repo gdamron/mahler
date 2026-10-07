@@ -84,6 +84,11 @@ writes them into `.harness/config.json`. Linear assignee and label filters are
 explicit install options; Mahler does not ship a default assignee. When a repo
 has a `package.json`, install pre-populates per-repo `checks` (test/lint/build
 commands) from its scripts; edit `.harness/config.json` to adjust them.
+Reinstalling keeps human-set config: the Mahler command, worktree root, Linear
+filters, repo checks, merge labels, each runtime's agent profile, and changes
+to Mahler's default model tiers, concurrency caps, guardrails, and Definition
+of Done, which are stored as overrides so new defaults still arrive (see
+[INSTALL.md](INSTALL.md#what-reinstall-keeps)).
 
 `mahler check` is a local mirror of CI: it runs each repo's configured check
 commands and reports ok/fail per command. With `--issue` it checks every

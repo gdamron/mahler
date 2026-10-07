@@ -71,8 +71,9 @@ Examples: required CI checks, branch protection, and forge-required human
 approvals. A merge that the forge refuses is a guardrail doing its job: never
 bypass it.
 
-Mahler declares these in the workspace config (`guardrails` in
-`.harness/config.json`) and in issue briefs so you can anticipate them. The
+Mahler declares these in the root `AGENTS.md` / `CLAUDE.md` block and in
+issue briefs (Mahler's defaults plus the workspace's `guardrails` changes in
+`.harness/config.json`) so you can anticipate them. The
 actual enforcement lives in the forge and CI — do not attempt to bypass it, and
 do not waste a PR cycle discovering it: run the checks CI will run before
 declaring work ready.

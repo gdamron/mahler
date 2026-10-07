@@ -79,8 +79,10 @@ decision against it:
 
 - Use the repo's configured merge method (squash, merge, or rebase); if none
   is documented, use the forge default.
-- Delete the merged branch and remove its worktree (see the branching and
-  workspace-safety policies).
+- Delete the merged branch (see the branching policy). Once all of an issue's
+  PRs are merged, remove its worktrees with `mahler cleanup <ISSUE>`; it keeps
+  any worktree with uncommitted changes and reports it. When the human merges,
+  the next composer session (or the human) runs the cleanup.
 - Retarget or rebase any stacked PRs that depended on it.
 - Let the forge's issue-tracker integration move the issue. If it doesn't, the
   composer may update the issue state and record that it did.

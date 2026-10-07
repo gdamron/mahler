@@ -72,6 +72,7 @@ mahler handoff FUG-123 --workspace /path/to/product-workspace --agent codex
 mahler decide --rule scope --reason "expanded to fix adjacent bug" --issue FUG-123 --agent codex --workspace /path/to/product-workspace
 mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue FUG-123 | --path <worktree>]
 mahler capacity --workspace /path/to/product-workspace
+mahler cleanup FUG-123 --workspace /path/to/product-workspace [--dry-run]
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project
@@ -93,6 +94,13 @@ forge/CI remains the Tier 3 authority.
 `mahler capacity` prints CPU cores, load average, and the `concurrency` caps
 from `.harness/config.json`, with an ok/busy verdict. Agents run it before
 launching parallel agents or heavy commands. Like `check`, it is advisory.
+
+`mahler cleanup` removes an issue's worktrees once its PRs are merged, keeping
+branches and the issue brief. It refuses to remove a worktree with uncommitted
+or untracked changes. Finished worktrees otherwise keep costing disk, and on
+macOS, Spotlight indexing; `mahler doctor` reports when Spotlight is indexing
+the worktree root (exclude it in System Settings → Spotlight → Search Privacy;
+folder markers such as `.metadata_never_index` are not honored there).
 
 `mahler decide` appends a note to the decisions ledger
 (`.harness/decisions/<YYYY-MM-DD>-<slug>.md`): the durable, cross-session record

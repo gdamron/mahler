@@ -1,9 +1,9 @@
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { basename, resolve } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
-import { readGit } from "../repos.js";
+import { gitCommonDir } from "../repos.js";
 import type { Finding, HarnessConfig, RepoConfig } from "../types.js";
 import { abs, listDirectories } from "../util.js";
 
@@ -188,15 +188,6 @@ function repoForDir(
     if (match) return match;
   }
   return repos.find((repo) => repo.name === basename(dir));
-}
-
-/** The git common dir for a worktree rooted exactly at `dir`, if it is one. */
-function gitCommonDir(dir: string): string | undefined {
-  if (!existsSync(dir)) return undefined;
-  const top = readGit(dir, ["rev-parse", "--show-toplevel"]);
-  if (!top || realpathSync(top) !== realpathSync(dir)) return undefined;
-  const common = readGit(dir, ["rev-parse", "--git-common-dir"]);
-  return common ? realpathSync(resolve(dir, common)) : undefined;
 }
 
 function targetLabel(repo: RepoConfig, cwd: string): string {

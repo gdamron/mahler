@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
 import { modelConfigProblems } from "../models.js";
+import { spotlightFinding } from "../spotlight.js";
 import {
   adapterRuntimes,
   installedPolicyNames,
@@ -106,6 +107,12 @@ export function doctor(workspaceInput: string): void {
     "Claude",
     installedSkillNames(workspace),
   );
+
+  const spotlight = spotlightFinding(
+    resolve(workspace, config.workspaceDir),
+    config.workspaceDir,
+  );
+  if (spotlight) results.push(spotlight);
 
   const modelProblems = modelConfigProblems(
     config.models,

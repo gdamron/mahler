@@ -2,6 +2,7 @@
 import { parseArgs, required, workspaceFlag } from "./args.js";
 import { capacity } from "./commands/capacity.js";
 import { check } from "./commands/check.js";
+import { cleanup } from "./commands/cleanup.js";
 import { decide } from "./commands/decide.js";
 import { doctor } from "./commands/doctor.js";
 import { install } from "./commands/install.js";
@@ -63,6 +64,9 @@ function main(): void {
     case "check":
       check(args.flags);
       break;
+    case "cleanup":
+      cleanup(required(args.rest[0], "issue identifier is required"), args.flags);
+      break;
     case "capacity":
       capacity(workspaceFlag(args.flags));
       break;
@@ -91,6 +95,7 @@ function usage(): void {
   mahler decide --rule <rule> --reason "<why>" [--issue <ISSUE>] [--agent codex|claude] [--slug <slug>] [--workspace <path>]
   mahler check --workspace <path> [--repo <name>] [--issue <ISSUE> | --path <worktree>]
   mahler capacity --workspace <path>
+  mahler cleanup <ISSUE> --workspace <path> [--dry-run]
   mahler doctor <workspace>
   mahler linear-template issue|project
 `);

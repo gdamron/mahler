@@ -59,6 +59,11 @@ export function modelOverrides(
       tiers[name] = null;
       continue;
     }
+    if (!base) {
+      // A tier the install added is kept whole, even with no runtime entries.
+      tiers[name] = want;
+      continue;
+    }
     const diff: Partial<Record<Runtime, TierChoice | null>> = {};
     for (const runtime of union(base ?? {}, want) as Runtime[]) {
       if (!same(base?.[runtime], want[runtime])) diff[runtime] = want[runtime] ?? null;
@@ -102,6 +107,27 @@ export function tierChoice(
 }
 
 /**
+ * What an agent definition pins for `tier` on `runtime`. An empty or absent
+ * entry inherits the launching session's model (Claude: `model: inherit`;
+ * Codex: nothing pinned). Undefined when the tier routes to a skill or agent.
+ */
+export function pinnedChoice(
+  models: ModelsConfig,
+  tier: string,
+  runtime: Runtime,
+): TierChoice | undefined {
+  const choice = tierChoice(models, tier, runtime);
+  if (choice?.skill || choice?.agent) return undefined;
+  if (!choice?.model && !choice?.effort) {
+    return runtime === "claude" ? { model: "inherit" } : {};
+  }
+  return {
+    ...(choice.model ? { model: choice.model } : {}),
+    ...(choice.effort ? { effort: choice.effort } : {}),
+  };
+}
+
+/**
  * The model and effort a profile's generated agent definition pins for
  * `runtime`. A default tier that routes to a skill or another agent pins
  * nothing: the Mahler agent then runs only when a parent picks another tier.
@@ -112,12 +138,10 @@ export function defaultModelFor(
   runtime: Runtime,
 ): TierChoice | undefined {
   const tier = models.profiles[profile]?.default;
-  const choice = tier ? tierChoice(models, tier, runtime) : undefined;
-  if (!choice || choice.skill || choice.agent) return undefined;
-  return { model: choice.model, effort: choice.effort };
+  return tier ? pinnedChoice(models, tier, runtime) : undefined;
 }
 
-/** A generated Claude agent definition that pins one of a profile's non-default tiers. */
+/** A generated agent definition that pins one of a profile's non-default tiers. */
 export interface TierVariant {
   /** `<profile>-<tier>`, the agent name a parent launches. */
   name: string;
@@ -126,26 +150,27 @@ export interface TierVariant {
 }
 
 /**
- * Claude's agent tool can override a launch's model (aliases only) but not
- * its effort, so each allowed non-default tier gets its own definition. Codex
- * sets model and reasoning effort per spawn and needs none. Tiers that route
- * to a skill or agent, set nothing, or match the default get no variant.
+ * One definition per allowed non-default tier, named `<profile>-<tier>`, so a
+ * parent picks a tier by launching that agent. Neither runtime can be trusted
+ * to honor a launch-time effort: Claude's agent tool takes only a model alias,
+ * and Codex applies a custom agent's settings over spawn values. Tiers that
+ * route to a skill or agent, or pin the same settings as the default, get no
+ * variant.
  */
-export function claudeTierVariants(
+export function tierVariants(
   models: ModelsConfig,
   profile: string,
+  runtime: Runtime,
 ): TierVariant[] {
   const tiers = models.profiles[profile];
   if (!tiers) return [];
-  const base = defaultModelFor(models, profile, "claude");
+  const base = defaultModelFor(models, profile, runtime);
   return (tiers.allowed ?? [])
     .filter((tier) => tier !== tiers.default)
     .flatMap((tier) => {
-      const choice = tierChoice(models, tier, "claude");
-      if (!choice || choice.skill || choice.agent) return [];
-      if (!choice.model && !choice.effort) return [];
-      if (choice.model === base?.model && choice.effort === base?.effort) return [];
-      return [{ name: `${profile}-${tier}`, tier, choice: { model: choice.model, effort: choice.effort } }];
+      const choice = pinnedChoice(models, tier, runtime);
+      if (!choice || same(choice, base)) return [];
+      return [{ name: `${profile}-${tier}`, tier, choice }];
     });
 }
 

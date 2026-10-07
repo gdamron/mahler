@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import { capacityReport } from "../src/commands/capacity.js";
 import { defaultConcurrency, defaultModels } from "../src/config.js";
 import {
-  claudeTierVariants,
   defaultModelFor,
   modelConfigProblems,
   modelOverrides,
   resolveModels,
+  tierVariants,
 } from "../src/models.js";
 import { profileNames } from "../src/scaffold.js";
 
@@ -34,10 +34,10 @@ test("defaultModelFor pins model and effort, but not skill or agent routes", () 
   assert.equal(defaultModelFor(models, "unknown", "claude"), undefined);
 });
 
-test("claudeTierVariants covers each other allowed tier that pins a model or effort", () => {
+test("tierVariants covers each other allowed tier with different settings, per runtime", () => {
   const models = defaultModels();
   assert.deepEqual(
-    claudeTierVariants(models, "conductor").map((v) => [v.name, v.choice]),
+    tierVariants(models, "conductor", "claude").map((v) => [v.name, v.choice]),
     [
       ["conductor-trivial", { model: "haiku", effort: "high" }],
       ["conductor-light", { model: "sonnet", effort: "high" }],
@@ -45,16 +45,33 @@ test("claudeTierVariants covers each other allowed tier that pins a model or eff
       ["conductor-deep", { model: "opus", effort: "high" }],
     ],
   );
+  // Codex applies an agent's settings over spawn values, so it gets variants too.
+  assert.deepEqual(
+    tierVariants(models, "reviewer", "codex").map((v) => [v.name, v.choice]),
+    [
+      ["reviewer-trivial", { model: "gpt-6-luna", effort: "high" }],
+      ["reviewer-standard", { model: "gpt-6.1-sol", effort: "high" }],
+      ["reviewer-deep", { model: "gpt-6-astra", effort: "high" }],
+    ],
+  );
   // Composer allows only its default tier.
-  assert.deepEqual(claudeTierVariants(models, "composer"), []);
+  assert.deepEqual(tierVariants(models, "composer", "claude"), []);
   // Skill routes and tiers identical to the default get no definition.
   models.tiers.cross = { claude: { skill: "codex:review" } };
   models.tiers.same = { claude: { model: "sonnet", effort: "high" } };
   models.profiles.reviewer.allowed = ["light", "cross", "same", "deep", "inherit"];
   assert.deepEqual(
-    claudeTierVariants(models, "reviewer").map((v) => [v.name, v.choice.model]),
+    tierVariants(models, "reviewer", "claude").map((v) => [v.name, v.choice.model]),
     [["reviewer-deep", "opus"], ["reviewer-inherit", "inherit"]],
   );
+});
+
+test("a tier left empty for a runtime gets an unpinned variant that inherits", () => {
+  const models = resolveModels(defaultModels(), { tiers: { deep: { claude: null, codex: {} } } });
+  const claude = tierVariants(models, "reviewer", "claude").find((v) => v.tier === "deep");
+  assert.deepEqual(claude?.choice, { model: "inherit" });
+  const codex = tierVariants(models, "reviewer", "codex").find((v) => v.tier === "deep");
+  assert.deepEqual(codex?.choice, {});
 });
 
 test("modelConfigProblems flags bad efforts, undefined tiers, and mixed routes", () => {
@@ -123,4 +140,10 @@ test("modelOverrides is the minimal diff, and round-trips through resolveModels"
   // An override equal to the default is dropped, so the install follows future defaults.
   const redundant = resolveModels(defaults, { tiers: { light: { claude: { model: "sonnet", effort: "high" } } } });
   assert.deepEqual(modelOverrides(defaults, redundant), { tiers: {}, profiles: {} });
+  // A tier the install added survives even with no runtime entries.
+  const native = resolveModels(defaults, {
+    tiers: { native: {} },
+    profiles: { reviewer: { allowed: ["light", "native"] } },
+  });
+  assert.deepEqual(modelOverrides(defaults, native).tiers, { native: {} });
 });

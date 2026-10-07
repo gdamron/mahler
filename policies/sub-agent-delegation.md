@@ -79,9 +79,9 @@ overrides in `.harness/config.json`, listed in `.harness/MODELS.md`): a
 model and reasoning effort per runtime, or a hand-off to another skill or agent
 (for example a cross-model review). Each profile has a default tier, baked into
 its generated agent definition, and a list of tiers a parent may pick per
-launch. Codex sets a tier's model and effort on the spawn; Claude can't set
-effort at launch, so install generates a `<profile>-<tier>` agent for each
-other allowed tier. The parent picks with the delegate skill and records the
+launch. Neither runtime reliably applies a launch-time effort (Claude's agent
+tool can't set one; Codex applies an agent's own settings over spawn values),
+so install generates a `<profile>-<tier>` agent for each other allowed tier. The parent picks with the delegate skill and records the
 tier and reason in the brief. A tier outside the profile's allowed list is a Tier 1
 deviation.
 

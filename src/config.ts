@@ -165,6 +165,8 @@ export function withInstallOptions(
   config: HarnessConfig,
   options: {
     repos?: HarnessConfig["repos"];
+    mahlerCommand?: string;
+    workspaceDir?: string;
     acceptedAssignees?: string[];
     requiredLabels?: string[];
     merge?: HarnessConfig["merge"];
@@ -175,6 +177,8 @@ export function withInstallOptions(
   return {
     ...config,
     repos: options.repos ?? config.repos,
+    mahlerCommand: options.mahlerCommand ?? config.mahlerCommand,
+    workspaceDir: options.workspaceDir ?? config.workspaceDir,
     merge: options.merge ?? config.merge,
     models: options.models ?? config.models,
     concurrency: options.concurrency ?? config.concurrency,

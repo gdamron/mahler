@@ -238,6 +238,28 @@ test("commands find the workspace from a nested directory when --workspace is om
   assert.match(result.stdout, /caps: 7 issue agents per composer/);
 });
 
+test("reinstall keeps the Mahler command, worktree root, and Linear filters unless flags reset them", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-keep-"));
+  const cli = (args: string[]) => spawnSync("node", ["dist/src/cli.js", "install", workspace, ...args], { encoding: "utf8" });
+  assert.equal(cli(["--linear-assignee", "gonzo", "--linear-label", "agent"]).status, 0);
+  const configFile = resolve(workspace, ".harness", "config.json");
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  config.mahlerCommand = "node /opt/mahler/cli.js";
+  config.workspaceDir = "worktrees";
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(cli([]).status, 0);
+  let after = JSON.parse(readFileSync(configFile, "utf8"));
+  assert.equal(after.mahlerCommand, "node /opt/mahler/cli.js");
+  assert.equal(after.workspaceDir, "worktrees");
+  assert.deepEqual(after.linear, { acceptedAssignees: ["gonzo"], requiredLabels: ["agent"] });
+  assert.match(readFileSync(resolve(workspace, "CLAUDE.md"), "utf8"), /node \/opt\/mahler\/cli\.js issue/);
+
+  assert.equal(cli(["--linear-assignee", "kermit"]).status, 0);
+  after = JSON.parse(readFileSync(configFile, "utf8"));
+  assert.deepEqual(after.linear, { acceptedAssignees: ["kermit"], requiredLabels: ["agent"] });
+});
+
 test("custom overlay overrides a default and adds custom-only files; reinstall preserves both", () => {
   const workspace = mkdtempSync(resolve(tmpdir(), "mahler-overlay-"));
   assert.equal(install(workspace).status, 0);

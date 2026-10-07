@@ -107,7 +107,8 @@ Find the chosen tier for your runtime in `.harness/MODELS.md`:
 
 ## 5. Respect capacity
 
-Run `mahler capacity` before launching agents in parallel or starting a full
+Run `mahler capacity --workspace <workspace>` (the product workspace, not
+your worktree) before launching agents in parallel or starting a full
 test suite, build, or `mahler check`:
 
 - `busy`: launch nothing new. Finish or wait on running work, and prefer

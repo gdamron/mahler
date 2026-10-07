@@ -73,7 +73,7 @@ commit, handoff. Skip the rest; your parent owns them.
    paths limited to the slice worktree, permission to commit and push the slice
    branch only, and no permission to open PRs, merge, force-push, change
    issue-tracker state, or delegate further. Stay within
-   `concurrency.maxSliceAgents` and check `mahler capacity` before launching.
+   `concurrency.maxSliceAgents` and check `mahler capacity --workspace <workspace>` before launching.
 4. **Monitor.** Answer slice questions within the issue scope. If a slice
    stalls or drifts out of scope, stop it and re-brief, or take it over.
    Escalate scope changes and Tier 2 actions to your parent; do not approve

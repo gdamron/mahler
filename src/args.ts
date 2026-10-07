@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 export type Flags = Record<string, string | boolean>;
 
@@ -30,8 +31,24 @@ export function parseArgs(argv: string[]): Args {
   return { command, rest, flags };
 }
 
+/**
+ * The product workspace: `--workspace`, else the nearest directory at or above
+ * the current one that holds `.harness/config.json` (agents usually run from a
+ * worktree inside the workspace), else the current directory.
+ */
 export function workspaceFlag(flags: Flags): string {
-  return resolve(String(flags.workspace ?? process.cwd()));
+  if (typeof flags.workspace === "string") return resolve(flags.workspace);
+  return findWorkspace(process.cwd()) ?? resolve(process.cwd());
+}
+
+function findWorkspace(start: string): string | undefined {
+  let dir = resolve(start);
+  for (;;) {
+    if (existsSync(resolve(dir, ".harness", "config.json"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
 }
 
 export function stringFlag(flags: Flags, key: string): string | undefined {

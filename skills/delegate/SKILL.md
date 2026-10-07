@@ -90,14 +90,13 @@ Rules of thumb:
 
 Find the chosen tier for your runtime in `.harness/MODELS.md`:
 
-- `model` / `effort`, in **Claude**: launch the agent named for the tier.
-  The default tier is the profile's own agent (`conductor`); each other
-  allowed tier has a generated definition named `<profile>-<tier>`
+- `model` / `effort`: launch the agent `MODELS.md` lists for the tier and
+  your runtime. The default tier is the profile's own agent (`conductor`);
+  each other allowed tier has a generated definition named `<profile>-<tier>`
   (`conductor-standard`, `reviewer-deep`) that pins its model and effort.
-  Claude's agent tool can't set effort at launch, so never fake a tier by
-  passing only a model override.
-- `model` / `effort`, in **Codex**: spawn the profile's agent and pass the
-  tier's model and reasoning effort on the spawn. Omitted fields inherit.
+  Pass no model or effort overrides: Claude's agent tool can't set effort at
+  launch, and Codex applies the agent's own settings over spawn values, so an
+  override either fakes the tier or is ignored.
 - `skill`: invoke that skill instead of launching a Mahler sub-agent (for
   example `codex:review` for a cross-model review). Pass the brief's
   objective, base branch, and scope as its arguments or focus text, then

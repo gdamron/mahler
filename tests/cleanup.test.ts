@@ -65,6 +65,34 @@ test("cleanup --dry-run reports without removing", () => {
   assert.equal(existsSync(resolve(repos, "app")), true);
 });
 
+test("cleanup keeps a detached worktree whose commits no branch reaches", () => {
+  const { workspace, repos } = workspaceWithWorktrees();
+  const wt = resolve(repos, "app-docs");
+  git(wt, ["checkout", "-q", "--detach"]);
+  git(wt, ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "orphan"]);
+
+  const result = runCleanup(workspace);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /app-docs: detached HEAD has commits on no branch, tag, or remote; kept/);
+  assert.equal(existsSync(wt), true);
+});
+
+test("cleanup removes worktrees of a repo with a separate git dir", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-cleanup-sep-"));
+  const app = resolve(workspace, "app");
+  spawnSync("git", ["init", "-q", "-b", "main", `--separate-git-dir=${resolve(workspace, "store.git")}`, app]);
+  git(app, ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"]);
+  assert.equal(spawnSync("node", ["dist/src/cli.js", "install", workspace]).status, 0);
+  const wt = resolve(workspace, "workspaces", "issues", "MAH-1", "repos", "app");
+  mkdirSync(resolve(wt, ".."), { recursive: true });
+  assert.equal(git(app, ["worktree", "add", "-q", "-b", "mah-1", wt]).status, 0);
+
+  const result = runCleanup(workspace);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /app: removed/);
+  assert.equal(existsSync(wt), false);
+});
+
 test("spotlightFinding is ok at zero and warns with the fix otherwise", () => {
   assert.equal(spotlightFinding("/w/workspaces", "workspaces", 0)?.level, "ok");
   const warn = spotlightFinding("/w/workspaces", "workspaces", 1234);

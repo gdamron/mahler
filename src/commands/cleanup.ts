@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmdirSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, rmdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, relative, resolve } from "node:path";
 import { type Flags, workspaceFlag } from "../args.js";
@@ -37,8 +37,10 @@ function cleanupWorktree(workspace: string, dir: string, dryRun: boolean): Findi
   if (!common) {
     return { level: "warn", message: `${label}: not a git worktree; left in place` };
   }
-  const source = dirname(common);
-  if (source === dir) {
+  // A linked worktree has its own git dir under the common one; a main
+  // checkout's git dir is the common dir (even with --separate-git-dir).
+  const gitDir = readGit(dir, ["rev-parse", "--absolute-git-dir"]);
+  if (!gitDir || realpathSync(gitDir) === common) {
     return { level: "warn", message: `${label}: a main checkout, not a worktree; left in place` };
   }
   if (readGit(dir, ["status", "--porcelain"])) {
@@ -48,6 +50,14 @@ function cleanupWorktree(workspace: string, dir: string, dryRun: boolean): Findi
     };
   }
   const branch = readGit(dir, ["branch", "--show-current"]);
+  // Removing a worktree drops its HEAD reflog, so commits only a detached
+  // HEAD reaches would become unreachable and eligible for garbage collection.
+  if (!branch && readGit(dir, ["rev-list", "-n", "1", "HEAD", "--not", "--branches", "--tags", "--remotes"])) {
+    return {
+      level: "error",
+      message: `${label}: detached HEAD has commits on no branch, tag, or remote; kept — create a branch for them or ask the human before discarding`,
+    };
+  }
   const unpushed = branch
     ? readGit(dir, ["log", "--oneline", branch, "--not", "--remotes"])
     : "";
@@ -59,7 +69,12 @@ function cleanupWorktree(workspace: string, dir: string, dryRun: boolean): Findi
   if (dryRun) {
     return { level: "info", message: `${label}: would remove${note}` };
   }
-  const result = spawnSync("git", ["worktree", "remove", dir], { cwd: source, encoding: "utf8" });
+  // Address the repository by its common git dir: with --separate-git-dir,
+  // that dir's parent is not necessarily a checkout.
+  const result = spawnSync("git", ["--git-dir", common, "worktree", "remove", dir], {
+    cwd: dirname(dir),
+    encoding: "utf8",
+  });
   if (result.status !== 0) {
     return { level: "error", message: `${label}: git worktree remove failed: ${result.stderr.trim()}` };
   }

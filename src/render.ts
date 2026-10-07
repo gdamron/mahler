@@ -211,9 +211,11 @@ export function claudeAgentDefinition(
   return renderTemplate("claude-agent", {
     name: variant?.name ?? profile.name,
     profile: profile.name,
-    description: variant
-      ? variantDescription(profile, variant)
-      : profileDescription(profile),
+    // JSON strings are valid YAML double-quoted scalars, so a description
+    // containing `: ` or `#` can't break the frontmatter.
+    description: JSON.stringify(
+      variant ? variantDescription(profile, variant) : profileDescription(profile),
+    ),
     modelLines: [
       pinned?.model ? `model: ${pinned.model}\n` : "",
       pinned?.effort ? `effort: ${pinned.effort}\n` : "",

@@ -112,7 +112,14 @@ test("install pins default tiers, and reinstall preserves human-set models and c
   }
   // Claude can't set effort at launch, so other allowed tiers get their own agent.
   const deep = readFileSync(resolve(workspace, ".claude", "agents", "conductor-deep.md"), "utf8");
-  assert.match(deep, /^---\nname: conductor-deep\ndescription: conductor at the deep tier \(opus, high effort\)/);
+  assert.match(deep, /^---\nname: conductor-deep\ndescription: "conductor at the deep tier \(opus, high effort\)/);
+  // Descriptions are quoted YAML scalars, so `: ` inside one can't break the frontmatter.
+  for (const profile of ["composer", "conductor", "reviewer"]) {
+    const body = readFileSync(resolve(workspace, ".claude", "agents", `${profile}.md`), "utf8");
+    const line = body.split("\n").find((l) => l.startsWith("description: ")) ?? "";
+    const description = JSON.parse(line.slice("description: ".length));
+    assert.equal(description, JSON.parse(readFileSync(resolve("agents", `${profile}.json`), "utf8")).description);
+  }
   assert.match(deep, /^model: opus\neffort: high$/m);
   for (const tier of ["trivial", "light", "standard"]) {
     assert.equal(existsSync(resolve(workspace, ".claude", "agents", `conductor-${tier}.md`)), true);
@@ -201,6 +208,20 @@ test("reinstall removes generated skills that are no longer installed, keeping h
     assert.equal(existsSync(resolve(workspace, root, "skills", "my-skill", "SKILL.md")), true, `${root} my-skill kept`);
     assert.equal(existsSync(resolve(workspace, root, "skills", "conduct", "SKILL.md")), true);
   }
+});
+
+test("install refuses a custom profile whose name collides with a tier agent", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-collide-"));
+  assert.equal(install(workspace).status, 0);
+  const custom = resolve(workspace, ".harness", "custom", "agents");
+  mkdirSync(custom, { recursive: true });
+  writeFileSync(
+    resolve(custom, "reviewer-deep.json"),
+    JSON.stringify({ name: "reviewer-deep", allowedSkills: ["review"], deniedSkills: [] }),
+  );
+  const result = install(workspace);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /tier agent "reviewer-deep" \(reviewer at the deep tier\) collides/);
 });
 
 test("custom overlay overrides a default and adds custom-only files; reinstall preserves both", () => {

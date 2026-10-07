@@ -8,6 +8,9 @@
     "select-project-issue",
     "work-on-issue",
     "interview",
+    "implement",
+    "commit",
+    "review",
     "pr",
     "merge",
     "handoff"

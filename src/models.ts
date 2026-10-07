@@ -174,6 +174,29 @@ export function tierVariants(
     });
 }
 
+/**
+ * Generated tier agents whose `<profile>-<tier>` name matches an installed
+ * profile: installing both would overwrite one definition with the other.
+ */
+export function agentNameCollisions(
+  models: ModelsConfig,
+  profiles: string[],
+): string[] {
+  const problems = new Set<string>();
+  for (const profile of profiles) {
+    for (const runtime of ["claude", "codex"] as const) {
+      for (const variant of tierVariants(models, profile, runtime)) {
+        if (profiles.includes(variant.name)) {
+          problems.add(
+            `tier agent "${variant.name}" (${profile} at the ${variant.tier} tier) collides with the profile of the same name; rename the profile or the tier`,
+          );
+        }
+      }
+    }
+  }
+  return [...problems];
+}
+
 /** Human-readable problems with the models config; empty when it is consistent. */
 export function modelConfigProblems(
   models: ModelsConfig,
@@ -222,5 +245,6 @@ export function modelConfigProblems(
       );
     }
   }
+  problems.push(...agentNameCollisions(models, profiles));
   return problems;
 }

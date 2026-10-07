@@ -73,16 +73,22 @@ Rules of thumb:
 - Review a high-risk diff (merge policy) at `deep` or with a cross-model tier.
   Otherwise the reviewer's tier need not match the author's.
 - A tier outside the profile's `allowed` list is a Tier 1 deviation: record
-  the reason in `HANDOFF.md`.
+  the reason in `HANDOFF.md`. In Claude it has no generated definition; the
+  closest you can get is a model-alias override, which keeps the default
+  tier's effort.
 
 ## 4. Launch it
 
 Read the chosen tier's entry for your runtime, `models.tiers.<tier>.<runtime>`:
 
-- `model` / `effort`: launch the profile's agent and pass them as the launch's
-  model and effort overrides (Claude: the agent tool's `model` and `effort`;
-  Codex: the spawn's model and reasoning effort). Omitted fields inherit. If
-  the runtime cannot override per launch, use the default and note it.
+- `model` / `effort`, in **Claude**: launch the agent named for the tier.
+  The default tier is the profile's own agent (`conductor`); each other
+  allowed tier has a generated definition named `<profile>-<tier>`
+  (`conductor-deep`, `reviewer-light`) that pins its model and effort.
+  Claude's agent tool can't set effort at launch, so never fake a tier by
+  passing only a model override.
+- `model` / `effort`, in **Codex**: spawn the profile's agent and pass the
+  tier's model and reasoning effort on the spawn. Omitted fields inherit.
 - `skill`: invoke that skill instead of launching a Mahler sub-agent (for
   example `codex:review` for a cross-model review). Pass the brief's
   objective, base branch, and scope as its arguments or focus text, then

@@ -22,6 +22,38 @@ export function defaultModelFor(
   return { model: choice.model, effort: choice.effort };
 }
 
+/** A generated Claude agent definition that pins one of a profile's non-default tiers. */
+export interface TierVariant {
+  /** `<profile>-<tier>`, the agent name a parent launches. */
+  name: string;
+  tier: string;
+  choice: TierChoice;
+}
+
+/**
+ * Claude's agent tool can override a launch's model (aliases only) but not
+ * its effort, so each allowed non-default tier gets its own definition. Codex
+ * sets model and reasoning effort per spawn and needs none. Tiers that route
+ * to a skill or agent, set nothing, or match the default get no variant.
+ */
+export function claudeTierVariants(
+  models: ModelsConfig,
+  profile: string,
+): TierVariant[] {
+  const tiers = models.profiles[profile];
+  if (!tiers) return [];
+  const base = defaultModelFor(models, profile, "claude");
+  return (tiers.allowed ?? [])
+    .filter((tier) => tier !== tiers.default)
+    .flatMap((tier) => {
+      const choice = models.tiers[tier]?.claude;
+      if (!choice || choice.skill || choice.agent) return [];
+      if (!choice.model && !choice.effort) return [];
+      if (choice.model === base?.model && choice.effort === base?.effort) return [];
+      return [{ name: `${profile}-${tier}`, tier, choice: { model: choice.model, effort: choice.effort } }];
+    });
+}
+
 /** Human-readable problems with the models config; empty when it is consistent. */
 export function modelConfigProblems(
   models: ModelsConfig,

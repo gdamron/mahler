@@ -138,7 +138,12 @@ each agent runs on, per runtime. Reinstall preserves it.
   tier to a smaller Codex model.
 - `models.profiles.<profile>` sets `default` (written into the generated agent
   definition) and `allowed` (tiers a parent may pick per launch with the
-  `delegate` skill).
+  `delegate` skill). Codex sets model and effort on each spawn, so it needs one
+  agent per profile. Claude can't set effort at launch, so install also writes
+  `.claude/agents/<profile>-<tier>.md` for each other allowed tier (for
+  example `conductor-deep`); removing a tier from `allowed` and reinstalling
+  removes its agent. Full model IDs work in Claude only through these
+  definitions, since a launch override accepts only aliases.
 - A tier may hand the role to something else instead of a model: `skill`
   invokes a runtime skill, `agent` launches a runtime agent type. For example,
   to route Claude reviews to Codex while Codex sessions review natively:

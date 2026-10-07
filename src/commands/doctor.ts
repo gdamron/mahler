@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
-import { modelConfigProblems } from "../models.js";
+import { claudeTierVariants, modelConfigProblems } from "../models.js";
 import {
   adapterRuntimes,
   installedPolicyNames,
@@ -184,6 +184,14 @@ export function doctor(workspaceInput: string): void {
       });
     } else {
       results.push({ level: "ok", message: `Claude agent ${profile} present` });
+    }
+    for (const variant of claudeTierVariants(config.models, profile)) {
+      if (!existsSync(resolve(workspace, ".claude", "agents", `${variant.name}.md`))) {
+        results.push({
+          level: "error",
+          message: `missing Claude tier agent: .claude/agents/${variant.name}.md — rerun mahler install`,
+        });
+      }
     }
   }
 

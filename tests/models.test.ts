@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { capacityReport } from "../src/commands/capacity.js";
 import { defaultConcurrency, defaultModels } from "../src/config.js";
-import { defaultModelFor, modelConfigProblems } from "../src/models.js";
+import { claudeTierVariants, defaultModelFor, modelConfigProblems } from "../src/models.js";
 import { profileNames } from "../src/scaffold.js";
 
 test("default models config is consistent with the canonical profiles", () => {
@@ -19,6 +19,24 @@ test("defaultModelFor pins model and effort, but not skill or agent routes", () 
   models.profiles.reviewer = { default: "cross", allowed: ["cross"] };
   assert.equal(defaultModelFor(models, "reviewer", "claude"), undefined);
   assert.equal(defaultModelFor(models, "unknown", "claude"), undefined);
+});
+
+test("claudeTierVariants covers each other allowed tier that pins a model or effort", () => {
+  const models = defaultModels();
+  assert.deepEqual(
+    claudeTierVariants(models, "conductor").map((v) => [v.name, v.choice]),
+    [
+      ["conductor-light", { model: "haiku", effort: undefined }],
+      ["conductor-deep", { model: "opus", effort: "medium" }],
+    ],
+  );
+  // Composer allows only its default tier.
+  assert.deepEqual(claudeTierVariants(models, "composer"), []);
+  // Skill routes and tiers identical to the default get no definition.
+  models.tiers.cross = { claude: { skill: "codex:review" } };
+  models.tiers.same = { claude: { model: "sonnet", effort: "high" } };
+  models.profiles.reviewer.allowed = ["standard", "cross", "same", "deep"];
+  assert.deepEqual(claudeTierVariants(models, "reviewer").map((v) => v.name), ["reviewer-deep"]);
 });
 
 test("modelConfigProblems flags bad efforts, undefined tiers, and mixed routes", () => {

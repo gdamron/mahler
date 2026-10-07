@@ -60,7 +60,7 @@ itself: one issue never needs a composer layer.
    acceptance criteria, contracts between issues, non-goals) and point the
    conductor brief at it. Use the interview skill with the human when the
    plan has open questions that change scope.
-4. **Dispatch.** Run `mahler capacity` before each wave. For each issue in the
+4. **Dispatch.** Run `mahler capacity --workspace <workspace>` before each wave. For each issue in the
    current wave, up to `concurrency.maxIssueAgents` in `.harness/config.json`
    (and none while capacity reports `busy`; raising the cap is a recorded
    deviation), launch a conductor with a sub-agent brief built with the

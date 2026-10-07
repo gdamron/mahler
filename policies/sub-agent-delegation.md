@@ -74,7 +74,8 @@ rather than approving them. Tier 3 boundaries always go to the human.
 
 ## Model Tiers
 
-Each install defines named tiers in `.harness/config.json` under `models`: a
+Each install defines named tiers (Mahler's defaults plus the `models`
+overrides in `.harness/config.json`, listed in `.harness/MODELS.md`): a
 model and reasoning effort per runtime, or a hand-off to another skill or agent
 (for example a cross-model review). Each profile has a default tier, baked into
 its generated agent definition, and a list of tiers a parent may pick per
@@ -99,7 +100,7 @@ Every delegated task should start from a written brief with these fields:
 
 - Role: the sub-agent's role in this delegation.
 - Base configured role/profile: the predefined role/profile used, or `none`.
-- Agent and tier: the tier from `models.tiers` (or the skill/agent it routes
+- Agent and tier: the tier from `.harness/MODELS.md` (or the skill/agent it routes
   to) and a one-line reason.
 - Specialization or ad hoc role description: narrower instructions, or the ad
   hoc role rationale when no configured role fits.

@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { INHERIT_TIER } from "./models.js";
+import { INHERIT_TIER, modelOverrides, resolveModels } from "./models.js";
 import type {
   ConcurrencyConfig,
   HarnessConfig,
   ModelsConfig,
+  ModelsOverrides,
 } from "./types.js";
 
 export function defaultConfig(_workspace: string): HarnessConfig {
@@ -200,12 +201,32 @@ export function loadConfig(workspace: string): HarnessConfig {
       agentMergeLabels:
         parsed.merge?.agentMergeLabels ?? defaults.merge.agentMergeLabels,
     },
-    models: {
-      tiers: parsed.models?.tiers ?? defaults.models.tiers,
-      profiles: parsed.models?.profiles ?? defaults.models.profiles,
-    },
+    models: resolveModels(defaults.models, parsed.models as ModelsOverrides | undefined),
     concurrency: { ...defaults.concurrency, ...parsed.concurrency },
   };
+}
+
+/**
+ * The config as written to disk: `models` and `concurrency` keep only the
+ * install's changes to Mahler's defaults, so later default changes still
+ * reach this install. Entries equal to a default are dropped.
+ */
+export function serializeConfig(config: HarnessConfig): string {
+  const defaults = defaultConfig("");
+  const concurrency = Object.fromEntries(
+    Object.entries(config.concurrency).filter(
+      ([key, value]) => defaults.concurrency[key as keyof ConcurrencyConfig] !== value,
+    ),
+  );
+  return `${JSON.stringify(
+    {
+      ...config,
+      models: modelOverrides(defaults.models, config.models),
+      concurrency,
+    },
+    null,
+    2,
+  )}\n`;
 }
 
 /** Where an issue's brief (`meta`) and its repo worktrees (`worktreeRoot`) live. */

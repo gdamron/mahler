@@ -29,7 +29,8 @@ other roles pick one.
   boundaries for their parent's go-ahead.
 - Delegation costs tokens, so it must earn its place. The `delegate` skill
   decides whether to launch a sub-agent and on which **model tier**: named
-  per-install tiers in `.harness/config.json` (`models`) map to a model and
+  per-install tiers (`models` overrides in `.harness/config.json`, listed in
+  `.harness/MODELS.md`) map to a model and
   reasoning effort per runtime, or hand a role to another skill or agent (for
   example a cross-model review). `concurrency` caps parallel agents and heavy
   commands, and `mahler capacity` reports machine load against them.

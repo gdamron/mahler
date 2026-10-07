@@ -114,6 +114,12 @@ export function doctor(workspaceInput: string): void {
   );
   if (spotlight) results.push(spotlight);
 
+  if (!existsSync(resolve(harness, "MODELS.md"))) {
+    results.push({
+      level: "error",
+      message: "missing .harness/MODELS.md — rerun mahler install",
+    });
+  }
   const modelProblems = modelConfigProblems(
     config.models,
     installedProfileNames(workspace),

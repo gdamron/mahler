@@ -1,5 +1,5 @@
 import { renderTemplate } from "./templates.js";
-import type { TierVariant } from "./models.js";
+import { claudeTierVariants, tierChoice, type TierVariant } from "./models.js";
 import type {
   AgentName,
   HarnessConfig,
@@ -7,6 +7,7 @@ import type {
   LinearIssue,
   LinearProject,
   MergeConfig,
+  ModelsConfig,
   TierChoice,
   Runtime,
 } from "./types.js";
@@ -221,6 +222,42 @@ function agentInstructions(profile: InstalledProfile, runtime: Runtime): string 
     allowedSkills: skillList(profile.allowedSkills),
     deniedSkills: skillList(profile.deniedSkills),
     skillsDir: runtimes[runtime].skillsDir,
+  });
+}
+
+/** `.harness/MODELS.md`: the install's effective tiers, for agents choosing one. */
+export function modelsMarkdown(models: ModelsConfig, profiles: string[]): string {
+  const cell = (choice?: TierChoice) => {
+    if (!choice) return "inherit";
+    if (choice.skill) return `skill: \`${choice.skill}\``;
+    const agent = choice.agent ? `agent: \`${choice.agent}\`` : "";
+    return [agent, tierSummary(choice)].filter(Boolean).join(", ") || "inherit";
+  };
+  const tiers = Object.entries(models.tiers).map(
+    ([tier, runtimes]) =>
+      `| \`${tier}\` | ${cell(runtimes.claude)} | ${cell(runtimes.codex)} |`,
+  );
+  const rows = profiles
+    .filter((profile) => models.profiles[profile])
+    .map((profile) => {
+      const { default: base, allowed } = models.profiles[profile];
+      const variants = new Map(
+        claudeTierVariants(models, profile).map((v) => [v.tier, v.name]),
+      );
+      const agents = allowed.map((tier) => {
+        const route = tierChoice(models, tier, "claude");
+        const name = route?.skill
+          ? `skill \`${route.skill}\``
+          : route?.agent
+            ? `agent \`${route.agent}\``
+            : `\`${tier === base ? profile : (variants.get(tier) ?? profile)}\``;
+        return `${tier}: ${name}`;
+      });
+      return `| \`${profile}\` | \`${base}\` | ${allowed.map((t) => `\`${t}\``).join(", ")} | ${agents.join("; ")} |`;
+    });
+  return renderTemplate("models", {
+    tiers: tiers.join("\n") || "| (none) | | |",
+    profiles: rows.join("\n") || "| (none) | | | |",
   });
 }
 

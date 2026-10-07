@@ -128,6 +128,12 @@ test("install pins default tiers, and reinstall preserves human-set models and c
 
   const configFile = resolve(workspace, ".harness", "config.json");
   const config = JSON.parse(readFileSync(configFile, "utf8"));
+  // config.json holds only changes to Mahler's defaults; MODELS.md shows the result.
+  assert.deepEqual(config.models, { tiers: {}, profiles: {} });
+  assert.deepEqual(config.concurrency, {});
+  const modelsDoc = readFileSync(resolve(workspace, ".harness", "MODELS.md"), "utf8");
+  assert.match(modelsDoc, /\| `deep` \| opus, high effort \| gpt-6-astra, high effort \|/);
+  assert.match(modelsDoc, /deep: `conductor-deep`/);
   // Route Claude reviews to a cross-model skill; Codex reviews stay native.
   config.models.tiers["cross-check"] = {
     claude: { skill: "codex:review" },
@@ -140,7 +146,10 @@ test("install pins default tiers, and reinstall preserves human-set models and c
   assert.equal(install(workspace).status, 0);
   const after = JSON.parse(readFileSync(configFile, "utf8"));
   assert.deepEqual(after.models, config.models);
-  assert.equal(after.concurrency.maxIssueAgents, 1);
+  assert.deepEqual(after.concurrency, { maxIssueAgents: 1 });
+  const modelsAfter = readFileSync(resolve(workspace, ".harness", "MODELS.md"), "utf8");
+  assert.match(modelsAfter, /\| `cross-check` \| skill: `codex:review` \| high effort \|/);
+  assert.match(modelsAfter, /cross-check: skill `codex:review`/);
   // A skill-routed default pins nothing in Claude; Codex gets the tier's effort.
   const rerendered = readFileSync(resolve(workspace, ".claude", "agents", "reviewer.md"), "utf8");
   assert.doesNotMatch(rerendered, /^(model|effort):/m);

@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { capacityReport } from "../src/commands/capacity.js";
 import { defaultConcurrency, defaultModels } from "../src/config.js";
-import { claudeTierVariants, defaultModelFor, modelConfigProblems } from "../src/models.js";
+import {
+  claudeTierVariants,
+  defaultModelFor,
+  modelConfigProblems,
+  modelOverrides,
+  resolveModels,
+} from "../src/models.js";
 import { profileNames } from "../src/scaffold.js";
 
 test("default models config is consistent with the canonical profiles", () => {
@@ -73,4 +79,48 @@ test("capacityReport says busy above the per-core threshold and ok below it", ()
   assert.match(ok, /verdict: ok — about 6 core\(s\) of headroom/);
   const unknown = capacityReport(caps, { cores: 8 });
   assert.match(unknown, /load: unavailable/);
+});
+
+test("resolveModels applies overrides per tier runtime and per profile field", () => {
+  const defaults = defaultModels();
+  const models = resolveModels(defaults, {
+    tiers: {
+      deep: { codex: { model: "gpt-7", effort: "xhigh" } },
+      trivial: null,
+      light: { codex: null },
+      "cross-check": { claude: { skill: "codex:review" } },
+    },
+    profiles: {
+      reviewer: { default: "cross-check" },
+      composer: null,
+    },
+  });
+  // A runtime entry replaces the default's; the other runtime keeps its default.
+  assert.deepEqual(models.tiers.deep, {
+    claude: { model: "opus", effort: "high" },
+    codex: { model: "gpt-7", effort: "xhigh" },
+  });
+  assert.equal(models.tiers.trivial, undefined);
+  assert.deepEqual(models.tiers.light, { claude: { model: "sonnet", effort: "high" } });
+  assert.deepEqual(models.tiers["cross-check"], { claude: { skill: "codex:review" } });
+  // Profile fields merge: default changes, allowed keeps the default list.
+  assert.deepEqual(models.profiles.reviewer, {
+    default: "cross-check",
+    allowed: defaults.profiles.reviewer.allowed,
+  });
+  assert.equal(models.profiles.composer, undefined);
+});
+
+test("modelOverrides is the minimal diff, and round-trips through resolveModels", () => {
+  const defaults = defaultModels();
+  assert.deepEqual(modelOverrides(defaults, defaults), { tiers: {}, profiles: {} });
+  const overrides = {
+    tiers: { deep: { codex: { model: "gpt-7", effort: "xhigh" } }, trivial: null },
+    profiles: { reviewer: { allowed: ["light", "deep"] }, composer: null },
+  };
+  const models = resolveModels(defaults, overrides);
+  assert.deepEqual(modelOverrides(defaults, models), overrides);
+  // An override equal to the default is dropped, so the install follows future defaults.
+  const redundant = resolveModels(defaults, { tiers: { light: { claude: { model: "sonnet", effort: "high" } } } });
+  assert.deepEqual(modelOverrides(defaults, redundant), { tiers: {}, profiles: {} });
 });

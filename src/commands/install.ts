@@ -5,6 +5,7 @@ import {
   configPath,
   defaultConfig,
   loadConfig,
+  serializeConfig,
   withInstallOptions,
 } from "../config.js";
 import { claudeTierVariants, defaultModelFor } from "../models.js";
@@ -12,6 +13,7 @@ import { parseProfileSource } from "../profiles.js";
 import {
   claudeAgentDefinition,
   codexAgentDefinition,
+  modelsMarkdown,
   nativeAdapter,
   rootAgentBlock,
   workflowMarkdown,
@@ -68,7 +70,7 @@ export function install(workspaceInput: string, flags: Flags): void {
   );
   writeFileEnsured(
     resolve(workspace, ".harness", "config.json"),
-    `${JSON.stringify(config, null, 2)}\n`,
+    serializeConfig(config),
   );
   writeFileEnsured(
     resolve(workspace, ".harness", "README.md"),
@@ -139,6 +141,10 @@ export function install(workspaceInput: string, flags: Flags): void {
       );
     }
   }
+  writeFileEnsured(
+    resolve(workspace, ".harness", "MODELS.md"),
+    modelsMarkdown(config.models, profiles),
+  );
   for (const runtime of adapterRuntimes()) {
     ensureDir(resolve(workspace, ".harness", "agents", runtime));
     writeFileEnsured(

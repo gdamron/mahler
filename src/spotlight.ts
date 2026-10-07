@@ -19,8 +19,12 @@ export function spotlightIndexedCount(dir: string): number | undefined {
     encoding: "utf8",
     timeout: 10_000,
   });
+  // mdfind may be missing from PATH; spawnSync then reports an error and no stdout.
+  if (result.error || result.status !== 0 || typeof result.stdout !== "string") {
+    return undefined;
+  }
   const count = Number.parseInt(result.stdout.trim(), 10);
-  return result.status === 0 && Number.isFinite(count) ? count : undefined;
+  return Number.isFinite(count) ? count : undefined;
 }
 
 /** Doctor finding for Spotlight indexing of the worktree root; undefined off macOS. */

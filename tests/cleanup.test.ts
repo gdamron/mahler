@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { spotlightFinding } from "../src/spotlight.js";
+import { spotlightFinding, spotlightIndexedCount } from "../src/spotlight.js";
 
 const git = (cwd: string, args: string[]) =>
   spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
@@ -55,6 +55,27 @@ test("cleanup keeps a worktree with uncommitted changes and exits non-zero", () 
   assert.match(result.stdout, /app-docs: has uncommitted or untracked changes; kept/);
   assert.equal(existsSync(resolve(repos, "app-docs", "draft.md")), true);
   assert.equal(existsSync(resolve(repos, "app")), false, "clean siblings are still removed");
+});
+
+test("cleanup sees untracked files even when git is configured to hide them", () => {
+  const { workspace, app, repos } = workspaceWithWorktrees();
+  git(app, ["config", "status.showUntrackedFiles", "no"]);
+  writeFileSync(resolve(repos, "app", "notes.md"), "untracked work\n");
+
+  const result = runCleanup(workspace);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /app: has uncommitted or untracked changes; kept/);
+  assert.equal(existsSync(resolve(repos, "app", "notes.md")), true);
+});
+
+test("spotlightIndexedCount skips the check when mdfind can't run", () => {
+  const path = process.env.PATH;
+  process.env.PATH = "";
+  try {
+    assert.equal(spotlightIndexedCount(tmpdir()), undefined);
+  } finally {
+    process.env.PATH = path;
+  }
 });
 
 test("cleanup --dry-run reports without removing", () => {

@@ -43,7 +43,9 @@ function cleanupWorktree(workspace: string, dir: string, dryRun: boolean): Findi
   if (!gitDir || realpathSync(gitDir) === common) {
     return { level: "warn", message: `${label}: a main checkout, not a worktree; left in place` };
   }
-  if (readGit(dir, ["status", "--porcelain"])) {
+  // Ask for untracked files explicitly: with `status.showUntrackedFiles=no`,
+  // plain status reports clean and `git worktree remove` deletes them.
+  if (readGit(dir, ["status", "--porcelain", "--untracked-files=all"])) {
     return {
       level: "error",
       message: `${label}: has uncommitted or untracked changes; kept — commit, push, or ask the human before discarding`,

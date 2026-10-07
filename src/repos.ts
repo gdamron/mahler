@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "./config.js";
@@ -44,6 +44,15 @@ export function withPreservedChecks(
     }
     return repo;
   });
+}
+
+/** The git common dir for a worktree rooted exactly at `dir`, if it is one. */
+export function gitCommonDir(dir: string): string | undefined {
+  if (!existsSync(dir)) return undefined;
+  const top = readGit(dir, ["rev-parse", "--show-toplevel"]);
+  if (!top || realpathSync(top) !== realpathSync(dir)) return undefined;
+  const common = readGit(dir, ["rev-parse", "--git-common-dir"]);
+  return common ? realpathSync(resolve(dir, common)) : undefined;
 }
 
 export function readGit(cwd: string, args: string[]): string {

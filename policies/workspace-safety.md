@@ -14,6 +14,21 @@ Rules:
 - Record deliberate workflow deviations in `HANDOFF.md`.
 - Stop and ask the human if the issue brief is missing or inconsistent.
 
+## Worktree Cost
+
+Every worktree is a full checkout, and a dependency install inside it is often
+100k+ files. Each one costs disk, CPU for installs and builds, and on macOS,
+Spotlight indexing that can keep `mds_stores` busy for hours.
+
+- Create only the worktrees the task needs; prefer fewer slices.
+- Install dependencies in a slice worktree only when its checks or tests need
+  them; a slice that edits docs or config can skip the install.
+- Remove an issue's worktrees with `mahler cleanup <ISSUE>` once its PRs are
+  merged. It keeps branches and the issue brief, and refuses to remove a
+  worktree with uncommitted or untracked changes.
+- `mahler doctor` reports whether Spotlight is indexing the worktree root. The
+  fix (System Settings → Spotlight → Search Privacy) is the human's to make.
+
 ## Work Trees
 
 For parallel AI agent work, use git worktrees to run multiple branches simultaneously. Choose branch names using the branching policy and create only the repo worktrees needed for the task.

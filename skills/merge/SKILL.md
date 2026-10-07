@@ -25,7 +25,7 @@ description: Decide whether a reviewed PR may be merged by an agent, then merge 
 - forge PR inspection: `gh pr view`, `gh pr checks`, `gh pr diff`
 - forge merge without bypass flags: `gh pr merge <pr> --<method> --delete-branch`
 - Linear MCP `get_issue` and `get_project` for labels
-- `git fetch`, `git worktree remove`, `git branch -d` for post-merge cleanup
+- `mahler cleanup <ISSUE> --workspace <workspace>`, `git fetch`, and `git branch -d` for post-merge cleanup
 
 ## Expected Inputs
 
@@ -47,7 +47,8 @@ description: Decide whether a reviewed PR may be merged by an agent, then merge 
 4. When an agent merge is allowed, merge using the repo's merge method.
    Otherwise, hand the PR to the human with the assessment and continue with
    other work.
-5. Clean up and retarget stacked PRs per the merge policy.
+5. Clean up and retarget stacked PRs per the merge policy. When the issue's
+   last PR merges, run `mahler cleanup <ISSUE>`.
 6. Record the decision in `COMPOSITION.md` and the issue's `HANDOFF.md`.
 
 ## Required Outputs

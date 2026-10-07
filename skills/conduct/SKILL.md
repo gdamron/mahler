@@ -63,8 +63,10 @@ commit, handoff. Skip the rest; your parent owns them.
    When you split, each slice gets its own branch and worktree so parallel
    workers never share a working tree: `repos/<repo>` for the first slice in a
    repo, `repos/<repo>-<slice>` for the rest. A slice that depends on another
-   branches from it and becomes a stacked PR. Record the shape and the reason
-   in `HANDOFF.md`.
+   branches from it and becomes a stacked PR. Each extra worktree with its own
+   dependency install costs disk, CPU, and indexing (see the workspace-safety
+   policy), so a slice installs dependencies only when its checks need them.
+   Record the shape and the reason in `HANDOFF.md`.
 3. **Implement.** Do your own slice with the implement skill. For each
    delegated slice, use the delegate skill to pick the tier and write the
    brief: base profile `conductor`, `slice mode`, authority `edit`, allowed

@@ -31,8 +31,8 @@ other roles pick one.
   decides whether to launch a sub-agent and on which **model tier**: named
   per-install tiers (`models` overrides in `.harness/config.json`, listed in
   `.harness/MODELS.md`) map to a model and
-  reasoning effort per runtime, or hand a role to another skill or agent (for
-  example a cross-model review). `concurrency` caps parallel agents and heavy
+  reasoning effort per runtime, or hand a role to another skill, agent type, or
+  shell command (for example a Codex review of Claude's work). `concurrency` caps parallel agents and heavy
   commands, and `mahler capacity` reports machine load against them.
 - Merging is a Tier 2 action only the composer takes, and only once readiness
   checks pass. Labels in `merge.humanReviewLabels` (default `high-risk`) always

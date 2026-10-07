@@ -10,6 +10,7 @@ import {
   resolveModels,
   tierVariants,
 } from "../src/models.js";
+import { modelsMarkdown } from "../src/render.js";
 import { profileNames } from "../src/scaffold.js";
 
 test("default models config is consistent with the canonical profiles", () => {
@@ -160,4 +161,23 @@ test("modelOverrides is the minimal diff, and round-trips through resolveModels"
     profiles: { reviewer: { allowed: ["light", "native"] } },
   });
   assert.deepEqual(modelOverrides(defaults, native).tiers, { native: {} });
+});
+
+test("a command route pins nothing, gets no tier agent, and is validated", () => {
+  const command = "node companion.mjs review --wait --cwd <worktree> --base <base> | tee review.txt";
+  const models = resolveModels(defaultModels(), {
+    tiers: { "cross-check": { claude: { command }, codex: { model: "gpt-6.1-sol", effort: "high" } } },
+    profiles: { reviewer: { default: "cross-check", allowed: ["light", "cross-check"] } },
+  });
+  assert.equal(defaultModelFor(models, "reviewer", "claude"), undefined);
+  assert.deepEqual(tierVariants(models, "reviewer", "claude").map((v) => v.name), ["reviewer-light"]);
+  assert.deepEqual(modelConfigProblems(models, ["composer", "conductor", "reviewer"]), []);
+  const doc = modelsMarkdown(models, ["reviewer"]);
+  assert.ok(doc.includes("| `cross-check` | command: `node companion.mjs review --wait --cwd <worktree> --base <base> \\| tee review.txt` |"));
+  assert.match(doc, /cross-check: command \(see Tiers\)/);
+
+  models.tiers.bad = { claude: { command: "x", skill: "y", model: "opus" } };
+  const problems = modelConfigProblems(models, ["reviewer"]).join("\n");
+  assert.match(problems, /bad\.claude sets skill and command; pick one/);
+  assert.match(problems, /bad\.claude routes to a skill, which ignores model and effort/);
 });

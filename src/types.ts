@@ -41,16 +41,19 @@ export type Runtime = "codex" | "claude";
 
 /**
  * How one runtime executes a tier. `model`/`effort` tune a Mahler sub-agent;
- * unset fields inherit from the parent session. `skill` or `agent` hands the
- * role to something else instead: invoke that runtime skill (e.g.
- * `codex:review`) or launch that runtime agent type in place of the Mahler
- * profile's agent.
+ * unset fields inherit from the parent session. `skill`, `agent`, or `command`
+ * hands the role to something else instead: invoke that runtime skill, launch
+ * that runtime agent type in place of the Mahler profile's agent, or run that
+ * shell command (e.g. a Codex review through the Codex plugin's companion
+ * script) and treat its output as the role's result.
  */
 export interface TierChoice {
   model?: string;
   effort?: string;
   skill?: string;
   agent?: string;
+  /** Shell command; `<placeholders>` such as `<worktree>` and `<base>` are filled from the brief. */
+  command?: string;
 }
 
 export interface ModelsConfig {

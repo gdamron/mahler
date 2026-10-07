@@ -36,15 +36,21 @@ import { ensureDir, writeFileEnsured } from "../util.js";
 export function install(workspaceInput: string, flags: Flags): void {
   const workspace = resolve(workspaceInput);
   ensureDir(workspace);
-  // Merge labels, model tiers, and concurrency caps are human-tuned; a
-  // reinstall must not reset them.
+  // Human-tuned settings survive a reinstall: the Mahler command, worktree
+  // root, Linear filters (unless a flag sets them again), merge labels, model
+  // tiers, and concurrency caps.
   const previous = existsSync(configPath(workspace))
     ? loadConfig(workspace)
     : undefined;
+  const flagList = (key: string) =>
+    flags[key] === undefined ? undefined : listFlag(flags, key);
   const config = withInstallOptions(defaultConfig(workspace), {
     repos: withPreservedChecks(workspace, discoverRepos(workspace)),
-    acceptedAssignees: listFlag(flags, "linear-assignee"),
-    requiredLabels: listFlag(flags, "linear-label"),
+    mahlerCommand: previous?.mahlerCommand,
+    workspaceDir: previous?.workspaceDir,
+    acceptedAssignees:
+      flagList("linear-assignee") ?? previous?.linear.acceptedAssignees,
+    requiredLabels: flagList("linear-label") ?? previous?.linear.requiredLabels,
     merge: previous?.merge,
     models: previous?.models,
     concurrency: previous?.concurrency,

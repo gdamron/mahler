@@ -59,8 +59,8 @@ pause: stop and get explicit human confirmation for the specific action before
 proceeding. Mahler does not enforce this in code — the norm is the gate.
 
 When you work under a parent agent, ask the parent instead of the human. A
-composer may approve Tier 2 actions for its orchestrators and records each
-approval in `COMPOSITION.md`; an orchestrator or other sub-agent passes the
+composer may approve Tier 2 actions for its conductors and records each
+approval in `COMPOSITION.md`; a conductor or other sub-agent passes the
 request up rather than approving it. For merges, the composer's authority is
 bounded by the merge policy: labels and risk decide whether it may merge or
 must hand the PR to the human.

@@ -1,13 +1,15 @@
 {
   "name": "reviewer",
-  "description": "Reviews issue-scoped diffs and records findings.",
+  "description": "Read-only reviewer of an issue- or slice-scoped diff; reports findings to the conductor that launched it.",
   "allowedSkills": [
     "interview",
     "review",
     "handoff"
   ],
   "deniedSkills": [
-    "orchestrate",
+    "conduct",
+    "delegate",
+    "compose",
     "select-project-issue",
     "work-on-issue",
     "implement",

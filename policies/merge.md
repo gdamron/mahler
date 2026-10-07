@@ -2,8 +2,7 @@
 
 Merging a PR into a base branch is a Tier 2 action with a designated approver
 (see the judgment policy). The composer is the only agent that merges.
-Orchestrators and full-stack agents stop at a PR that is ready to merge and
-report a merge assessment; they merge only when the human explicitly asks for
+Conductors stop at a PR that is ready to merge and report a merge assessment; they merge only when the human explicitly asks for
 that specific PR.
 
 ## Who Decides
@@ -24,8 +23,8 @@ first rule that matches:
 3. **No matching label.** The composer judges risk with the rubric below. Low
    risk: the composer may merge. Anything else: the human decides.
 
-With no composer in the chain (a human tasked an orchestrator or full-stack
-agent directly), the human decides. The agent recommends, using the same
+With no composer in the chain (a human tasked a conductor directly), the human
+decides. The agent recommends, using the same
 assessment.
 
 ## Readiness
@@ -65,7 +64,7 @@ covering tests, and internal refactors fully covered by existing tests.
 
 ## Merge Assessment
 
-An orchestrator reports this for each PR, and the composer records its
+A conductor reports this for each PR, and the composer records its
 decision against it:
 
 ```md

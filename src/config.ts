@@ -1,6 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { HarnessConfig } from "./types.js";
+import { INHERIT_TIER, modelOverrides, resolveModels } from "./models.js";
+import type {
+  ConcurrencyConfig,
+  HarnessConfig,
+  ModelsConfig,
+  ModelsOverrides,
+} from "./types.js";
 
 export function defaultConfig(_workspace: string): HarnessConfig {
   return {
@@ -32,6 +38,8 @@ export function defaultConfig(_workspace: string): HarnessConfig {
       humanReviewLabels: ["high-risk"],
       agentMergeLabels: ["agent-merge"],
     },
+    models: defaultModels(),
+    concurrency: defaultConcurrency(),
     agents: {
       codex: {
         runtime: "codex",
@@ -39,10 +47,14 @@ export function defaultConfig(_workspace: string): HarnessConfig {
         role: "composer",
         skills: [
           "compose",
-          "orchestrate",
+          "conduct",
+          "delegate",
           "select-project-issue",
           "work-on-issue",
           "interview",
+          "implement",
+          "commit",
+          "review",
           "pr",
           "merge",
           "handoff",
@@ -69,10 +81,14 @@ export function defaultConfig(_workspace: string): HarnessConfig {
         role: "composer",
         skills: [
           "compose",
-          "orchestrate",
+          "conduct",
+          "delegate",
           "select-project-issue",
           "work-on-issue",
           "interview",
+          "implement",
+          "commit",
+          "review",
           "pr",
           "merge",
           "handoff",
@@ -97,6 +113,54 @@ export function defaultConfig(_workspace: string): HarnessConfig {
   };
 }
 
+/**
+ * Claude tiers use model aliases so they track the latest release. Profiles a
+ * human may talk to directly default to `inherit`, so the session keeps the
+ * model the human chose.
+ */
+export function defaultModels(): ModelsConfig {
+  return {
+    tiers: {
+      trivial: {
+        claude: { model: "haiku", effort: "high" },
+        codex: { model: "gpt-6-luna", effort: "high" },
+      },
+      light: {
+        claude: { model: "sonnet", effort: "high" },
+        codex: { model: "gpt-6.1-sol", effort: "medium" },
+      },
+      standard: {
+        claude: { model: "opus", effort: "medium" },
+        codex: { model: "gpt-6.1-sol", effort: "high" },
+      },
+      deep: {
+        claude: { model: "opus", effort: "high" },
+        codex: { model: "gpt-6-astra", effort: "high" },
+      },
+    },
+    profiles: {
+      composer: { default: INHERIT_TIER, allowed: [INHERIT_TIER] },
+      conductor: {
+        default: INHERIT_TIER,
+        allowed: [INHERIT_TIER, "trivial", "light", "standard", "deep"],
+      },
+      reviewer: {
+        default: "light",
+        allowed: ["trivial", "light", "standard", "deep"],
+      },
+    },
+  };
+}
+
+export function defaultConcurrency(): ConcurrencyConfig {
+  return {
+    maxIssueAgents: 3,
+    maxSliceAgents: 2,
+    maxHeavyCommands: 2,
+    loadPerCore: 0.8,
+  };
+}
+
 export function withInstallOptions(
   config: HarnessConfig,
   options: {
@@ -104,12 +168,16 @@ export function withInstallOptions(
     acceptedAssignees?: string[];
     requiredLabels?: string[];
     merge?: HarnessConfig["merge"];
+    models?: HarnessConfig["models"];
+    concurrency?: HarnessConfig["concurrency"];
   },
 ): HarnessConfig {
   return {
     ...config,
     repos: options.repos ?? config.repos,
     merge: options.merge ?? config.merge,
+    models: options.models ?? config.models,
+    concurrency: options.concurrency ?? config.concurrency,
     linear: {
       acceptedAssignees:
         options.acceptedAssignees ?? config.linear.acceptedAssignees,
@@ -139,7 +207,32 @@ export function loadConfig(workspace: string): HarnessConfig {
       agentMergeLabels:
         parsed.merge?.agentMergeLabels ?? defaults.merge.agentMergeLabels,
     },
+    models: resolveModels(defaults.models, parsed.models as ModelsOverrides | undefined),
+    concurrency: { ...defaults.concurrency, ...parsed.concurrency },
   };
+}
+
+/**
+ * The config as written to disk: `models` and `concurrency` keep only the
+ * install's changes to Mahler's defaults, so later default changes still
+ * reach this install. Entries equal to a default are dropped.
+ */
+export function serializeConfig(config: HarnessConfig): string {
+  const defaults = defaultConfig("");
+  const concurrency = Object.fromEntries(
+    Object.entries(config.concurrency).filter(
+      ([key, value]) => defaults.concurrency[key as keyof ConcurrencyConfig] !== value,
+    ),
+  );
+  return `${JSON.stringify(
+    {
+      ...config,
+      models: modelOverrides(defaults.models, config.models),
+      concurrency,
+    },
+    null,
+    2,
+  )}\n`;
 }
 
 /** Where an issue's brief (`meta`) and its repo worktrees (`worktreeRoot`) live. */

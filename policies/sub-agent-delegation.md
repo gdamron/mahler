@@ -1,6 +1,6 @@
 # Sub-Agent Delegation Policy
 
-Composer and orchestrator agents delegate scoped work to sub-agents through the
+Composer and conductor agents delegate scoped work to sub-agents through the
 native/runtime agent capabilities available in the current environment. Mahler
 does not launch sub-agents itself and does not provide `mahler subagent ...`
 commands.
@@ -14,16 +14,18 @@ authority.
 
 ```text
 human
-  └── composer            plans multiple issues; one orchestrator per issue; merges
-        └── orchestrator  owns one issue; one implementer per slice
-              ├── implementer  edits, commits, and pushes its slice branch
-              └── reviewer     read-only review of a finished slice
+  └── composer          plans multiple issues; one conductor per issue; merges
+        └── conductor   owns one issue; works directly by default
+              ├── conductor (slice mode)  edits, commits, and pushes one slice
+              └── reviewer                read-only review of a finished diff
 ```
 
-- A human may task any level directly. `full-stack` is the lowest-level agent a
-  human tasks directly: it runs the whole issue loop itself.
+- A human may task any level directly. A composer handed a single issue
+  conducts it itself rather than adding a layer.
+- Delegation is a tool, not a default: use the delegate skill to decide
+  whether a sub-agent earns its context cost, and which tier to launch it on.
 - Each agent reports to its parent. Escalations travel up one level at a time.
-- The orchestrator owns the issue's `HANDOFF.md`; the composer owns
+- The issue's conductor owns its `HANDOFF.md`; the composer owns
   `COMPOSITION.md`. Sub-agents report status and results to their parent
   rather than rewriting those records, but any agent may record its own
   workflow deviations (see the judgment policy).
@@ -34,7 +36,8 @@ human
 
 ## Role Selection
 
-- Prefer configured or predefined sub-agent roles by default.
+- Prefer configured or predefined sub-agent roles by default; the delegate
+  skill maps common needs to roles.
 - Choose the closest fitting configured role, then specialize it in the brief
   when the task needs narrower instructions.
 - Use an ad hoc role only when no configured role fits. The brief must state why
@@ -55,18 +58,41 @@ If edit authority is granted, the brief must state the exact allowed
 modification scope: repos, files, paths, command classes, and any protected
 areas. Standard grants by role:
 
-- **Implementer:** edit within its slice worktree, commit, and push its slice
-  branch. It does not open PRs, merge, force-push shared branches, or change
-  issue-tracker state.
+- **Conductor, slice mode (from a conductor):** edit within its slice
+  worktree, commit, and push its slice branch. It does not open PRs, merge,
+  force-push shared branches, change issue-tracker state, or delegate further.
 - **Reviewer:** read-only. It may run tests and checks to validate findings.
-- **Orchestrator (from a composer):** run the orchestrate skill for its one
-  issue, including launching implementers and reviewers and opening PRs.
+- **Conductor, issue mode (from a composer):** run the conduct skill for its
+  one issue, including launching slice conductors and reviewers and opening
+  PRs.
 
 Only the composer merges, under the merge policy; sub-agents never merge or
 bypass human review. For Tier 2 actions (see the
 judgment policy) it asks its parent. A composer may give Tier 2 go-ahead to its
-orchestrators; an orchestrator passes Tier 2 requests up to its own parent
+conductors; a conductor passes Tier 2 requests up to its own parent
 rather than approving them. Tier 3 boundaries always go to the human.
+
+## Model Tiers
+
+Each install defines named tiers (Mahler's defaults plus the `models`
+overrides in `.harness/config.json`, listed in `.harness/MODELS.md`): a
+model and reasoning effort per runtime, or a hand-off to another skill or agent
+(for example a cross-model review). Each profile has a default tier, baked into
+its generated agent definition, and a list of tiers a parent may pick per
+launch. Neither runtime reliably applies a launch-time effort (Claude's agent
+tool can't set one; Codex applies an agent's own settings over spawn values),
+so install generates a `<profile>-<tier>` agent for each other allowed tier. The parent picks with the delegate skill and records the
+tier and reason in the brief. A tier outside the profile's allowed list is a Tier 1
+deviation.
+
+## Concurrency
+
+Parallel agents share one machine. Caps live in `.harness/config.json` under
+`concurrency`; `mahler capacity` reports them with the current load. The
+top-level agent is responsible for the whole tree: it checks capacity before
+each wave, holds new launches and heavy commands while the machine is busy, and
+passes the relevant caps down in each brief. These are Tier 1 norms; raising a
+cap is a recorded deviation.
 
 ## Required Brief Fields
 
@@ -74,6 +100,8 @@ Every delegated task should start from a written brief with these fields:
 
 - Role: the sub-agent's role in this delegation.
 - Base configured role/profile: the predefined role/profile used, or `none`.
+- Agent and tier: the tier from `.harness/MODELS.md` (or the skill/agent it routes
+  to) and a one-line reason.
 - Specialization or ad hoc role description: narrower instructions, or the ad
   hoc role rationale when no configured role fits.
 - Objective: the concrete outcome requested.
@@ -95,6 +123,7 @@ Every delegated task should start from a written brief with these fields:
 
 - Role:
 - Base configured role/profile:
+- Agent and tier:
 - Specialization or ad hoc role description:
 - Objective:
 - Relevant context and links:

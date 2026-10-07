@@ -1,7 +1,7 @@
 # Mahler
 
 Mahler (as in Gustav, everyone's favorite composer/conductor) is a workflow
-tool for multi-agent software work. A composer agent coordinates orchestrator
+tool for multi-agent software work. A composer agent coordinates conductor
 agents, each owning one issue, under a human developer who stays the final
 accountable authority. It installs
 project-scoped instructions, policies, and helpers so agents can be prompted
@@ -22,12 +22,18 @@ other roles pick one.
   integration, merge, and release — not modeled as an agent.
 - Agents form a hierarchy: a **composer** (the default role and primary
   interface to the human) plans multi-issue work and dispatches one
-  **orchestrator** per issue; each orchestrator delegates slices to
-  **implementers** (which edit, commit, and push) and **reviewers** (read-only),
-  then opens the PRs. A **full-stack** agent is the lowest-level agent a human
-  tasks directly and runs the whole issue loop itself. Any agent may act
-  directly when warranted — delegation is the common case, not a capability
-  limit — and pauses at Tier 2 boundaries for its parent's go-ahead.
+  **conductor** per issue. A conductor does the work itself by default and
+  delegates slices to other conductors in **slice mode** only when the issue
+  spans repos, splits into parallel parts, or is too large for one PR. A
+  **reviewer** (read-only) reviews every diff. Agents pause at Tier 2
+  boundaries for their parent's go-ahead.
+- Delegation costs tokens, so it must earn its place. The `delegate` skill
+  decides whether to launch a sub-agent and on which **model tier**: named
+  per-install tiers (`models` overrides in `.harness/config.json`, listed in
+  `.harness/MODELS.md`) map to a model and
+  reasoning effort per runtime, or hand a role to another skill or agent (for
+  example a cross-model review). `concurrency` caps parallel agents and heavy
+  commands, and `mahler capacity` reports machine load against them.
 - Merging is a Tier 2 action only the composer takes, and only once readiness
   checks pass. Labels in `merge.humanReviewLabels` (default `high-risk`) always
   send a PR to the human; labels in `merge.agentMergeLabels` (default
@@ -66,6 +72,7 @@ mahler can codex commit --workspace /path/to/product-workspace
 mahler handoff FUG-123 --workspace /path/to/product-workspace --agent codex
 mahler decide --rule scope --reason "expanded to fix adjacent bug" --issue FUG-123 --agent codex --workspace /path/to/product-workspace
 mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue FUG-123 | --path <worktree>]
+mahler capacity --workspace /path/to/product-workspace
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project
@@ -83,6 +90,10 @@ worktree under the issue's `repos/` dir, including slice worktrees such as
 `repos/<repo>-<slice>`, and fails if there are none; with `--path` it checks a
 single worktree; otherwise it checks each source repo. It is feedback, not a gate — the
 forge/CI remains the Tier 3 authority.
+
+`mahler capacity` prints CPU cores, load average, and the `concurrency` caps
+from `.harness/config.json`, with an ok/busy verdict. Agents run it before
+launching parallel agents or heavy commands. Like `check`, it is advisory.
 
 `mahler decide` appends a note to the decisions ledger
 (`.harness/decisions/<YYYY-MM-DD>-<slug>.md`): the durable, cross-session record

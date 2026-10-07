@@ -27,7 +27,7 @@ description: Review an issue-scoped diff and report findings before handoff.
 
 - Existing issue brief and selected worktree
 - Diff or branch to review, and the base it should be compared against
-- When delegated: the reviewer brief from the orchestrator
+- When delegated: the reviewer brief from the conductor
 
 ## Required Outputs
 
@@ -35,7 +35,7 @@ description: Review an issue-scoped diff and report findings before handoff.
 - File and line references when available
 - A recommended fix for each finding when you have one
 - Updated `HANDOFF.md`, or, when delegated, findings reported to the
-  orchestrator that owns it (record your own workflow deviations in
+  conductor that owns it (record your own workflow deviations in
   `HANDOFF.md` either way)
 
 ## Stop Conditions

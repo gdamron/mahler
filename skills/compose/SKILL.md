@@ -1,13 +1,15 @@
 ---
 name: compose
-description: Plan a Linear project or set of issues, dispatch one orchestrator per issue, and synthesize their results for the human.
+description: Plan a Linear project or set of issues, dispatch one conductor per issue, and synthesize their results for the human.
 ---
 
 # Compose
 
 The composer is the human's primary interface for multi-issue work. It plans,
-dispatches orchestrators, answers their escalations, and reports synthesis. It
-does not write code; each issue's work belongs to that issue's orchestrator.
+dispatches conductors, answers their escalations, and reports synthesis. It
+does not write code; each issue's work belongs to that issue's conductor. Handed
+a single issue, the composer skips this skill and follows the conduct skill
+itself: one issue never needs a composer layer.
 
 ## Triggers
 
@@ -30,7 +32,8 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 - `mahler linear-template project`
 - `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
 - Linear MCP project and issue lookup
-- runtime-native agent launch for orchestrators (sub-agents, agent teams, or
+- `mahler capacity --workspace <workspace>`
+- runtime-native agent launch for conductors (sub-agents, agent teams, or
   headless sessions such as `claude -p` / `codex exec`)
 - read-only git, status, and diff commands across issue workspaces
 
@@ -55,33 +58,37 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 3. **Specify.** When an issue is underspecified, or issues share an interface,
    add a section under `Specifications` in `COMPOSITION.md` (clarified
    acceptance criteria, contracts between issues, non-goals) and point the
-   orchestrator brief at it. Use the interview skill with the human when the
+   conductor brief at it. Use the interview skill with the human when the
    plan has open questions that change scope.
-4. **Dispatch.** For each issue in the current wave, up to the concurrency cap
-   (default 3; adjust by judgment and record why), launch an orchestrator with
-   a sub-agent brief: base profile `orchestrator`, authority `edit`, objective
-   "carry `<ISSUE>` through the orchestrate skill to open, reviewed PRs",
+4. **Dispatch.** Run `mahler capacity --workspace <workspace>` before each wave. For each issue in the
+   current wave, up to `concurrency.maxIssueAgents` in `.harness/config.json`
+   (and none while capacity reports `busy`; raising the cap is a recorded
+   deviation), launch a conductor with a sub-agent brief built with the
+   delegate skill: base profile `conductor`, issue mode, a tier chosen from the
+   issue's risk and ambiguity, authority `edit`, objective
+   "carry `<ISSUE>` through the conduct skill to open, reviewed PRs", the
+   `maxSliceAgents` and `maxHeavyCommands` caps,
    context link to its `Specifications` section and the project's labels
-   (the orchestrator records them as `projectLabels`), results destination the
-   issue's `HANDOFF.md` plus a reply to the composer. Exactly one orchestrator
+   (the conductor records them as `projectLabels`), results destination the
+   issue's `HANDOFF.md` plus a reply to the composer. Exactly one conductor
    owns an issue at a time.
 5. **Choose an execution mode** and record it in `COMPOSITION.md`. Prefer
-   orchestrators that can launch their own sub-agents. If the runtime cannot
+   conductors that can launch their own sub-agents. If the runtime cannot
    nest agents that deep:
-   - launch orchestrators as independent top-level sessions (e.g. headless
+   - launch conductors as independent top-level sessions (e.g. headless
      `claude -p` or `codex exec` in the product workspace) and monitor them
      through their `HANDOFF.md`, or
-   - act as the orchestrator for each issue yourself: follow the orchestrate
-     skill per issue, launching implementers and reviewers directly and keeping
+   - act as the conductor for each issue yourself: follow the conduct
+     skill per issue, launching slice conductors and reviewers directly and keeping
      each issue's state in its own `HANDOFF.md`.
-6. **Monitor.** Track each orchestrator through its replies and
+6. **Monitor.** Track each conductor through its replies and
    `.harness/issues/<ISSUE>/HANDOFF.md`. Answer escalations:
-   - Tier 2 requests from orchestrators: the composer may approve or deny them
+   - Tier 2 requests from conductors: the composer may approve or deny them
      (see the judgment policy); log each approval in `COMPOSITION.md`.
    - Scope changes that affect other issues or the project goal, conflicts
-     between orchestrators, or an orchestrator blocked twice on the same
+     between conductors, or a conductor blocked twice on the same
      problem: escalate to the human.
-7. **Merge and advance waves.** When an orchestrator reports PRs ready to
+7. **Merge and advance waves.** When a conductor reports PRs ready to
    merge, use the merge skill: labels first, then readiness, then your own risk
    judgment. Merge what the merge policy allows (predecessors first for stacked
    PRs); hand everything else to the human with its assessment. Start
@@ -100,8 +107,8 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 - Composer: <agent>
 - Source: <Linear project URL or issue list>
 - Project labels: <labels, or none>
-- Execution mode: nested sub-agents | separate sessions | composer-as-orchestrator
-- Concurrency cap: 3
+- Execution mode: nested sub-agents | separate sessions | composer-as-conductor
+- Concurrency: <maxIssueAgents> issue agents (from `.harness/config.json`; note any override and why)
 
 ## Goal
 
@@ -109,7 +116,7 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 
 ## Plan
 
-| Wave | Issue | Title | Depends on | Repos | Orchestrator | Status | PRs | Merge |
+| Wave | Issue | Title | Depends on | Repos | Conductor (tier) | Status | PRs | Merge |
 |---|---|---|---|---|---|---|---|---|
 
 ## Specifications
@@ -137,7 +144,7 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 ## Required Outputs
 
 - A current `COMPOSITION.md` under `.harness/projects/<slug>/`
-- One orchestrator brief per dispatched issue
+- One conductor brief, with tier and reason, per dispatched issue
 - A synthesis report to the human
 - Workflow deviations recorded in the affected issue's `HANDOFF.md`, or in
   `COMPOSITION.md` when they span issues; a ledger note only when the reason
@@ -152,5 +159,5 @@ does not write code; each issue's work belongs to that issue's orchestrator.
 - a PR needs human review under the merge policy: hand it off and continue
   with other work
 - the plan requires scope beyond the requested project or issue set
-- orchestrators conflict over the same code and cannot be serialized without a
+- conductors conflict over the same code and cannot be serialized without a
   human decision

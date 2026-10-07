@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
+import { modelConfigProblems, tierVariants } from "../models.js";
 import {
   adapterRuntimes,
   installedPolicyNames,
@@ -106,6 +107,22 @@ export function doctor(workspaceInput: string): void {
     installedSkillNames(workspace),
   );
 
+  if (!existsSync(resolve(harness, "MODELS.md"))) {
+    results.push({
+      level: "error",
+      message: "missing .harness/MODELS.md — rerun mahler install",
+    });
+  }
+  const modelProblems = modelConfigProblems(
+    config.models,
+    installedProfileNames(workspace),
+  );
+  results.push(
+    ...(modelProblems.length === 0
+      ? [{ level: "ok" as const, message: "models config is consistent" }]
+      : modelProblems.map((message) => ({ level: "warn" as const, message }))),
+  );
+
   for (const profile of installedProfileNames(workspace)) {
     const path = resolve(harness, "agents", "profiles", `${profile}.json`);
     if (!existsSync(path)) {
@@ -173,6 +190,20 @@ export function doctor(workspaceInput: string): void {
       });
     } else {
       results.push({ level: "ok", message: `Claude agent ${profile} present` });
+    }
+    for (const [runtime, dir, ext] of [
+      ["codex", ".codex", ".toml"],
+      ["claude", ".claude", ".md"],
+    ] as const) {
+      for (const variant of tierVariants(config.models, profile, runtime)) {
+        const file = `${dir}/agents/${variant.name}${ext}`;
+        if (!existsSync(resolve(workspace, file))) {
+          results.push({
+            level: "error",
+            message: `missing tier agent: ${file} — rerun mahler install`,
+          });
+        }
+      }
     }
   }
 

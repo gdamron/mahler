@@ -126,6 +126,72 @@ Rules:
 is not installed. See `.harness/custom/README.md` (written on install) for a
 short in-tree reference.
 
+### Model tiers
+
+`models` in `.harness/config.json` controls which model and reasoning effort
+each agent runs on, per runtime. It holds only this install's **changes** to
+Mahler's defaults, so later default changes (a new model, say) still reach the
+install; reinstall keeps your changes and drops any entry identical to a
+default. `.harness/MODELS.md` (generated on install) shows the result.
+
+- `models.tiers.<tier>.<claude|codex>` sets `model` and/or `effort`; unset
+  fields inherit the parent session. An entry you write for a runtime replaces
+  that runtime's default entry; `null` removes a default tier or a runtime's
+  entry. Defaults:
+
+  | Tier | Claude | Codex |
+  |---|---|---|
+  | `trivial` | haiku, high | gpt-6-luna, high |
+  | `light` | sonnet, high | gpt-6.1-sol, medium |
+  | `standard` | opus, medium | gpt-6.1-sol, high |
+  | `deep` | opus, high | gpt-6-astra, high |
+
+- `inherit` is a reserved tier: run on the launching session's model. The
+  `composer` and `conductor` profiles default to it so a session keeps the
+  model the human picked; the `reviewer`, only ever a sub-agent, defaults to
+  `light`.
+- `models.profiles.<profile>` sets `default` (written into the generated agent
+  definition) and `allowed` (tiers a parent may pick per launch with the
+  `delegate` skill); either field replaces the default's, and `null` removes
+  the profile's tiers. Neither runtime reliably applies a launch-time effort
+  (Claude's agent tool can't set one; Codex applies an agent's own settings
+  over spawn values), so install also writes a `<profile>-<tier>` agent in
+  `.claude/agents/` and `.codex/agents/` for each other allowed tier (for
+  example `conductor-deep`), and parents pick a tier by agent name. Removing a
+  tier from `allowed` and reinstalling removes its agents. A tier entry left
+  empty for a runtime runs on the launching session's model there.
+- A tier may hand the role to something else instead of a model: `skill`
+  invokes a runtime skill, `agent` launches a runtime agent type. For example,
+  to route Claude reviews to Codex while Codex sessions review natively:
+
+  ```json
+  "tiers": {
+    "cross-check": {
+      "claude": { "skill": "codex:review" },
+      "codex": { "effort": "high" }
+    }
+  },
+  "profiles": {
+    "reviewer": { "default": "cross-check", "allowed": ["light", "standard", "cross-check"] }
+  }
+  ```
+
+  The tier applies only to profiles that list it, so no review-skill override
+  is needed.
+
+`mahler doctor` warns about undefined tiers and invalid effort values.
+
+### Concurrency
+
+`concurrency` in `.harness/config.json` caps parallel work on this machine (like
+`models`, it stores only your changes to the defaults):
+`maxIssueAgents` (conductors per composer), `maxSliceAgents` (slice conductors
+per conductor), `maxHeavyCommands` (full test suites, builds, or `mahler check`
+at once), and `loadPerCore` (the 1-minute load per core above which agents hold
+new work). `mahler capacity` prints the caps, the current load, and an
+ok/busy verdict; agents run it before launching parallel work. Reinstall
+preserves these values.
+
 ## Manual Dogfood Checklist
 
 Use this checklist when validating Mahler against a real Linear issue from a

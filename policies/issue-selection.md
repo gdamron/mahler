@@ -26,6 +26,6 @@ When a composer is asked to work on a Linear project or a set of issues:
    named issues are in scope as named).
 2. Order them by blockers, then priority, then oldest update/create timestamp,
    and group independent issues into waves in `COMPOSITION.md`.
-3. Dispatch one orchestrator per issue; each runs the normal issue workflow.
+3. Dispatch one conductor per issue; each runs the normal issue workflow.
 
 Do not create code changes directly from a project-level prompt.

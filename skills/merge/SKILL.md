@@ -7,7 +7,7 @@ description: Decide whether a reviewed PR may be merged by an agent, then merge 
 
 ## Triggers
 
-- an orchestrator reports a PR ready to merge
+- a conductor reports a PR ready to merge
 - "merge the PRs for this wave"
 - "merge PR #123"
 
@@ -31,7 +31,7 @@ description: Decide whether a reviewed PR may be merged by an agent, then merge 
 
 - PR URL and the issue brief under `.harness/issues/<ISSUE>/`, including the
   issue's `labels` and `projectLabels`
-- The orchestrator's merge assessment
+- The conductor's merge assessment
 - `merge.humanReviewLabels` and `merge.agentMergeLabels` from
   `.harness/config.json`
 
@@ -39,7 +39,7 @@ description: Decide whether a reviewed PR may be merged by an agent, then merge 
 
 1. Confirm the issue and project labels with Linear MCP (they may have changed
    since the brief) and apply the merge policy's decision order.
-2. Verify every readiness item yourself; do not rely only on the orchestrator's
+2. Verify every readiness item yourself; do not rely only on the conductor's
    assessment.
 3. If there is no matching label, apply the risk rubric independently. With an
    agent-merge label, skip the rubric, but still hand the PR to the human if

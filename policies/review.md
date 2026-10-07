@@ -4,10 +4,12 @@ Review work focuses on correctness, regressions, missing tests, and workflow ris
 
 Review a local diff and report findings before creating a pull request. This
 applies to review between agents and self-review. Always perform a local review
-before opening a pull request. An orchestrator sends every slice to a reviewer
-sub-agent that did not write it. A full-stack agent self-reviews and should also
-use a reviewer sub-agent when the runtime allows; skipping that is a recorded
-deviation. Human sign-off is expected before merge.
+before opening a pull request. A conductor self-reviews and sends every slice
+to a reviewer sub-agent that did not write it; skipping that is a recorded
+deviation. The delegate skill picks the reviewer's tier, which may route to a
+cross-model review skill; its findings are translated into the format below.
+Merging follows the merge policy: a composer may merge the PRs it allows, and
+everything else waits for human sign-off.
 
 When reviewing:
 

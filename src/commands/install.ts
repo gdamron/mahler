@@ -1,16 +1,19 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Flags, listFlag } from "../args.js";
 import {
   configPath,
   defaultConfig,
   loadConfig,
+  serializeConfig,
   withInstallOptions,
 } from "../config.js";
+import { agentNameCollisions, defaultModelFor, tierVariants } from "../models.js";
 import { parseProfileSource } from "../profiles.js";
 import {
   claudeAgentDefinition,
   codexAgentDefinition,
+  modelsMarkdown,
   nativeAdapter,
   rootAgentBlock,
   workflowMarkdown,
@@ -33,15 +36,28 @@ import { ensureDir, writeFileEnsured } from "../util.js";
 export function install(workspaceInput: string, flags: Flags): void {
   const workspace = resolve(workspaceInput);
   ensureDir(workspace);
+  // Merge labels, model tiers, and concurrency caps are human-tuned; a
+  // reinstall must not reset them.
+  const previous = existsSync(configPath(workspace))
+    ? loadConfig(workspace)
+    : undefined;
   const config = withInstallOptions(defaultConfig(workspace), {
     repos: withPreservedChecks(workspace, discoverRepos(workspace)),
     acceptedAssignees: listFlag(flags, "linear-assignee"),
     requiredLabels: listFlag(flags, "linear-label"),
-    // Merge labels decide who may merge; a reinstall must not reset them.
-    merge: existsSync(configPath(workspace))
-      ? loadConfig(workspace).merge
-      : undefined,
+    merge: previous?.merge,
+    models: previous?.models,
+    concurrency: previous?.concurrency,
   });
+  // Fail before writing anything: a tier agent and a profile sharing a name
+  // would overwrite each other.
+  const collisions = agentNameCollisions(
+    config.models,
+    installedProfileNames(workspace),
+  );
+  if (collisions.length > 0) {
+    throw new Error(`Cannot install: ${collisions.join("; ")}.`);
+  }
   ensureDir(resolve(workspace, ".harness", "policies"));
   ensureDir(resolve(workspace, ".harness", "agents", "profiles"));
   ensureDir(resolve(workspace, ".harness", "decisions"));
@@ -63,7 +79,7 @@ export function install(workspaceInput: string, flags: Flags): void {
   );
   writeFileEnsured(
     resolve(workspace, ".harness", "config.json"),
-    `${JSON.stringify(config, null, 2)}\n`,
+    serializeConfig(config),
   );
   writeFileEnsured(
     resolve(workspace, ".harness", "README.md"),
@@ -82,6 +98,7 @@ export function install(workspaceInput: string, flags: Flags): void {
       withProvenance(source, source.content),
     );
   }
+  pruneStaleSkills(workspace, installedSkillNames(workspace));
   for (const skill of installedSkillNames(workspace)) {
     const source = readSkillSource(workspace, skill);
     assertSkillWellFormed(source, skill);
@@ -98,7 +115,17 @@ export function install(workspaceInput: string, flags: Flags): void {
       body,
     );
   }
-  for (const profile of installedProfileNames(workspace)) {
+  const profiles = installedProfileNames(workspace);
+  const variantsFor = (runtime: "codex" | "claude", profile: string) =>
+    tierVariants(config.models, profile, runtime);
+  const agentNames = (runtime: "codex" | "claude") => [
+    ...profiles,
+    ...profiles.flatMap((profile) =>
+      variantsFor(runtime, profile).map((variant) => variant.name),
+    ),
+  ];
+  pruneStaleProfiles(workspace, profiles, agentNames("codex"), agentNames("claude"));
+  for (const profile of profiles) {
     const source = readProfileSource(workspace, profile);
     const parsed = parseProfileSource(source, profile);
     writeFileEnsured(
@@ -107,13 +134,35 @@ export function install(workspaceInput: string, flags: Flags): void {
     );
     writeFileEnsured(
       resolve(workspace, ".codex", "agents", `${profile}.toml`),
-      codexAgentDefinition(parsed),
+      codexAgentDefinition(
+        parsed,
+        defaultModelFor(config.models, profile, "codex"),
+      ),
     );
     writeFileEnsured(
       resolve(workspace, ".claude", "agents", `${profile}.md`),
-      claudeAgentDefinition(parsed),
+      claudeAgentDefinition(
+        parsed,
+        defaultModelFor(config.models, profile, "claude"),
+      ),
     );
+    for (const variant of variantsFor("codex", profile)) {
+      writeFileEnsured(
+        resolve(workspace, ".codex", "agents", `${variant.name}.toml`),
+        codexAgentDefinition(parsed, undefined, variant),
+      );
+    }
+    for (const variant of variantsFor("claude", profile)) {
+      writeFileEnsured(
+        resolve(workspace, ".claude", "agents", `${variant.name}.md`),
+        claudeAgentDefinition(parsed, undefined, variant),
+      );
+    }
   }
+  writeFileEnsured(
+    resolve(workspace, ".harness", "MODELS.md"),
+    modelsMarkdown(config.models, profiles),
+  );
   for (const runtime of adapterRuntimes()) {
     ensureDir(resolve(workspace, ".harness", "agents", runtime));
     writeFileEnsured(
@@ -131,6 +180,56 @@ export function install(workspaceInput: string, flags: Flags): void {
     console.log(
       "No Linear assignee filter configured. Add one with --linear-assignee <username> or edit .harness/config.json.",
     );
+  }
+}
+
+/**
+ * Remove artifacts for profiles and Claude tier variants that no longer exist
+ * (e.g. after a rename or a tier change), so stale agent definitions don't
+ * linger in every parent's agent list. Native agent files are removed only
+ * when Mahler generated them.
+ */
+function pruneStaleProfiles(
+  workspace: string,
+  profiles: string[],
+  codexAgents: string[],
+  claudeAgents: string[],
+): void {
+  const stale = (dir: string, ext: string, generatedOnly: boolean, keep = profiles) => {
+    if (!existsSync(dir)) return;
+    for (const file of readdirSync(dir)) {
+      if (!file.endsWith(ext) || keep.includes(file.slice(0, -ext.length)))
+        continue;
+      const path = resolve(dir, file);
+      if (generatedOnly && !readFileSync(path, "utf8").includes("Generated by Mahler"))
+        continue;
+      rmSync(path);
+    }
+  };
+  stale(resolve(workspace, ".harness", "agents", "profiles"), ".json", false);
+  stale(resolve(workspace, ".codex", "agents"), ".toml", true, codexAgents);
+  stale(resolve(workspace, ".claude", "agents"), ".md", true, claudeAgents);
+}
+
+/**
+ * Remove generated skills that are no longer installed (e.g. `orchestrate`
+ * after it became `conduct`), so neither runtime can still discover them.
+ * Hand-written skills, which lack Mahler's generated marker, are left alone.
+ */
+function pruneStaleSkills(workspace: string, skills: string[]): void {
+  for (const root of [".agents", ".claude"]) {
+    const dir = resolve(workspace, root, "skills");
+    if (!existsSync(dir)) continue;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || skills.includes(entry.name)) continue;
+      const skillFile = resolve(dir, entry.name, "SKILL.md");
+      if (!existsSync(skillFile)) continue;
+      if (!readFileSync(skillFile, "utf8").includes("Generated by Mahler")) continue;
+      rmSync(skillFile);
+      if (readdirSync(resolve(dir, entry.name)).length === 0) {
+        rmSync(resolve(dir, entry.name), { recursive: true });
+      }
+    }
   }
 }
 

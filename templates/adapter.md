@@ -9,7 +9,7 @@ When the user asks to work on a Linear issue or project, including bare prompts 
 1. Read `WORKFLOW.md`.
 2. Read `.harness/config.json` to identify the active {{runtimeLabel}} profile.
 3. Read that profile under `.harness/agents/profiles/`.
-4. For `work on ISSUE-123`: an orchestrator uses `{{skillsDir}}/orchestrate/SKILL.md`, which starts with `{{skillsDir}}/work-on-issue/SKILL.md`; any other role uses `{{skillsDir}}/work-on-issue/SKILL.md` directly.
+4. For `work on ISSUE-123`: use `{{skillsDir}}/conduct/SKILL.md`, which starts with `{{skillsDir}}/work-on-issue/SKILL.md`. Before launching any sub-agent, use `{{skillsDir}}/delegate/SKILL.md` to pick the agent and model tier.
 5. For project or multi-issue prompts: a composer uses `{{skillsDir}}/compose/SKILL.md` to plan every eligible issue; any other role uses `{{skillsDir}}/select-project-issue/SKILL.md` to pick one.
 6. Read every policy named by the selected skill from `.harness/policies/`.
 7. Use Linear MCP for issue or project details.

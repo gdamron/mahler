@@ -102,6 +102,15 @@ test("install pins default tiers, and reinstall preserves human-set models and c
   assert.match(reviewer, /^model: sonnet\neffort: high$/m);
   const codexReviewer = readFileSync(resolve(workspace, ".codex", "agents", "reviewer.toml"), "utf8");
   assert.match(codexReviewer, /^model_reasoning_effort = "medium"$/m);
+  // Claude can't set effort at launch, so other allowed tiers get their own agent.
+  const deep = readFileSync(resolve(workspace, ".claude", "agents", "conductor-deep.md"), "utf8");
+  assert.match(deep, /^---\nname: conductor-deep\ndescription: conductor at the deep tier \(opus, medium effort\)/);
+  assert.match(deep, /^model: opus\neffort: medium$/m);
+  assert.match(deep, /# Mahler conductor Profile/);
+  assert.match(deep, /Mahler conductor profile/);
+  assert.equal(existsSync(resolve(workspace, ".claude", "agents", "reviewer-light.md")), true);
+  // Codex sets effort per spawn: no variants.
+  assert.equal(existsSync(resolve(workspace, ".codex", "agents", "conductor-deep.toml")), false);
 
   const configFile = resolve(workspace, ".harness", "config.json");
   const config = JSON.parse(readFileSync(configFile, "utf8"));
@@ -123,6 +132,10 @@ test("install pins default tiers, and reinstall preserves human-set models and c
   assert.doesNotMatch(rerendered, /^(model|effort):/m);
   const codexAfter = readFileSync(resolve(workspace, ".codex", "agents", "reviewer.toml"), "utf8");
   assert.match(codexAfter, /^model_reasoning_effort = "high"$/m);
+  // Tiers dropped from reviewer's allowed list lose their variants; light remains.
+  assert.equal(existsSync(resolve(workspace, ".claude", "agents", "reviewer-deep.md")), false);
+  assert.equal(existsSync(resolve(workspace, ".claude", "agents", "reviewer-light.md")), true);
+  assert.equal(existsSync(resolve(workspace, ".claude", "agents", "reviewer-cross-check.md")), false);
 });
 
 test("reinstall removes generated artifacts for profiles that no longer exist", () => {

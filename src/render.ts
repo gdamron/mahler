@@ -1,4 +1,5 @@
 import { renderTemplate } from "./templates.js";
+import type { TierVariant } from "./models.js";
 import type {
   AgentName,
   HarnessConfig,
@@ -189,17 +190,26 @@ ${agentInstructions(profile, "codex")}"""
 `;
 }
 
-/** `model` pins the profile's default tier; parents may override it per launch. */
+/**
+ * `model` pins the profile's default tier. With `variant`, renders that tier's
+ * definition instead (`<profile>-<tier>`), since Claude can't set effort per
+ * launch.
+ */
 export function claudeAgentDefinition(
   profile: InstalledProfile,
   model?: TierChoice,
+  variant?: TierVariant,
 ): string {
+  const pinned = variant?.choice ?? model;
   return renderTemplate("claude-agent", {
-    name: profile.name,
-    description: profileDescription(profile),
+    name: variant?.name ?? profile.name,
+    profile: profile.name,
+    description: variant
+      ? `${profile.name} at the ${variant.tier} tier (${tierSummary(variant.choice)}). Same role and instructions as ${profile.name}; launch it when the delegate skill picks this tier.`
+      : profileDescription(profile),
     modelLines: [
-      model?.model ? `model: ${model.model}\n` : "",
-      model?.effort ? `effort: ${model.effort}\n` : "",
+      pinned?.model ? `model: ${pinned.model}\n` : "",
+      pinned?.effort ? `effort: ${pinned.effort}\n` : "",
     ].join(""),
     instructions: agentInstructions(profile, "claude").trimEnd(),
   });
@@ -226,6 +236,12 @@ export function launchCommand(
     return `claude --add-dir ${shell(metadataPath)} ${shell(repoPath)}`;
   }
   return `<launch ${agent} in ${repoPath} with metadata dir ${metadataPath}>`;
+}
+
+function tierSummary(choice: TierChoice): string {
+  return [choice.model, choice.effort && `${choice.effort} effort`]
+    .filter(Boolean)
+    .join(", ");
 }
 
 function profileDescription(profile: InstalledProfile): string {

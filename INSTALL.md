@@ -132,10 +132,19 @@ short in-tree reference.
 each agent runs on, per runtime. Reinstall preserves it.
 
 - `models.tiers.<tier>.<claude|codex>` sets `model` and/or `effort`; unset
-  fields inherit the parent session. Defaults: `light` (Claude haiku; Codex
-  low effort), `standard` (sonnet, high; Codex medium), `deep` (opus, medium;
-  Codex high). Codex tiers inherit the session model; add `model` to route a
-  tier to a smaller Codex model.
+  fields inherit the parent session. Defaults:
+
+  | Tier | Claude | Codex |
+  |---|---|---|
+  | `trivial` | haiku, high | gpt-6-luna, high |
+  | `light` | sonnet, high | gpt-6.1-sol, medium |
+  | `standard` | opus, medium | gpt-6.1-sol, high |
+  | `deep` | opus, high | gpt-6-astra, high |
+
+- `inherit` is a reserved tier: run on the launching session's model. The
+  `composer` and `conductor` profiles default to it so a session keeps the
+  model the human picked; the `reviewer`, only ever a sub-agent, defaults to
+  `light`.
 - `models.profiles.<profile>` sets `default` (written into the generated agent
   definition) and `allowed` (tiers a parent may pick per launch with the
   `delegate` skill). Codex sets model and effort on each spawn, so it needs one

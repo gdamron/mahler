@@ -101,14 +101,28 @@ test("install pins default tiers, and reinstall preserves human-set models and c
   const reviewer = readFileSync(resolve(workspace, ".claude", "agents", "reviewer.md"), "utf8");
   assert.match(reviewer, /^model: sonnet\neffort: high$/m);
   const codexReviewer = readFileSync(resolve(workspace, ".codex", "agents", "reviewer.toml"), "utf8");
-  assert.match(codexReviewer, /^model_reasoning_effort = "medium"$/m);
+  assert.match(codexReviewer, /^model = "gpt-6\.1-sol"\nmodel_reasoning_effort = "medium"$/m);
+  // Agents a human talks to keep the session's model.
+  for (const profile of ["composer", "conductor"]) {
+    const claude = readFileSync(resolve(workspace, ".claude", "agents", `${profile}.md`), "utf8");
+    assert.match(claude, /^model: inherit\n---$/m);
+    assert.doesNotMatch(claude, /^effort:/m);
+    const codex = readFileSync(resolve(workspace, ".codex", "agents", `${profile}.toml`), "utf8");
+    assert.doesNotMatch(codex, /^model/m);
+  }
   // Claude can't set effort at launch, so other allowed tiers get their own agent.
   const deep = readFileSync(resolve(workspace, ".claude", "agents", "conductor-deep.md"), "utf8");
-  assert.match(deep, /^---\nname: conductor-deep\ndescription: conductor at the deep tier \(opus, medium effort\)/);
-  assert.match(deep, /^model: opus\neffort: medium$/m);
+  assert.match(deep, /^---\nname: conductor-deep\ndescription: conductor at the deep tier \(opus, high effort\)/);
+  assert.match(deep, /^model: opus\neffort: high$/m);
+  for (const tier of ["trivial", "light", "standard"]) {
+    assert.equal(existsSync(resolve(workspace, ".claude", "agents", `conductor-${tier}.md`)), true);
+  }
+  assert.equal(existsSync(resolve(workspace, ".claude", "agents", "conductor-inherit.md")), false);
   assert.match(deep, /# Mahler conductor Profile/);
   assert.match(deep, /Mahler conductor profile/);
-  assert.equal(existsSync(resolve(workspace, ".claude", "agents", "reviewer-light.md")), true);
+  // The default tier is the base agent, so it gets no variant of its own.
+  assert.equal(existsSync(resolve(workspace, ".claude", "agents", "reviewer-light.md")), false);
+  assert.equal(existsSync(resolve(workspace, ".claude", "agents", "reviewer-trivial.md")), true);
   // Codex sets effort per spawn: no variants.
   assert.equal(existsSync(resolve(workspace, ".codex", "agents", "conductor-deep.toml")), false);
 

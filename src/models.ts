@@ -3,8 +3,27 @@ import type { TierChoice, ModelsConfig, Runtime } from "./types.js";
 /** Reasoning-effort values each runtime accepts in agent definitions and spawn calls. */
 export const effortValues: Record<Runtime, string[]> = {
   claude: ["low", "medium", "high", "xhigh", "max"],
-  codex: ["minimal", "low", "medium", "high", "xhigh"],
+  codex: ["minimal", "low", "medium", "high", "xhigh", "max", "ultra"],
 };
+
+/**
+ * Reserved tier: run on the launching session's model. Profiles a human may
+ * talk to directly default to it, so a pinned model never overrides the
+ * human's choice.
+ */
+export const INHERIT_TIER = "inherit";
+
+/** A tier's entry for `runtime`, with `inherit` resolved to "pin nothing" (Claude: `model: inherit`). */
+export function tierChoice(
+  models: ModelsConfig,
+  tier: string,
+  runtime: Runtime,
+): TierChoice | undefined {
+  if (tier === INHERIT_TIER) {
+    return runtime === "claude" ? { model: "inherit" } : {};
+  }
+  return models.tiers[tier]?.[runtime];
+}
 
 /**
  * The model and effort a profile's generated agent definition pins for
@@ -17,7 +36,7 @@ export function defaultModelFor(
   runtime: Runtime,
 ): TierChoice | undefined {
   const tier = models.profiles[profile]?.default;
-  const choice = tier ? models.tiers[tier]?.[runtime] : undefined;
+  const choice = tier ? tierChoice(models, tier, runtime) : undefined;
   if (!choice || choice.skill || choice.agent) return undefined;
   return { model: choice.model, effort: choice.effort };
 }
@@ -46,7 +65,7 @@ export function claudeTierVariants(
   return (tiers.allowed ?? [])
     .filter((tier) => tier !== tiers.default)
     .flatMap((tier) => {
-      const choice = models.tiers[tier]?.claude;
+      const choice = tierChoice(models, tier, "claude");
       if (!choice || choice.skill || choice.agent) return [];
       if (!choice.model && !choice.effort) return [];
       if (choice.model === base?.model && choice.effort === base?.effort) return [];
@@ -60,6 +79,9 @@ export function modelConfigProblems(
   profiles: string[],
 ): string[] {
   const problems: string[] = [];
+  if (models.tiers[INHERIT_TIER]) {
+    problems.push(`models.tiers.${INHERIT_TIER} is reserved: it means "use the launching session's model"`);
+  }
   for (const [tier, runtimes] of Object.entries(models.tiers)) {
     for (const [runtime, choice] of Object.entries(runtimes ?? {})) {
       const allowed = effortValues[runtime as Runtime];
@@ -89,7 +111,7 @@ export function modelConfigProblems(
       problems.push(`models.profiles.${profile} names no installed profile`);
     }
     for (const tier of new Set([tiers.default, ...(tiers.allowed ?? [])])) {
-      if (!models.tiers[tier]) {
+      if (tier !== INHERIT_TIER && !models.tiers[tier]) {
         problems.push(`models.profiles.${profile} uses undefined tier "${tier}"`);
       }
     }

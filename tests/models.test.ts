@@ -11,10 +11,17 @@ test("default models config is consistent with the canonical profiles", () => {
 
 test("defaultModelFor pins model and effort, but not skill or agent routes", () => {
   const models = defaultModels();
-  assert.deepEqual(defaultModelFor(models, "conductor", "claude"), {
+  assert.deepEqual(defaultModelFor(models, "reviewer", "claude"), {
     model: "sonnet",
     effort: "high",
   });
+  assert.deepEqual(defaultModelFor(models, "reviewer", "codex"), {
+    model: "gpt-6.1-sol",
+    effort: "medium",
+  });
+  // Profiles a human talks to inherit the session's model.
+  assert.equal(defaultModelFor(models, "conductor", "claude")?.model, "inherit");
+  assert.equal(defaultModelFor(models, "composer", "codex")?.model, undefined);
   models.tiers.cross = { claude: { skill: "codex:review" } };
   models.profiles.reviewer = { default: "cross", allowed: ["cross"] };
   assert.equal(defaultModelFor(models, "reviewer", "claude"), undefined);
@@ -26,8 +33,10 @@ test("claudeTierVariants covers each other allowed tier that pins a model or eff
   assert.deepEqual(
     claudeTierVariants(models, "conductor").map((v) => [v.name, v.choice]),
     [
-      ["conductor-light", { model: "haiku", effort: undefined }],
-      ["conductor-deep", { model: "opus", effort: "medium" }],
+      ["conductor-trivial", { model: "haiku", effort: "high" }],
+      ["conductor-light", { model: "sonnet", effort: "high" }],
+      ["conductor-standard", { model: "opus", effort: "medium" }],
+      ["conductor-deep", { model: "opus", effort: "high" }],
     ],
   );
   // Composer allows only its default tier.
@@ -35,17 +44,22 @@ test("claudeTierVariants covers each other allowed tier that pins a model or eff
   // Skill routes and tiers identical to the default get no definition.
   models.tiers.cross = { claude: { skill: "codex:review" } };
   models.tiers.same = { claude: { model: "sonnet", effort: "high" } };
-  models.profiles.reviewer.allowed = ["standard", "cross", "same", "deep"];
-  assert.deepEqual(claudeTierVariants(models, "reviewer").map((v) => v.name), ["reviewer-deep"]);
+  models.profiles.reviewer.allowed = ["light", "cross", "same", "deep", "inherit"];
+  assert.deepEqual(
+    claudeTierVariants(models, "reviewer").map((v) => [v.name, v.choice.model]),
+    [["reviewer-deep", "opus"], ["reviewer-inherit", "inherit"]],
+  );
 });
 
 test("modelConfigProblems flags bad efforts, undefined tiers, and mixed routes", () => {
   const models = defaultModels();
-  models.tiers.light.codex = { effort: "max" };
+  models.tiers.light.codex = { effort: "turbo" };
+  models.tiers.inherit = { claude: { model: "opus" } };
   models.tiers.odd = { claude: { skill: "codex:review", model: "opus" } };
   models.profiles.reviewer = { default: "missing", allowed: ["light"] };
   const problems = modelConfigProblems(models, profileNames()).join("\n");
-  assert.match(problems, /light\.codex\.effort "max"/);
+  assert.match(problems, /light\.codex\.effort "turbo"/);
+  assert.match(problems, /models\.tiers\.inherit is reserved/);
   assert.match(problems, /ignores model and effort/);
   assert.match(problems, /undefined tier "missing"/);
   assert.match(problems, /not in its allowed list/);

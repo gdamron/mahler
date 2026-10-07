@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { INHERIT_TIER } from "./models.js";
 import type {
   ConcurrencyConfig,
   HarnessConfig,
@@ -106,35 +107,39 @@ export function defaultConfig(_workspace: string): HarnessConfig {
 }
 
 /**
- * Claude tiers use model aliases so they track the latest release. Codex tiers
- * set effort only and inherit the session model; add `model` per tier to route
- * Codex to a smaller model.
+ * Claude tiers use model aliases so they track the latest release. Profiles a
+ * human may talk to directly default to `inherit`, so the session keeps the
+ * model the human chose.
  */
 export function defaultModels(): ModelsConfig {
   return {
     tiers: {
+      trivial: {
+        claude: { model: "haiku", effort: "high" },
+        codex: { model: "gpt-6-luna", effort: "high" },
+      },
       light: {
-        claude: { model: "haiku" },
-        codex: { effort: "low" },
+        claude: { model: "sonnet", effort: "high" },
+        codex: { model: "gpt-6.1-sol", effort: "medium" },
       },
       standard: {
-        claude: { model: "sonnet", effort: "high" },
-        codex: { effort: "medium" },
+        claude: { model: "opus", effort: "medium" },
+        codex: { model: "gpt-6.1-sol", effort: "high" },
       },
       deep: {
-        claude: { model: "opus", effort: "medium" },
-        codex: { effort: "high" },
+        claude: { model: "opus", effort: "high" },
+        codex: { model: "gpt-6-astra", effort: "high" },
       },
     },
     profiles: {
-      composer: { default: "deep", allowed: ["deep"] },
+      composer: { default: INHERIT_TIER, allowed: [INHERIT_TIER] },
       conductor: {
-        default: "standard",
-        allowed: ["light", "standard", "deep"],
+        default: INHERIT_TIER,
+        allowed: [INHERIT_TIER, "trivial", "light", "standard", "deep"],
       },
       reviewer: {
-        default: "standard",
-        allowed: ["light", "standard", "deep"],
+        default: "light",
+        allowed: ["trivial", "light", "standard", "deep"],
       },
     },
   };

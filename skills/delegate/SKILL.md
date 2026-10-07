@@ -49,14 +49,20 @@ check, or a one-file fix almost never earns a sub-agent.
 Tiers are defined per install in `.harness/config.json` under `models`:
 `models.tiers` maps each tier to a model and effort per runtime, and
 `models.profiles.<profile>` names the default tier and the tiers you may pick.
-The generated agent definition already uses the default; you only act when you
-pick a different tier. With the default config:
+With the default config:
 
 | Tier | Claude | Codex | Use for |
 |---|---|---|---|
-| `light` | haiku | low effort | lookups, search, summarizing logs, fully specified mechanical edits, docs-only review |
-| `standard` | sonnet, high effort | medium effort | well-specified implementation that follows existing patterns, routine review, fixing accepted findings |
-| `deep` | opus, medium effort | high effort | ambiguous or underspecified work, cross-repo interfaces, security, concurrency, data migrations, unknown-cause debugging, review of high-risk PRs |
+| `trivial` | haiku, high | gpt-6-luna, high | lookups, search, summarizing logs, fully specified mechanical edits (renames, formatting) |
+| `light` | sonnet, high | gpt-6.1-sol, medium | well-specified implementation that follows existing patterns, routine review, fixing accepted findings |
+| `standard` | opus, medium | gpt-6.1-sol, high | work that needs judgment: design choices inside one repo, moderate ambiguity, debugging with a likely cause |
+| `deep` | opus, high | gpt-6-astra, high | underspecified work, cross-repo interfaces, security, concurrency, data migrations, unknown-cause debugging, review of high-risk PRs |
+
+`inherit` is a reserved tier: the sub-agent runs on your own model and effort.
+Profiles a human may talk to directly (`composer`, `conductor`) default to it,
+so a session keeps the model the human chose. When you launch one of them as a
+sub-agent, name a tier anyway: leaving it at `inherit` silently copies your
+model, which is usually more than the work needs.
 
 Effort and model trade differently. Raise **effort** on a mid-size model when
 the work is clear but must be careful and thorough. Choose the **larger model**
@@ -65,8 +71,9 @@ reading intent from sparse context.
 
 Rules of thumb:
 
-- Start at the profile's default. Go below it only when the work is plainly
-  mechanical; go above it only for the `deep` signals above.
+- Start at `light` for well-specified work and `standard` when it needs
+  judgment; drop to `trivial` only when the work is plainly mechanical, and go
+  to `deep` only for the signals above. The reviewer defaults to `light`.
 - Escalate one tier after a failed attempt, after a second review round with
   substantive (non-style) findings, or when the sub-agent reports the task is
   ambiguous. Say why in the brief.
@@ -84,7 +91,7 @@ Read the chosen tier's entry for your runtime, `models.tiers.<tier>.<runtime>`:
 - `model` / `effort`, in **Claude**: launch the agent named for the tier.
   The default tier is the profile's own agent (`conductor`); each other
   allowed tier has a generated definition named `<profile>-<tier>`
-  (`conductor-deep`, `reviewer-light`) that pins its model and effort.
+  (`conductor-standard`, `reviewer-deep`) that pins its model and effort.
   Claude's agent tool can't set effort at launch, so never fake a tier by
   passing only a model override.
 - `model` / `effort`, in **Codex**: spawn the profile's agent and pass the

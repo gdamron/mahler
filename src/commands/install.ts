@@ -91,12 +91,6 @@ export function install(workspaceInput: string, flags: Flags): void {
     resolve(workspace, ".harness", "config.json"),
     serializeConfig(config),
   );
-  // Which Mahler generated this workspace, so doctor can spot a CLI upgrade
-  // that hasn't been reinstalled yet.
-  writeFileEnsured(
-    resolve(workspace, ".harness", "install.json"),
-    `${JSON.stringify({ mahlerVersion: mahlerVersion() }, null, 2)}\n`,
-  );
   writeFileEnsured(
     resolve(workspace, ".harness", "README.md"),
     renderTemplate("harness-readme"),
@@ -188,6 +182,13 @@ export function install(workspaceInput: string, flags: Flags): void {
   }
   mergeRootInstruction(resolve(workspace, "AGENTS.md"), rootAgentBlock(config));
   mergeRootInstruction(resolve(workspace, "CLAUDE.md"), rootAgentBlock(config));
+  // Which Mahler generated this workspace, so doctor can spot a CLI upgrade
+  // that hasn't been reinstalled yet. Written last: a failed install must
+  // leave the previous version on record.
+  writeFileEnsured(
+    resolve(workspace, ".harness", "install.json"),
+    `${JSON.stringify({ mahlerVersion: mahlerVersion() }, null, 2)}\n`,
+  );
   console.log(`Installed Mahler workflow into ${workspace}`);
   console.log(
     `Configured ${config.repos.length} repo(s): ${config.repos.map((repo) => repo.name).join(", ") || "(none)"}`,

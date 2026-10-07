@@ -12,7 +12,7 @@ carries the built CLI as a tarball (attached by the Release workflow when a
 `v*` tag is pushed):
 
 ```sh
-npm install -g https://github.com/gdamron/mahler/releases/download/v0.2.0/mahler-0.2.0.tgz
+npm install -g https://github.com/gdamron/mahler/releases/download/v2026.10.0/mahler-2026.10.0.tgz
 mahler --version
 ```
 
@@ -41,8 +41,11 @@ npm install -g https://github.com/gdamron/mahler/releases/download/<tag>/mahler-
 mahler install /path/to/product-workspace
 ```
 
-To cut a release, bump `version` in `package.json`, merge, then push a
-matching tag (`git tag v0.2.1 && git push origin v0.2.1`). The Release
+Versions are date-based, `<year>.<month>.<n>`: `n` counts releases within the
+month from 0, and the month has no leading zero (npm rejects one), so January
+2027's first release is `2027.1.0`. To cut a release, set `version` in
+`package.json`, merge, then push a matching tag
+(`git tag v2026.10.1 && git push origin v2026.10.1`). The Release
 workflow runs the tests, checks the tag matches the version, and attaches the
 tarball.
 

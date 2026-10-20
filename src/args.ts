@@ -3,32 +3,62 @@ import { dirname, resolve } from "node:path";
 
 export type Flags = Record<string, string | boolean>;
 
+/** How a flag takes its value: `string` reads the next argument, `boolean` never does. */
+export type FlagKind = "string" | "boolean";
+
+export interface ArgSpec {
+  /** Most positional arguments the command accepts. */
+  positionals: number;
+  flags: Record<string, FlagKind>;
+}
+
+/** A mistake in how the command was called; the CLI prints usage with it. */
+export class UsageError extends Error {}
+
 export interface Args {
-  command?: string;
   rest: string[];
   flags: Flags;
 }
 
-export function parseArgs(argv: string[]): Args {
-  const [command, ...tail] = argv;
+/** `--help` or `-h` anywhere asks for usage, never for the command to run. */
+export function wantsHelp(argv: string[]): boolean {
+  return argv.some((part) => part === "--help" || part === "-h");
+}
+
+/**
+ * Parse a command's arguments against its spec. Unknown flags, extra
+ * positionals, and string flags without a value are errors, not ignored:
+ * several commands write or delete files, so a mistyped invocation must stop
+ * before doing anything.
+ */
+export function parseArgs(argv: string[], spec: ArgSpec): Args {
   const rest: string[] = [];
   const flags: Flags = {};
-  for (let index = 0; index < tail.length; index += 1) {
-    const part = tail[index];
-    if (part.startsWith("--")) {
-      const key = part.slice(2);
-      const next = tail[index + 1];
-      if (next && !next.startsWith("--")) {
-        flags[key] = next;
-        index += 1;
-      } else {
+  for (let index = 0; index < argv.length; index += 1) {
+    const part = argv[index];
+    if (part.startsWith("-") && part !== "-") {
+      const key = part.startsWith("--") ? part.slice(2) : part;
+      const kind = part.startsWith("--") ? spec.flags[key] : undefined;
+      if (!kind) throw new UsageError(`unknown option: ${part}`);
+      if (key in flags) throw new UsageError(`option given twice: ${part}`);
+      if (kind === "boolean") {
         flags[key] = true;
+        continue;
       }
+      const next = argv[index + 1];
+      if (next === undefined || next.startsWith("--")) {
+        throw new UsageError(`option needs a value: ${part}`);
+      }
+      flags[key] = next;
+      index += 1;
     } else {
       rest.push(part);
     }
   }
-  return { command, rest, flags };
+  if (rest.length > spec.positionals) {
+    throw new UsageError(`unexpected argument: ${rest[spec.positionals]}`);
+  }
+  return { rest, flags };
 }
 
 /**
@@ -66,6 +96,6 @@ export function listFlag(flags: Flags, key: string): string[] {
 }
 
 export function required(value: string | undefined, message: string): string {
-  if (!value) throw new Error(message);
+  if (!value) throw new UsageError(message);
   return value;
 }

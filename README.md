@@ -77,7 +77,12 @@ mahler cleanup FUG-123 --workspace /path/to/product-workspace [--dry-run]
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project
+mahler <command> --help
 ```
+
+`--help` (or `-h`) on any command prints its usage and does nothing else.
+Commands reject options they don't know, extra arguments, and options missing
+their value, so a mistyped command stops before it writes or deletes anything.
 
 `mahler install` scans the target workspace for immediate child git repos and
 writes them into `.harness/config.json`. Linear assignee and label filters are

@@ -86,6 +86,34 @@ test("cleanup --dry-run reports without removing", () => {
   assert.equal(existsSync(resolve(repos, "app")), true);
 });
 
+for (const extra of [["--help"], ["-h"], ["--dry-run", "--help"]]) {
+  test(`cleanup <ISSUE> ${extra.join(" ")} prints usage and touches nothing`, () => {
+    const { workspace, app, repos } = workspaceWithWorktrees();
+    const before = git(app, ["worktree", "list", "--porcelain"]).stdout;
+
+    const result = runCleanup(workspace, extra);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /^Usage: mahler cleanup <ISSUE>/);
+    assert.doesNotMatch(result.stdout, /^(ok|info|warn|error) /m, "cleanup reported results");
+    assert.equal(existsSync(resolve(repos, "app")), true);
+    assert.equal(existsSync(resolve(repos, "app-docs")), true);
+    assert.equal(git(app, ["worktree", "list", "--porcelain"]).stdout, before);
+  });
+}
+
+for (const extra of [["--force"], ["--dry-run", "yes"], ["extra"], ["-n"], ["--workspace"]]) {
+  test(`cleanup refuses ${extra.join(" ")} and touches nothing`, () => {
+    const { workspace, repos } = workspaceWithWorktrees();
+    const result = runCleanup(workspace, extra);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, /unknown option|unexpected argument|needs a value|given twice/);
+    assert.match(result.stderr, /Usage: mahler cleanup <ISSUE>/);
+    assert.equal(result.stdout, "");
+    assert.equal(existsSync(resolve(repos, "app")), true);
+    assert.equal(existsSync(resolve(repos, "app-docs")), true);
+  });
+}
+
 test("cleanup keeps a detached worktree whose commits no branch reaches", () => {
   const { workspace, repos } = workspaceWithWorktrees();
   const wt = resolve(repos, "app-docs");

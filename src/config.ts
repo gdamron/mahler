@@ -30,7 +30,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
       "`mahler check` passes for every touched repo.",
       "Self-review is complete.",
       "Sub-agent review is complete.",
-      "Each sub-agent review finding has a response: fixed, acknowledged, set aside for triage, or rebutted.",
+      "Sub-agent review findings are weighed (see the review policy).",
       "A PR is open for every touched repo, with a description of the change and its context.",
       "`HANDOFF.md` is current with changed files, checks run, blockers, and next steps.",
       "The change stays within the Linear issue scope.",
@@ -277,7 +277,10 @@ const retiredDefaults = {
   guardrails: [
     "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
   ],
-  definitionOfDone: ["A PR is opened for human review before merge."],
+  definitionOfDone: [
+    "A PR is opened for human review before merge.",
+    "Sub-agent review comments are addressed.",
+  ],
 };
 
 /** The effective list: Mahler's defaults minus `remove`, then `add`. */

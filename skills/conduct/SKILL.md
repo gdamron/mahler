@@ -87,8 +87,8 @@ commit, handoff. Skip the rest; your parent owns them.
 5. **Review.** Launch a reviewer that did not write the code, with a read-only
    brief covering the diff against its base branch; pick its tier with the
    delegate skill. For more than one slice, review each slice's diff.
-6. **Iterate.** Weigh each finding as the review policy describes (fix,
-   acknowledge, set aside for triage, or rebut). Fix the ones you accept (or
+6. **Iterate.** Weigh the findings as the review policy describes (for
+   example fix, acknowledge, set aside for triage, or rebut). Fix the ones you accept (or
    send them back to the slice conductor), then ask the same reviewer to
    re-review only the fix commits rather than launching a fresh one. Stop when
    nothing open is a clear bug or likely to reach users. After about three

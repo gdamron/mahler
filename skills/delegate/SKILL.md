@@ -116,8 +116,8 @@ Find the chosen tier for your runtime in `.harness/MODELS.md`:
 **When a tier can't run, don't wait for it.** A missing tool, a usage or
 quota limit, a rate limit, an auth error, or a run far past its usual time
 with no result all mean the tier is unavailable for now. Switch to the tier's
-`falls back to` entry in `MODELS.md`. Without one, pick the closest allowed
-tier that gives the same rigor (for a high-risk review, `deep`). Note the
+`falls back to` entry in `MODELS.md`. Without one, or when the profile doesn't
+allow it, pick the closest allowed tier that gives the same rigor (for a high-risk review, `deep`). Note the
 switch in `HANDOFF.md` and keep going: a review from a different model beats
 a review that waits hours. Tell sub-agents to do the same in their briefs.
 

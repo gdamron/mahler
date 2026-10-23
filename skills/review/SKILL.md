@@ -34,6 +34,10 @@ description: Review an issue-scoped diff and report findings before handoff.
 - Findings first, ordered by severity
 - File and line references when available
 - A recommended fix for each finding when you have one
+- Where it helps the author weigh a finding: who would hit it and whether this
+  diff introduced it (see the review policy)
+- On a re-review: what the fix commits changed, rather than a fresh review of
+  the whole diff
 - Updated `HANDOFF.md`, or, when delegated, findings reported to the
   conductor that owns it (record your own workflow deviations in
   `HANDOFF.md` either way)

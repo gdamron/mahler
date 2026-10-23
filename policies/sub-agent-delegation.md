@@ -110,6 +110,9 @@ Every delegated task should start from a written brief with these fields:
 - Allowed repos/files/paths: exact scope the sub-agent may inspect or modify.
 - Constraints and guardrails: non-goals, protected areas, command limits, and
   policy reminders.
+- Expected size (optional, for edit work): a rough estimate (PRs, changed
+  lines, review rounds) and when to check back in, for example "if it needs
+  more PRs than this, or a new kind of gap turns up".
 - Authority mode: `read-only` or `edit`; default is `read-only`.
 - Expected output format: findings, patch summary, test results, risks, open
   questions, or another explicit format.
@@ -129,6 +132,7 @@ Every delegated task should start from a written brief with these fields:
 - Relevant context and links:
 - Allowed repos/files/paths:
 - Constraints and guardrails:
+- Expected size:
 - Authority mode: read-only
 - Expected output format:
 - Results destination:
@@ -142,6 +146,8 @@ Every delegated task should start from a written brief with these fields:
   summary for the delegating agent.
 - Stop and report back if required context is missing, scope is unclear, or the
   task appears to require broader authority.
+- If the work grows well past its expected size, check in with a proposed
+  cut rather than pushing on.
 ```
 
 ## Synthesizing Results

@@ -30,7 +30,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
       "`mahler check` passes for every touched repo.",
       "Self-review is complete.",
       "Sub-agent review is complete.",
-      "Sub-agent review comments are addressed.",
+      "Each sub-agent review finding has a response: fixed, acknowledged, set aside for triage, or rebutted.",
       "A PR is open for every touched repo, with a description of the change and its context.",
       "`HANDOFF.md` is current with changed files, checks run, blockers, and next steps.",
       "The change stays within the Linear issue scope.",

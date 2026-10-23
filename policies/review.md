@@ -48,9 +48,32 @@ the main goal is to let work get done. For each issue identified, provide a
 recommended fix or improvement if you have one. Don't be a gate keeper; instead,
 facilitate progress.
 
+When it helps the author weigh a finding, say who would hit it and how
+(likely, rare, only with unusual access, or theoretical), and whether this diff
+introduced it, exposed something that was already there, or came from an
+earlier review round's fix. A severity label alone says how bad a problem would
+be, not how likely anyone is to run into it.
+
+If the review is adversarial (hunting for ways to break a stated rule), it
+helps to have the threat model and the non-goals in the brief. Without them,
+every path looks like an attack and the review never comes back clean.
+
 ### 4. Handling feedback
 
-When you are the recipient of a review, address all feedback before opening a
-pull request. It is completely valid to have multiple iterations of review and
-improvement before a pull request is ready. While you should be receptive to all
-feedback, you are not obligated to implement every suggestion. Use your judgment.
+When you are the recipient of a review, findings are input to weigh, not orders.
+Respond to each one before opening a pull request:
+
+- **Fix** clear bugs and regressions users would notice, plus anything in the
+  areas the workspace cares most about (its protected areas and risk notes). When several findings share a cause, fix the cause.
+- **Acknowledge** a rare edge case as not covered, with the reasoning, in the
+  PR or `HANDOFF.md`.
+- **Set aside for triage** a finding that is real but outside this change. List
+  it in `HANDOFF.md` so the human can decide what becomes new work.
+- **Rebut** a finding you disagree with, saying why.
+
+Multiple rounds are fine, but each one should earn its place. Stop when nothing
+open is a clear bug or something users are likely to hit, not when the
+reviewer runs out of things to say: a thorough reviewer rarely does. Rounds
+after the first usually look only at the fix commits. If the same mechanism
+keeps drawing serious findings round after round, that usually means the
+design needs a rethink rather than another patch.

@@ -91,8 +91,8 @@ itself: one issue never needs a composer layer.
      between conductors, or a conductor blocked twice on the same
      problem: escalate to the human.
    - Review findings a conductor escalates, and check-ins about work that has
-     outgrown its estimate: decide yourself what matters (the review policy's
-     fix, acknowledge, set aside or rebut) rather than passing every finding
+     outgrown its estimate: decide yourself what matters (see the review
+     policy) rather than passing every finding
      back as more work. Batch the set-aside findings for the human to triage
      before any of them becomes a new issue.
 7. **Merge and advance waves.** When a conductor reports PRs ready to

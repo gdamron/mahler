@@ -123,7 +123,7 @@ carries intent forward (the "experience" an agent otherwise lacks each session).
 Because the ledger is read at the start of every session, it stays lean:
 only deviations whose reason _generalizes beyond the issue that produced them_
 belong here; purely issue-local calls stay in `HANDOFF.md`. It is append-only —
-agents never edit, delete, or move entries — and humans curate, promoting
+agents never edit, delete, or move entries on their own — and humans curate, promoting
 recurring decisions into policy and moving stale notes to
 `.harness/decisions/archive/` (not read by default). The composer's `audit`
 skill helps with that curation: now and then it reviews the ledger, overlays,

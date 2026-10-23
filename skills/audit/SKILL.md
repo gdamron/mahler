@@ -48,9 +48,11 @@ Use judgment about depth: a quick pass over a small workspace is fine.
   - upstream changes the overlay is missing
   - overlays that no longer differ in substance
   - overlays that could be a short addition instead of a full replacement
-- **Instruction files** (`CLAUDE.md`, `AGENTS.md` outside the Mahler block,
-  and any runtime memory the workspace keeps): rules that duplicate or conflict
-  with policies or the ledger.
+- **Instruction files** (`CLAUDE.md` and `AGENTS.md`, outside the
+  `<!-- HARNESS:START -->` … `<!-- HARNESS:END -->` block that install
+  rewrites): rules that duplicate or conflict with policies or the ledger. If
+  the human points you at runtime memory kept elsewhere, read it too, and
+  propose changes there for them to make.
 - **Config** (`.harness/config.json`): look for any of these that no longer
   fit how the team works:
   - guardrail and Definition of Done changes
@@ -61,12 +63,13 @@ Use judgment about depth: a quick pass over a small workspace is fine.
 
 ## Output
 
-Write a short report to `.harness/audits/<YYYY-MM-DD>.md`. Group proposals by
-action (archive, promote, update, drop, keep), each with a one-line reason and
-the files involved. Present the report to the human and ask which proposals to
-apply. Apply only those: the ledger stays append-only for agents, so moving a
-note into `archive/` is the human's call. Record what was applied at the end
-of the report, so the next audit knows where this one left off.
+Group proposals by action (archive, promote, update, drop, keep), each with a
+one-line reason and the files involved. For a full audit, write them to
+`.harness/audits/<YYYY-MM-DD>.md`; for a quick pass, the list in chat plus a
+short dated note there is enough. Present the proposals to the human and ask
+which to apply. Apply only those: the ledger stays append-only for agents, so moving a
+note into `archive/` is the human's call. Record what was applied in the dated
+file, so the next audit knows where this one left off.
 
 ## Stop Conditions
 

@@ -64,7 +64,8 @@ When you are the recipient of a review, findings are input to weigh, not orders.
 Respond to each one before opening a pull request:
 
 - **Fix** clear bugs and regressions users would notice, plus anything in the
-  areas the workspace cares most about (its protected areas and risk notes). When several findings share a cause, fix the cause.
+  areas the workspace cares most about (its protected areas and risk notes).
+  When several findings share a cause, fix the cause.
 - **Acknowledge** a rare edge case as not covered, with the reasoning, in the
   PR or `HANDOFF.md`.
 - **Set aside for triage** a finding that is real but outside this change. List

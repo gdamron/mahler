@@ -22,4 +22,7 @@ Launch the agent listed for the tier and your runtime, without model or effort
 overrides: each definition pins its tier's settings, and neither runtime
 reliably applies a launch-time effort. A `skill`, `agent`, or `command` entry
 hands the role to that skill, agent type, or shell command instead; fill a
-command's `<placeholders>` from the brief.
+command's `<placeholders>` from the brief. A `falls back to` tier is the one to
+use when this one can't run right now (its tool is missing, its usage or rate
+limit is reached, or it gives no result in a reasonable time): switch to it
+rather than wait, and note the switch in `HANDOFF.md`.

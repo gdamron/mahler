@@ -55,6 +55,12 @@ export interface TierChoice {
   agent?: string;
   /** Shell command; `<placeholders>` such as `<worktree>` and `<base>` are filled from the brief. */
   command?: string;
+  /**
+   * Tier to use instead when this one can't run right now: its tool is
+   * missing, its usage or rate limit is reached, or it gives no result in a
+   * reasonable time. Agents switch to it rather than wait.
+   */
+  fallback?: string;
 }
 
 export interface ModelsConfig {

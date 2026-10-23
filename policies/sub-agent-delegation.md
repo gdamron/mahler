@@ -148,6 +148,9 @@ Every delegated task should start from a written brief with these fields:
   task appears to require broader authority.
 - If the work grows well past its expected size, check in with a proposed
   cut rather than pushing on.
+- If a tool, model, or service you need is unavailable (missing, out of
+  usage, rate-limited, or not returning), use its fallback (see the delegate
+  skill) or report back. Don't wait on it.
 ```
 
 ## Synthesizing Results

@@ -237,10 +237,11 @@ function agentInstructions(profile: InstalledProfile, runtime: Runtime): string 
 export function modelsMarkdown(models: ModelsConfig, profiles: string[]): string {
   const cell = (choice?: TierChoice) => {
     if (!choice) return "inherit";
-    if (choice.skill) return `skill: \`${choice.skill}\``;
-    if (choice.command) return `command: \`${choice.command.replaceAll("|", "\\|")}\``;
+    const fallback = choice.fallback ? `; falls back to \`${choice.fallback}\`` : "";
+    if (choice.skill) return `skill: \`${choice.skill}\`${fallback}`;
+    if (choice.command) return `command: \`${choice.command.replaceAll("|", "\\|")}\`${fallback}`;
     const agent = choice.agent ? `agent: \`${choice.agent}\`` : "";
-    return [agent, tierSummary(choice)].filter(Boolean).join(", ") || "inherit";
+    return ([agent, tierSummary(choice)].filter(Boolean).join(", ") || "inherit") + fallback;
   };
   const tiers = Object.entries(models.tiers).map(
     ([tier, runtimes]) =>

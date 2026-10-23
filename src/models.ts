@@ -212,6 +212,27 @@ export function agentNameCollisions(
   return [...problems];
 }
 
+/**
+ * A tier's fallback must name a defined tier (or `inherit`), and following
+ * fallbacks must end rather than loop back to a tier already tried.
+ */
+function fallbackProblems(models: ModelsConfig, tier: string, runtime: Runtime): string[] {
+  const first = models.tiers[tier]?.[runtime]?.fallback;
+  if (first === undefined) return [];
+  if (first !== INHERIT_TIER && !models.tiers[first]) {
+    return [`models.tiers.${tier}.${runtime}.fallback names undefined tier "${first}"`];
+  }
+  const chain = [tier];
+  for (let next: string | undefined = first; next !== undefined && next !== INHERIT_TIER; ) {
+    if (chain.includes(next)) {
+      return [`models.tiers.${tier}.${runtime} fallbacks loop: ${[...chain, next].join(" → ")}`];
+    }
+    chain.push(next);
+    next = models.tiers[next]?.[runtime]?.fallback;
+  }
+  return [];
+}
+
 /** Human-readable problems with the models config; empty when it is consistent. */
 export function modelConfigProblems(
   models: ModelsConfig,
@@ -244,6 +265,7 @@ export function modelConfigProblems(
           `models.tiers.${tier}.${runtime}.effort "${choice.effort}" is not one of ${allowed.join(", ")}`,
         );
       }
+      problems.push(...fallbackProblems(models, tier, runtime as Runtime));
     }
   }
   for (const [profile, tiers] of Object.entries(models.profiles)) {

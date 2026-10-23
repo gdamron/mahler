@@ -109,11 +109,17 @@ Find the chosen tier for your runtime in `.harness/MODELS.md`:
   worktree, `<base>` its base branch — and commit first when the command
   reads the branch diff. Commands can take minutes: use a long timeout or run
   it in the background and wait. Treat its output as the role's result and
-  translate it as for `skill`. If the command can't run (tool missing, not
-  set up), fall back to another allowed tier (the reviewer's `light`, say)
-  and record the deviation in `HANDOFF.md`.
+  translate it as for `skill`.
 - `agent`: launch that runtime agent type instead of the Mahler profile, with
   the same brief plus any `model` / `effort` the entry sets.
+
+**When a tier can't run, don't wait for it.** A missing tool, a usage or
+quota limit, a rate limit, an auth error, or a run far past its usual time
+with no result all mean the tier is unavailable for now. Switch to the tier's
+`falls back to` entry in `MODELS.md`. Without one, pick the closest allowed
+tier that gives the same rigor (for a high-risk review, `deep`). Note the
+switch in `HANDOFF.md` and keep going: a review from a different model beats
+a review that waits hours. Tell sub-agents to do the same in their briefs.
 
 ## 5. Respect capacity
 

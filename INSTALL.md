@@ -225,7 +225,8 @@ default. `.harness/MODELS.md` (generated on install) shows the result.
   "tiers": {
     "cross-check": {
       "claude": {
-        "command": "node \"$(ls -d ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)\" review --wait --cwd <worktree> --base <base>"
+        "command": "node \"$(ls -d ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)\" review --wait --cwd <worktree> --base <base>",
+        "fallback": "deep"
       },
       "codex": { "model": "gpt-6.1-sol", "effort": "high" }
     }
@@ -236,10 +237,13 @@ default. `.harness/MODELS.md` (generated on install) shows the result.
   ```
 
   The tier applies only to profiles that list it, so no review-policy override
-  is needed. If the command can't run, the delegate skill falls back to another
-  allowed tier.
+  is needed. `fallback` names the tier to use when the command can't run right
+  now (Codex isn't installed, is out of usage, or doesn't return), so the review
+  goes to a Claude model instead of waiting. Without one, the delegate skill
+  picks the closest allowed tier.
 
-`mahler doctor` warns about undefined tiers and invalid effort values.
+`mahler doctor` warns about undefined tiers, invalid effort values, and fallbacks
+that name no tier or loop.
 
 ### Concurrency
 

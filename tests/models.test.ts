@@ -181,3 +181,22 @@ test("a command route pins nothing, gets no tier agent, and is validated", () =>
   assert.match(problems, /bad\.claude sets skill and command; pick one/);
   assert.match(problems, /bad\.claude routes to a skill, which ignores model and effort/);
 });
+
+test("a tier's fallback is shown in MODELS.md and must name a tier without looping", () => {
+  const models = resolveModels(defaultModels(), {
+    tiers: { "cross-check": { claude: { command: "node companion.mjs review", fallback: "deep" } } },
+    profiles: { reviewer: { default: "cross-check", allowed: ["light", "deep", "cross-check"] } },
+  });
+  assert.deepEqual(modelConfigProblems(models, ["composer", "conductor", "reviewer"]), []);
+  assert.ok(
+    modelsMarkdown(models, ["reviewer"]).includes(
+      "| `cross-check` | command: `node companion.mjs review`; falls back to `deep` |",
+    ),
+  );
+
+  models.tiers.lost = { claude: { model: "opus", fallback: "nowhere" } };
+  models.tiers.deep = { ...models.tiers.deep, claude: { model: "opus", fallback: "cross-check" } };
+  const problems = modelConfigProblems(models, ["reviewer"]).join("\n");
+  assert.match(problems, /lost\.claude\.fallback names undefined tier "nowhere"/);
+  assert.match(problems, /cross-check\.claude fallbacks loop: cross-check → deep → cross-check/);
+});

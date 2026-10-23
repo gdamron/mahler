@@ -54,7 +54,9 @@ itself: one issue never needs a composer layer.
    Order issues by blockers, then priority, then oldest update/create
    timestamp, and group them into waves: an issue joins a wave only when its
    blockers are done or can be stacked on an open PR. Issues likely to touch the
-   same files go in different waves.
+   same files go in different waves. An issue that holds several deliverables,
+   each able to merge on its own, is often better split into several issues
+   now than discovered as one long stack later.
 3. **Specify.** When an issue is underspecified, or issues share an interface,
    add a section under `Specifications` in `COMPOSITION.md` (clarified
    acceptance criteria, contracts between issues, non-goals) and point the
@@ -67,7 +69,7 @@ itself: one issue never needs a composer layer.
    delegate skill: base profile `conductor`, issue mode, a tier chosen from the
    issue's risk and ambiguity, authority `edit`, objective
    "carry `<ISSUE>` through the conduct skill to open, reviewed PRs", the
-   `maxSliceAgents` and `maxHeavyCommands` caps,
+   `maxSliceAgents` and `maxHeavyCommands` caps, a rough expected size,
    context link to its `Specifications` section and the project's labels
    (the conductor records them as `projectLabels`), results destination the
    issue's `HANDOFF.md` plus a reply to the composer. Exactly one conductor
@@ -88,6 +90,11 @@ itself: one issue never needs a composer layer.
    - Scope changes that affect other issues or the project goal, conflicts
      between conductors, or a conductor blocked twice on the same
      problem: escalate to the human.
+   - Review findings a conductor escalates, and check-ins about work that has
+     outgrown its estimate: decide yourself what matters (see the review
+     policy) rather than passing every finding
+     back as more work. Batch the set-aside findings for the human to triage
+     before any of them becomes a new issue.
 7. **Merge and advance waves.** When a conductor reports PRs ready to
    merge, use the merge skill: labels first, then readiness, then your own risk
    judgment. Merge what the merge policy allows (predecessors first for stacked
@@ -98,6 +105,17 @@ itself: one issue never needs a composer layer.
 8. **Synthesize.** Report to the human: per-issue status and PR links, risks,
    decisions needed, and what the next wave will do. Keep `COMPOSITION.md`
    current so a later session can resume from it.
+
+When the human asks for something new mid-project ("fix that now"), a rough
+size and a suggested cut before starting usually beat a quick yes. For example:
+"the reported bug is one small PR; closing every related path is four or
+five. I suggest the first."
+
+When the human asks you to pause, reply in the same turn with what is in
+flight and where each piece will stop. Ask conductors to finish and push their
+current commit, update `HANDOFF.md` and report, without starting new review
+rounds. Then save state in `COMPOSITION.md`. A pause means wrapping work up
+cleanly, not leaving it half-merged: keep base branches releasable.
 
 ## COMPOSITION.md Template
 

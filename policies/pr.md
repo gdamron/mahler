@@ -20,7 +20,9 @@ Before preparing a PR:
 
 A PR should be as small as possible while still being a complete unit of work.
 It is preferable to have multiple small PRs than one large PR. If a PR is too
-large, consider breaking it down into smaller, more focused PRs.
+large, consider breaking it down into smaller, more focused PRs. If a change
+keeps needing more PRs than planned, that is also a sign to check its scope
+with whoever assigned it, not only to split again.
 
 ### PR Title
 

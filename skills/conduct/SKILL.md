@@ -66,7 +66,9 @@ commit, handoff. Skip the rest; your parent owns them.
    branches from it and becomes a stacked PR. Each extra worktree with its own
    dependency install costs disk, CPU, and indexing (see the workspace-safety
    policy), so a slice installs dependencies only when its checks need them.
-   Record the shape and the reason in `HANDOFF.md`.
+   Record the shape and the reason in `HANDOFF.md`, with a rough estimate
+   (PRs, changed lines). The estimate is not a limit. It is what lets you, and
+   your parent, notice when the work has grown into something else.
 3. **Implement.** Do your own slice with the implement skill. For each
    delegated slice, use the delegate skill to pick the tier and write the
    brief: base profile `conductor`, `slice mode`, authority `edit`, allowed
@@ -77,15 +79,23 @@ commit, handoff. Skip the rest; your parent owns them.
 4. **Monitor.** Answer slice questions within the issue scope. If a slice
    stalls or drifts out of scope, stop it and re-brief, or take it over.
    Escalate scope changes and Tier 2 actions to your parent; do not approve
-   them yourself.
+   them yourself. When the work clearly outgrows its estimate (more PRs than
+   planned, or new kinds of gaps turning up), check in with your parent before
+   continuing. Bring a proposed cut: ship what is done, ship the clear bug and
+   set the rest aside for triage, or redesign. Splitting into more stacked PRs
+   keeps each one reviewable, but it doesn't make the whole change smaller.
 5. **Review.** Launch a reviewer that did not write the code, with a read-only
    brief covering the diff against its base branch; pick its tier with the
    delegate skill. For more than one slice, review each slice's diff.
-6. **Iterate.** Fix findings you accept (or send them back to the slice
-   conductor), then ask the same reviewer to re-review only the fix commits
-   rather than launching a fresh one. Use judgment on optional findings per the
-   review policy. After three review rounds on one slice, stop and escalate
-   the outstanding findings to your parent.
+6. **Iterate.** Weigh the findings as the review policy describes (for
+   example fix, acknowledge, set aside for triage, or rebut). Fix the ones you accept (or
+   send them back to the slice conductor), then ask the same reviewer to
+   re-review only the fix commits rather than launching a fresh one. Stop when
+   nothing open is a clear bug or likely to reach users. After about three
+   rounds on one slice, escalate what is still open to your parent with a
+   recommendation: accept the risk, rebut, set aside, run one more round on a
+   named question, or redesign. When the parent allows more rounds, give each
+   one a purpose rather than continuing until the reviewer is quiet.
 7. **Verify.** Run `mahler check --issue <ISSUE>`, which checks every worktree
    under the issue's `repos/` dir, slices included, and walk the Definition of
    Done checklist.
@@ -127,6 +137,9 @@ Do not set up the issue, open PRs, write merge assessments, or delegate.
 - a Tier 2 action has no go-ahead from the parent (composer or human)
 - the next step crosses a Tier 3 boundary
 - the work requires scope beyond the issue or slice
-- a slice still has unresolved review findings after three rounds
+- a slice still has open review findings after about three rounds
+- the work has clearly outgrown its estimate (check in, as in Monitor)
+- your parent asks you to pause: finish and push the current commit, update
+  `HANDOFF.md`, and report, without starting another review round
 - a blocker needs a parent decision
 - the next step is merging: hand the PR to your parent

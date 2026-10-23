@@ -9,7 +9,9 @@ improves outcome, safety, or efficiency.
 Bounded freedom means:
 
 1. Do not violate explicit human instructions.
-2. Do not broaden task scope silently.
+2. Do not broaden task scope silently. Work that grows well past what was
+   asked (a quick fix turning into several PRs) is a scope change worth
+   raising.
 3. Record deviations where the next session will find them.
 4. Ask the human when a deviation changes scope, ownership, or an outward action.
 

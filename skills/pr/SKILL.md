@@ -41,4 +41,4 @@ description: Prepare or open a pull request for committed issue-scoped work.
 
 - branch has uncommitted changes
 - no remote is configured
-- review findings on the branch are unresolved
+- a review finding on the branch has no response yet (see the review policy)

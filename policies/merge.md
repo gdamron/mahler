@@ -33,8 +33,9 @@ Every agent merge requires all of these, regardless of labels:
 
 - Required CI checks are green. Never merge with failures, and never use
   bypass or admin flags (for example `gh pr merge --admin`).
-- Reviewer sub-agent findings are resolved, and no human review comment is left
-  unanswered.
+- Reviewer sub-agent findings that matter have a response, such as a fix, an
+  acknowledgement with a reason, a note for triage, or a rebuttal (see the
+  review policy), and no human review comment is left unanswered.
 - `mahler check` passed for the touched repo.
 - The forge reports the PR mergeable with no conflicts.
 - For a stacked PR, its predecessor has merged and the PR now targets the base

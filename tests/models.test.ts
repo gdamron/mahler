@@ -199,4 +199,10 @@ test("a tier's fallback is shown in MODELS.md and must name a tier without loopi
   const problems = modelConfigProblems(models, ["reviewer"]).join("\n");
   assert.match(problems, /lost\.claude\.fallback names undefined tier "nowhere"/);
   assert.match(problems, /cross-check\.claude fallbacks loop: cross-check → deep → cross-check/);
+
+  models.profiles.reviewer = { default: "cross-check", allowed: ["light", "cross-check"] };
+  assert.match(
+    modelConfigProblems(models, ["reviewer"]).join("\n"),
+    /reviewer allows tier "cross-check", whose claude fallback "deep" it does not allow/,
+  );
 });

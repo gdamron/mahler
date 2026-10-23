@@ -276,6 +276,14 @@ export function modelConfigProblems(
       if (tier !== INHERIT_TIER && !models.tiers[tier]) {
         problems.push(`models.profiles.${profile} uses undefined tier "${tier}"`);
       }
+      for (const [runtime, choice] of Object.entries(models.tiers[tier] ?? {})) {
+        const fallback = choice?.fallback;
+        if (fallback !== undefined && !(tiers.allowed ?? []).includes(fallback)) {
+          problems.push(
+            `models.profiles.${profile} allows tier "${tier}", whose ${runtime} fallback "${fallback}" it does not allow`,
+          );
+        }
+      }
     }
     if (!(tiers.allowed ?? []).includes(tiers.default)) {
       problems.push(

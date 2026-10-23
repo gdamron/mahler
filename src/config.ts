@@ -59,6 +59,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "pr",
           "merge",
           "handoff",
+          "audit",
         ],
         policies: [
           "branching",
@@ -93,6 +94,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "pr",
           "merge",
           "handoff",
+          "audit",
         ],
         policies: [
           "branching",

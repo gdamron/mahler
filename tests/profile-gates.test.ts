@@ -38,7 +38,7 @@ test("profile prints active profile permissions", () => {
 
 test("can reports allowed skills for the composer default", () => {
   const workspace = installWorkspace();
-  for (const skill of ["compose", "conduct", "delegate", "pr", "merge", "handoff"]) {
+  for (const skill of ["compose", "conduct", "delegate", "pr", "merge", "handoff", "audit"]) {
     const allowed = run(["can", "codex", skill, "--workspace", workspace]);
     assert.equal(allowed.status, 0, allowed.stderr);
     assert.match(allowed.stdout, new RegExp(`codex can use ${skill}`));

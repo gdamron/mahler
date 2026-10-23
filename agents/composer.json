@@ -13,7 +13,8 @@
     "review",
     "pr",
     "merge",
-    "handoff"
+    "handoff",
+    "audit"
   ],
   "deniedSkills": [],
   "runtimeHints": {

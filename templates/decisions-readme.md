@@ -20,12 +20,14 @@ be worth reading. Record a deviation here **only when its reason generalizes
 beyond the issue that produced it** — a decision a future, unrelated session
 should know. Purely issue-local judgment calls belong in `HANDOFF.md` only.
 
-- **Append-only:** agents never edit, delete, or move entries.
+- **Append-only:** agents never edit, delete, or move entries on their own;
+  an audit moves notes to `archive/` only once the human approves.
 - **Read the active ledger** (this directory, not `archive/`); filter by the
   `issue:` or `rule:` frontmatter when you only need a slice.
 - **Humans curate.** Recurring decisions get promoted into a policy or
   `CLAUDE.md` rule; folded or stale notes move to `archive/`, which sessions do
-  not read by default.
+  not read by default. The `audit` skill prepares those proposals for the
+  human (reports in `.harness/audits/`).
 
 This is interim, designed to fold into a future Obsidian-based shared memory
 store with no migration.

@@ -61,7 +61,9 @@ every path looks like an attack and the review never comes back clean.
 ### 4. Handling feedback
 
 When you are the recipient of a review, findings are input to weigh, not orders.
-Respond to each one before opening a pull request:
+Before opening a pull request, decide what to do with each finding that
+matters; minor nits can be grouped or skipped without comment. Common
+responses:
 
 - **Fix** clear bugs and regressions users would notice, plus anything in the
   areas the workspace cares most about (its protected areas and risk notes).

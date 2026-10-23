@@ -25,7 +25,8 @@ should know. Purely issue-local judgment calls belong in `HANDOFF.md` only.
   `issue:` or `rule:` frontmatter when you only need a slice.
 - **Humans curate.** Recurring decisions get promoted into a policy or
   `CLAUDE.md` rule; folded or stale notes move to `archive/`, which sessions do
-  not read by default.
+  not read by default. The `audit` skill prepares those proposals for the
+  human (reports in `.harness/audits/`).
 
 This is interim, designed to fold into a future Obsidian-based shared memory
 store with no migration.

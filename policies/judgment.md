@@ -46,7 +46,10 @@ At the start of a session, read the active ledger in `.harness/decisions/` (not
 frontmatter when you only need a slice. The ledger is **append-only**: never
 edit, delete, or move entries. Humans curate — promoting recurring decisions into
 a policy or `CLAUDE.md` rule and moving folded or stale notes to
-`.harness/decisions/archive/` (which sessions do not read by default). An
+`.harness/decisions/archive/` (which sessions do not read by default). The
+audit skill helps: it proposes what to archive, promote, or update, and the
+human decides. When the ledger has grown long or the last audit in
+`.harness/audits/` is old, suggest one. An
 unrecorded deviation is a workflow failure; a recorded one is a review input.
 
 ### Tier 2 — Confirm (get explicit human go-ahead first)

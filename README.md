@@ -168,6 +168,14 @@ find notes about the files being changed, and `mahler knowledge search
 <terms>` covers the rest. `mahler knowledge verify` marks a note confirmed, so the
 audit can find notes nobody has checked in a long time.
 
+The store is a local folder by default. To share it between machines and
+people working in the same workspace, set `knowledge.repo` (and optionally
+`knowledge.branch`) in `.harness/config.json` and rerun `mahler install`,
+which clones the repo into the store folder and carries over any local notes.
+From then on `learn`, `verify`, and `import` commit and push, briefs pull
+first, and `mahler knowledge sync` does both on demand. The generated
+`INDEX.md` stays out of the repo.
+
 `mahler decide` appends a note to the decisions ledger
 (`.harness/decisions/<YYYY-MM-DD>-<slug>.md`): the cross-session record of
 Tier-1 deviations and the reasons behind them. Only deviations whose reason

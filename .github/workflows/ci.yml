@@ -1,7 +1,10 @@
 name: CI
 
+# Pull requests run on the PR event; pushes run only on main, so a push to a
+# PR branch doesn't run the suite twice.
 on:
   push:
+    branches: [main]
   pull_request:
     types: [opened, synchronize, reopened]
 

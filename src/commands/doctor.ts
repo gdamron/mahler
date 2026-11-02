@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
-import { decisionsDir, readLedger } from "../knowledge.js";
+import { decisionsDir, knowledgeDir, knowledgeIndex, readLedger, readNotes } from "../knowledge.js";
+import { storeState } from "../knowledge-repo.js";
 import { modelConfigProblems, tierVariants } from "../models.js";
 import { spotlightFinding } from "../spotlight.js";
 import {
@@ -88,6 +89,7 @@ export function doctor(workspaceInput: string): void {
         ".harness/decisions/ missing — created on install; agents append Tier-1 deviation notes here",
     });
   }
+  results.push(...knowledgeFindings(workspace, config));
 
   const installedSkills = new Set(installedSkillNames(workspace));
   checkFiles(
@@ -356,6 +358,37 @@ function report(results: Finding[]): void {
     `\n${results.length} checks, ${errors} error(s), ${warnings} warning(s)`,
   );
   if (errors > 0) process.exit(1);
+}
+
+/** The knowledge store's mode, its clone's state in repo mode, and whether its index is current. */
+export function knowledgeFindings(workspace: string, config: HarnessConfig): Finding[] {
+  const dir = knowledgeDir(workspace, config);
+  const { repo, publish } = config.knowledge;
+  const findings: Finding[] = [];
+  if (!repo) {
+    findings.push({ level: "ok", message: `knowledge store: local folder ${dir}` });
+  } else {
+    const state = storeState(workspace, config);
+    if (state.problem) {
+      findings.push({ level: "error", message: `knowledge store: ${state.problem}` });
+      return findings;
+    }
+    findings.push({ level: "ok", message: `knowledge store: clone of ${repo} on ${state.branch}` });
+    if (publish === "pr") {
+      findings.push({ level: "warn", message: 'knowledge.publish "pr" is not supported yet; learn and sync refuse to publish until it is "direct"' });
+    }
+    if ((state.ahead ?? 0) > 0) {
+      findings.push({ level: "warn", message: `knowledge store has ${state.ahead} unpublished ${state.ahead === 1 ? "commit" : "commits"}; run \`mahler knowledge sync\`` });
+    }
+    if (state.dirty) {
+      findings.push({ level: "info", message: "knowledge store has uncommitted changes; the next sync commits and publishes them" });
+    }
+  }
+  const index = resolve(dir, "INDEX.md");
+  if (existsSync(dir) && (!existsSync(index) || readFileSync(index, "utf8") !== knowledgeIndex(dir, readNotes(dir)))) {
+    findings.push({ level: "info", message: "knowledge INDEX.md is out of date; run `mahler knowledge index`" });
+  }
+  return findings;
 }
 
 /** Sessions read the ledger's index at start, so a long ledger costs every session. */

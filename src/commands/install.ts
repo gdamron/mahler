@@ -9,6 +9,7 @@ import {
   withInstallOptions,
 } from "../config.js";
 import { knowledgeDir, writeIndexes } from "../knowledge.js";
+import { cloneKnowledgeStore } from "../knowledge-repo.js";
 import { agentNameCollisions, defaultModelFor, tierVariants } from "../models.js";
 import { parseProfileSource } from "../profiles.js";
 import {
@@ -75,6 +76,7 @@ export function install(workspaceInput: string, flags: Flags): void {
   ensureDir(resolve(workspace, ".harness", "policies"));
   ensureDir(resolve(workspace, ".harness", "agents", "profiles"));
   ensureDir(resolve(workspace, ".harness", "decisions"));
+  const cloned = cloneKnowledgeStore(workspace, config);
   ensureDir(resolve(knowledgeDir(workspace, config), "notes"));
   ensureDir(resolve(workspace, ".agents", "skills"));
   ensureDir(resolve(workspace, ".codex", "agents"));
@@ -200,6 +202,7 @@ export function install(workspaceInput: string, flags: Flags): void {
     `${JSON.stringify({ mahlerVersion: mahlerVersion() }, null, 2)}\n`,
   );
   console.log(`Installed Mahler workflow into ${workspace}`);
+  if (cloned) console.log(cloned);
   console.log(
     `Configured ${config.repos.length} repo(s): ${config.repos.map((repo) => repo.name).join(", ") || "(none)"}`,
   );

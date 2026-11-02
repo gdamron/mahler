@@ -51,6 +51,13 @@ code or its docs already say plainly.
    relative to the repo (`src/cache/**`), so path searches find it.
 7. **No secrets, credentials, or customer data.** The store may be shared.
 
+When the store is a shared repo (`knowledge.repo` in config), `learn`,
+`verify`, and `import` publish the change, and briefs pull others' notes
+first. After editing a note by hand, run `mahler knowledge sync`. If a sync
+reports a conflict, your commit is kept locally: resolve it in the store
+folder, or raise it with the human. A sync that couldn't reach the remote
+only warns; the next sync publishes.
+
 Conductors and composers run `mahler learn`. Slice conductors, testers, and
 reviewers put proposed notes (title, description, scope) in their report, and
 their parent records them.

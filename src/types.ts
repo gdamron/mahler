@@ -108,6 +108,12 @@ export interface ProfileTiers {
 export interface KnowledgeConfig {
   /** The store's folder, relative to the workspace or absolute. */
   path: string;
+  /** A git remote to share the store through; without it, the store is a local folder. */
+  repo?: string;
+  /** The branch notes are published on (default "main"). */
+  branch?: string;
+  /** How notes reach `branch`: "direct" pushes (the default); "pr" is not supported yet. */
+  publish?: "direct" | "pr";
 }
 
 export interface ConcurrencyConfig {

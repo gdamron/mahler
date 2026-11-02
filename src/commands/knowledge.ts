@@ -29,6 +29,7 @@ import { repoForDir } from "../repos.js";
 import type { HarnessConfig } from "../types.js";
 import { slugify } from "../util.js";
 import { changedFiles } from "./check.js";
+import { syncKnowledge } from "../knowledge-repo.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -53,6 +54,23 @@ export function learn(flags: Flags): void {
     date: today(),
   });
   console.log(`Recorded knowledge: ${file}`);
+  publish(workspace, config, `knowledge: add ${basename(file, ".md")}`, file);
+}
+
+/**
+ * In repo mode, commit and push what was just written. A failure throws with
+ * the note's path, since the note itself is saved either way.
+ */
+function publish(workspace: string, config: HarnessConfig, message: string, file: string): void {
+  if (!config.knowledge.repo) return;
+  let result;
+  try {
+    result = syncKnowledge(workspace, config, message);
+  } catch (error) {
+    throw new Error(`${file} is saved locally, but publishing it failed: ${(error as Error).message}`);
+  }
+  if (result.published) console.log(result.summary);
+  else console.warn(result.summary);
 }
 
 /**
@@ -102,6 +120,7 @@ function importLedgerNote(workspace: string, config: HarnessConfig, target: stri
     writeIndexes(workspace, config);
     console.log(`Archived the ledger note: ${archived}`);
   }
+  publish(workspace, config, `knowledge: import ${basename(file, ".md")}`, file);
   if (!title || !description) {
     console.log(
       "Now rewrite the note for readers outside the issue: a title that states the fact as a claim, and a description that carries it (see .harness/policies/knowledge.md).",
@@ -192,7 +211,7 @@ function slugTaken(dir: string, slug: string, existing: string, retired: boolean
   );
 }
 
-/** `mahler knowledge index|search|verify|import`. */
+/** `mahler knowledge index|search|verify|import|sync`. */
 export function knowledge(action: string, args: string[], flags: Flags): void {
   const workspace = workspaceFlag(flags);
   const config = loadConfig(workspace);
@@ -210,11 +229,17 @@ export function knowledge(action: string, args: string[], flags: Flags): void {
     case "verify":
       verify(workspace, config, required(args[0], "the note's slug is required"));
       return;
+    case "sync": {
+      const result = syncKnowledge(workspace, config);
+      if (result.published) console.log(result.summary);
+      else console.warn(result.summary);
+      return;
+    }
     case "import":
       importLedgerNote(workspace, config, required(args[0], "the ledger note's path or file name is required"), flags);
       return;
     default:
-      throw new UsageError(`unknown action "${action}": use index, search, verify, or import`);
+      throw new UsageError(`unknown action "${action}": use index, search, verify, import, or sync`);
   }
 }
 
@@ -296,6 +321,7 @@ function verify(workspace: string, config: HarnessConfig, slug: string): void {
   writeFileSync(file, setFrontmatterField(readFileSync(file, "utf8"), "verified", date));
   writeIndexes(workspace, config);
   console.log(`Verified ${slug} on ${date}: ${file}`);
+  publish(workspace, config, `knowledge: verify ${slug}`, file);
 }
 
 function noteBody(flags: Flags): string {

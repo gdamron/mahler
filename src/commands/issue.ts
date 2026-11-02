@@ -24,6 +24,7 @@ import {
   writeIndexes,
 } from "../knowledge.js";
 import { issueRisk } from "../risk.js";
+import { syncKnowledge } from "../knowledge-repo.js";
 import type { LinearIssue, RiskConfig } from "../types.js";
 import {
   ensureDir,
@@ -94,8 +95,16 @@ function writeBrief(
     );
   }
   ensureDir(paths.meta);
-  // Notes may have been edited by hand (in Obsidian, say) since the last write.
-  writeIndexes(workspace, config);
+  // Pull notes others published, and rebuild the indexes: notes may also have
+  // been edited by hand (in Obsidian, say) since the last write. A brief never
+  // waits on the network: a failed sync warns and uses the local notes.
+  try {
+    const result = syncKnowledge(workspace, config);
+    if (!result.published) console.warn(result.summary);
+  } catch (error) {
+    writeIndexes(workspace, config);
+    console.warn(`Knowledge sync skipped: ${(error as Error).message}`);
+  }
   const notes = readNotes(knowledgeDir(workspace, config));
   const knowledge = relevantKnowledgeMarkdown(
     relevantNotes(notes, issue, config.repos),

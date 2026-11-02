@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -38,6 +38,7 @@ const fs = require("fs");
 const file = process.env.FAKE_GH_STATE;
 const prs = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : [];
 const args = process.argv.slice(2);
+if (process.env.FAKE_GH_DOWN) { console.error("error connecting to api.github.com"); process.exit(1); }
 const flag = (name) => args[args.indexOf(name) + 1];
 if (args[0] === "pr" && args[1] === "create") {
   if (process.env.FAKE_GH_FAIL) { console.error("error connecting to api.github.com"); process.exit(1); }
@@ -281,7 +282,7 @@ test("a blocked pull keeps a merged pending note until the note arrives", () => 
 
   const blocked = sync(ws, gh);
   assert.equal(blocked.status, 0, blocked.stderr);
-  assert.match(blocked.stderr, /couldn't pull: local edits to notes\/seed-note\.md overlap changes on main/);
+  assert.match(blocked.stderr, /couldn't pull: your edits to notes\/seed-note\.md conflict with changes on main/);
   assert.ok(existsSync(pending(ws, "arrives-later")), "still searchable while the pull is blocked");
   assert.equal(gh.prs().length, 2, "a merged note isn't proposed again");
 
@@ -472,7 +473,7 @@ test("a blocked pull proposes no edits built on the old commit", () => {
 
   const blocked = sync(ws, gh);
   assert.equal(blocked.status, 0, blocked.stderr);
-  assert.match(blocked.stderr, /couldn't pull: .*your edits are proposed once the pull succeeds/);
+  assert.match(blocked.stderr, /couldn't pull: .*until then your edits aren't proposed/);
   assert.equal(tipOf(shared, pr), proposedTip, "the PR keeps what it had");
 });
 
@@ -493,4 +494,76 @@ test("doctor reports edits not yet proposed, and a pending note changed after me
   assert.ok(existsSync(pending(ws, "clashing-note")), "kept for a hand merge");
   assert.match(run(["doctor", ws], gh.env).stdout, /pending\/clashing-note\.md changed after its PR merged/);
   assert.equal(gh.prs().length, 2, "not proposed again");
+});
+
+test("a pull folds local edits into overlapping changes instead of blocking", () => {
+  const { shared, ws, gh } = prWorkspace();
+  const original = readFileSync(noteFile(ws, "seed-note"), "utf8");
+  writeFileSync(noteFile(ws, "seed-note"), `${original}\nMy line at the end.\n`);
+  assert.match(sync(ws, gh).stdout, /proposed 1 edit/);
+  pushToMain(shared, "notes/seed-note.md", original.replace(/^description: .*$/m, 'description: "Their wording."'));
+
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /folded your edits to notes\/seed-note\.md into the pulled changes; pulled 1 commit/);
+  const note = readFileSync(noteFile(ws, "seed-note"), "utf8");
+  assert.match(note, /Their wording\./);
+  assert.match(note, /My line at the end\./);
+  assert.equal(gh.prs()[0].state, "OPEN", "the batch PR stays open");
+});
+
+test("edits an interrupted sync set aside are put back by the next one", () => {
+  const { ws, gh } = prWorkspace();
+  const file = noteFile(ws, "seed-note");
+  const original = readFileSync(file, "utf8");
+  const edited = `${original}\nCarried over.\n`;
+  const folded = `${original}\nCarried over, folded.\n`;
+  // As if a sync recorded the carry and was killed before restoring the file.
+  writeFileSync(file, edited);
+  mkdirSync(resolve(store(ws), "pending"), { recursive: true });
+  writeFileSync(
+    resolve(store(ws), "pending", "prs.json"),
+    JSON.stringify({ notes: {}, settling: [{ path: "notes/seed-note.md", local: edited, text: folded }] }),
+  );
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.equal(readFileSync(file, "utf8"), folded);
+  assert.match(synced.stdout, /proposed 1 edit/);
+  assert.equal(ledger(ws).settling, undefined);
+});
+
+test("switching to direct publish without a working gh publishes no batch edits", () => {
+  const { shared, ws, gh } = prWorkspace();
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nRejected claim.\n");
+  assert.match(sync(ws, gh).stdout, /proposed 1 edit/);
+  gh.setState(gh.prs()[0].url, "CLOSED");
+  assert.equal(setRepo(ws, { publish: "direct" }, gh.env).status, 0);
+  const synced = sync(ws, { ...gh, env: { ...gh.env, FAKE_GH_DOWN: "1" } });
+  assert.match(synced.stderr, /couldn't check https:\/\/forge\.example\/pr\/1, the PR holding your edits; nothing was published/);
+  assert.doesNotMatch(git(shared, ["show", "main:notes/seed-note.md"]), /Rejected claim/);
+
+  const settled = sync(ws, gh);
+  assert.equal(settled.status, 0, settled.stderr);
+  assert.match(settled.stdout, /dropped the edits in https:\/\/forge\.example\/pr\/1 \(closed unmerged\)/);
+  assert.doesNotMatch(git(shared, ["show", "main:notes/seed-note.md"]), /Rejected claim/);
+});
+
+test("a pending note's branch deleted before its PR opened is pushed again", () => {
+  const { shared, ws, gh } = prWorkspace();
+  assert.equal(learn(ws, "Pushed twice", { ...gh.env, FAKE_GH_FAIL: "1" }).status, 0);
+  const { branch } = ledger(ws).notes["pushed-twice"];
+  git(shared, ["branch", "-D", branch]);
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /opened https:\/\/forge\.example\/pr\/1 for pushed-twice/);
+  assert.match(git(shared, ["show", `${branch}:notes/pushed-twice.md`]), /Pushed twice/);
+});
+
+test("deleting a pending note by hand forgets its PR", () => {
+  const { ws, gh } = prWorkspace();
+  assert.equal(learn(ws, "Withdrawn", gh.env).status, 0);
+  rmSync(pending(ws, "withdrawn"));
+  const synced = sync(ws, gh);
+  assert.match(synced.stdout, /forgot the PR for withdrawn, since pending\/withdrawn\.md is gone; close https:\/\/forge\.example\/pr\/1 if it's still open/);
+  assert.ok(!existsSync(resolve(store(ws), "pending", "prs.json")));
 });

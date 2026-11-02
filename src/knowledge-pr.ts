@@ -36,6 +36,8 @@ interface Proposal {
   url?: string;
   /** The commit Mahler last pushed to the branch. */
   head?: string;
+  /** A commit Mahler was pushing when it last heard nothing back. */
+  pushing?: string;
 }
 
 interface NoteProposal extends Proposal {
@@ -55,6 +57,8 @@ interface BatchProposal extends Proposal {
 export interface Ledger {
   notes: Record<string, NoteProposal>;
   batch?: BatchProposal;
+  /** Edits set aside for a pull, to put back once it's done; kept here so a crash can't lose them. */
+  settling?: Carry[];
 }
 
 type PrState = "OPEN" | "MERGED" | "CLOSED" | "NONE";
@@ -82,10 +86,15 @@ export function prModeSync(dir: string, branch: string, repo: string, message: s
   };
   ensureExcluded(dir);
   git(dir, ["worktree", "prune"]);
+  const ledger = readLedger(dir);
+  pruneLedger(dir, ledger, done);
+  // Ask the forge before fetching, so a PR it calls merged is in the fetch.
+  const answers = quick ? new Map<string, PrInfo | undefined>() : askForge(dir, ledger);
+  const ask = (proposal: Proposal) => answers.get(proposal.branch);
   const fetch = git(dir, ["fetch", "--quiet", "--prune", "origin"], NETWORK_TIMEOUT_MS);
   if (!fetch.ok) {
     return {
-      done: [`couldn't reach ${repo} (${firstLine(fetch.stderr)}); run \`mahler knowledge sync\` later to propose your changes`],
+      done: [...done, `couldn't reach ${repo} (${firstLine(fetch.stderr)}); run \`mahler knowledge sync\` later to propose your changes`],
       published: false,
     };
   }
@@ -101,26 +110,12 @@ export function prModeSync(dir: string, branch: string, repo: string, message: s
       `${dir} has ${ahead} local ${ahead === 1 ? "commit" : "commits"} on ${branch}, which PR publish never pushes. Publish them with knowledge.publish "direct" and \`mahler knowledge sync\`, or move them to a branch and open a PR by hand.`,
     );
   }
-  const forge = !quick;
-  const ledger = readLedger(dir);
 
-  const batch = settleBatch(dir, remote, forge, ledger, true, done);
-  let pulled = true;
-  const behind = count(dir, `HEAD..${remote}`);
-  if (behind > 0) {
-    const merge = git(dir, ["merge", "--ff-only", "--quiet", remote]);
-    if (merge.ok) {
-      done.push(`pulled ${behind} ${behind === 1 ? "commit" : "commits"}`);
-    } else {
-      pulled = false;
-      fall(
-        `couldn't pull: local edits to ${overwrittenFiles(merge.stderr) || "some notes"} overlap changes on ${branch}. In ${dir}, keep the remote's version (discard or move your copy) or fold yours into it; your edits are proposed once the pull succeeds`,
-      );
-    }
-  }
-  // Edits made after a merged batch's last push, put back on top of the pull.
-  for (const carry of batch.carries) writeOrRemove(resolve(dir, carry.path), pulled ? carry.text : carry.local);
-  const notes = settlePendingNotes(dir, remote, forge, pulled, ledger, done, fall);
+  resumeSettling(dir, ledger, done);
+  const batch = settleBatch(dir, remote, ledger, ask, true, done);
+  const pulled = pull(dir, remote, branch, ledger, done, fall);
+  applySettling(dir, ledger, pulled);
+  const notes = settlePendingNotes(dir, remote, ask, pulled, ledger, done, fall);
   if (quick) return { done, published };
 
   for (const file of pendingNotes(dir)) {
@@ -158,7 +153,7 @@ export function prModeSync(dir: string, branch: string, repo: string, message: s
 function settlePendingNotes(
   dir: string,
   remote: string,
-  forge: boolean,
+  ask: (proposal: Proposal) => PrInfo | undefined,
   pulled: boolean,
   ledger: Ledger,
   done: string[],
@@ -175,7 +170,7 @@ function settlePendingNotes(
       continue;
     }
     const path = `notes/${slug}.md`;
-    const info: PrInfo | undefined = entry.merged ? { state: "MERGED", head: entry.mergedHead } : noteState(dir, remote, forge, entry, path);
+    const info: PrInfo | undefined = entry.merged ? { state: "MERGED", head: entry.mergedHead } : noteState(dir, remote, ask, entry, path);
     if (!info) continue;
     if (info.url && !entry.url) {
       // A PR opened without Mahler hearing back.
@@ -231,14 +226,20 @@ function settlePendingNotes(
 }
 
 /** The note's PR state: merged when the remote holds the note exactly as last pushed, else what the forge says. */
-function noteState(dir: string, remote: string, forge: boolean, entry: NoteProposal, path: string): PrInfo | undefined {
+function noteState(
+  dir: string,
+  remote: string,
+  ask: (proposal: Proposal) => PrInfo | undefined,
+  entry: NoteProposal,
+  path: string,
+): PrInfo | undefined {
   if (entry.head && entry.blob && blobId(dir, remote, path) === entry.blob) return { state: "MERGED", head: entry.head };
-  return forge ? findPr(dir, entry) : undefined;
+  return ask(entry);
 }
 
 interface Carry {
   path: string;
-  /** The file as it is now, put back if the pull fails; null when deleted. */
+  /** The file as it was, put back if the pull fails; null when deleted. */
   local: string | null;
   /** The file to write once the pull succeeds. */
   text: string | null;
@@ -247,39 +248,40 @@ interface Carry {
 /**
  * Settle the open batch when its PR has merged (perhaps with a reviewer's
  * edits) or closed: put each file it proposed back to the clone's version, so
- * the pull can fast-forward over it. A file edited again since its last push
- * keeps the edit. For a merged batch, `carry` folds that edit into the merged
- * version, to write after the pull; without it, or when the edit conflicts,
- * the file is left as it is. Returns the batch's PR state (absent when the
- * forge couldn't say), and the folded edits.
+ * the pull can fast-forward over it. A file edited again since keeps the
+ * edit. For a merged batch, `carry` folds that edit into the merged version
+ * and sets it aside in the ledger to write after the pull; without it, or
+ * when the edit conflicts, the file is left as it is. Returns the batch's PR
+ * state, absent when the forge couldn't say.
  */
 function settleBatch(
   dir: string,
   remote: string,
-  forge: boolean,
   ledger: Ledger,
+  ask: (proposal: Proposal) => PrInfo | undefined,
   carry: boolean,
   done: string[],
-): { state?: PrState; carries: Carry[] } {
+): { state?: PrState } {
   const { batch } = ledger;
-  if (!batch) return { state: "NONE", carries: [] };
+  if (!batch) return { state: "NONE" };
   const entries = Object.entries(batch.files);
-  let info: PrInfo | undefined;
-  if (batch.head && entries.length > 0 && entries.every(([path, id]) => blobId(dir, remote, path) === id)) {
-    info = { state: "MERGED", head: batch.head };
-  } else if (forge) {
-    info = findPr(dir, batch);
-  }
-  if (!info) return { carries: [] };
+  const info: PrInfo | undefined =
+    batch.head && entries.length > 0 && entries.every(([path, id]) => blobId(dir, remote, path) === id)
+      ? { state: "MERGED", head: batch.head }
+      : ask(batch);
+  if (!info) return {};
   if (info.state === "OPEN" || info.state === "NONE") {
     if (info.url && !batch.url) {
       batch.url = info.url;
       writeLedger(dir, ledger);
       done.push(`found ${info.url} for your edits`);
     }
-    return { state: info.state, carries: [] };
+    return { state: info.state };
   }
   ensureCommit(dir, info.head);
+  // Decide everything first, and record the edits to carry over, so nothing
+  // is lost if the restores below are interrupted.
+  const restores: string[] = [];
   const carries: Carry[] = [];
   let kept = 0;
   for (const [path, recorded] of entries) {
@@ -287,7 +289,7 @@ function settleBatch(
     const base = info.state === "MERGED" ? baseBlob(dir, info.head, batch.head, path, recorded) : recorded;
     const theirs = blobId(dir, remote, path);
     if (local === base || local === theirs) {
-      restore(dir, path);
+      restores.push(path);
       continue;
     }
     const localText = local === null ? null : readFileSync(resolve(dir, path), "utf8");
@@ -300,20 +302,115 @@ function settleBatch(
       }
     }
     if (text !== undefined && text === (theirs === null ? null : readBlob(dir, theirs))) {
-      restore(dir, path);
+      restores.push(path);
       continue;
     }
     kept += 1;
-    if (text === undefined) continue;
-    restore(dir, path);
-    carries.push({ path, local: localText, text });
+    if (text !== undefined) carries.push({ path, local: localText, text });
   }
+  ledger.settling = [...(ledger.settling ?? []), ...carries];
   delete ledger.batch;
   writeLedger(dir, ledger);
+  for (const path of [...restores, ...carries.map((entry) => entry.path)]) restore(dir, path);
   const name = batch.url ?? batch.branch;
   const later = kept > 0 ? `, keeping your later edits to ${kept} ${kept === 1 ? "file" : "files"}` : "";
   done.push(info.state === "MERGED" ? `${name} merged${later}` : `dropped the edits in ${name} (closed unmerged)${later}`);
-  return { state: info.state, carries };
+  return { state: info.state };
+}
+
+/**
+ * Fast-forward to the remote branch. Local edits in the way are folded into
+ * the incoming changes (three-way, against HEAD) and put back after; only
+ * edits that conflict block the pull.
+ */
+function pull(dir: string, remote: string, branch: string, ledger: Ledger, done: string[], fall: (why: string) => void): boolean {
+  const behind = count(dir, `HEAD..${remote}`);
+  if (behind === 0) return true;
+  let merge = git(dir, ["merge", "--ff-only", "--quiet", remote]);
+  let blocking = merge.ok ? [] : overwrittenPaths(merge.stderr);
+  if (!merge.ok && blocking.length > 0) {
+    const folds: Carry[] = [];
+    const conflicts: string[] = [];
+    for (const path of blocking) {
+      const local = existsSync(resolve(dir, path)) ? readFileSync(resolve(dir, path), "utf8") : null;
+      const head = blobId(dir, "HEAD", path);
+      const theirs = blobId(dir, remote, path);
+      const text = local === null || theirs === null ? undefined : merge3(dir, local, head ? readBlob(dir, head) ?? "" : "", readBlob(dir, theirs) ?? "");
+      if (text === undefined) conflicts.push(path);
+      else folds.push({ path, local, text });
+    }
+    if (conflicts.length === 0) {
+      ledger.settling = [...(ledger.settling ?? []), ...folds];
+      writeLedger(dir, ledger);
+      for (const fold of folds) restore(dir, fold.path);
+      merge = git(dir, ["merge", "--ff-only", "--quiet", remote]);
+      if (merge.ok) done.push(`folded your edits to ${folds.map((fold) => fold.path).join(", ")} into the pulled changes`);
+      else blocking = overwrittenPaths(merge.stderr);
+    } else {
+      blocking = conflicts;
+    }
+  }
+  if (merge.ok) {
+    done.push(`pulled ${behind} ${behind === 1 ? "commit" : "commits"}`);
+    return true;
+  }
+  fall(
+    `couldn't pull: your edits to ${blocking.join(", ") || "some notes"} conflict with changes on ${branch}. In ${dir}, fold them into the remote's version by hand, then sync again; until then your edits aren't proposed`,
+  );
+  return false;
+}
+
+/** Put back edits set aside for the pull: folded after a successful one, as they were after a failed one. */
+function applySettling(dir: string, ledger: Ledger, pulled: boolean): void {
+  if (!ledger.settling || ledger.settling.length === 0) return;
+  for (const carry of ledger.settling) writeOrRemove(resolve(dir, carry.path), pulled ? carry.text : carry.local);
+  delete ledger.settling;
+  writeLedger(dir, ledger);
+}
+
+/**
+ * Pick up edits an interrupted sync set aside: restore the files it hadn't
+ * yet, so this sync's pull puts them back. A file edited since is left alone.
+ */
+function resumeSettling(dir: string, ledger: Ledger, done: string[]): void {
+  if (!ledger.settling || ledger.settling.length === 0) return;
+  ledger.settling = ledger.settling.filter((carry) => {
+    const now = existsSync(resolve(dir, carry.path)) ? readFileSync(resolve(dir, carry.path), "utf8") : null;
+    if (now === carry.text) return false;
+    if (now === carry.local) {
+      restore(dir, carry.path);
+      return true;
+    }
+    if (localBlobId(dir, carry.path) === blobId(dir, "HEAD", carry.path)) return true;
+    done.push(`left ${carry.path} as you edited it, instead of finishing an interrupted sync's change to it`);
+    return false;
+  });
+  if (ledger.settling.length === 0) delete ledger.settling;
+  writeLedger(dir, ledger);
+}
+
+/** Ask the forge about every recorded PR, once per sync. */
+function askForge(dir: string, ledger: Ledger): Map<string, PrInfo | undefined> {
+  const answers = new Map<string, PrInfo | undefined>();
+  const proposals: Proposal[] = [
+    ...(ledger.batch ? [ledger.batch] : []),
+    ...Object.values(ledger.notes).filter((entry) => !entry.merged),
+  ];
+  for (const proposal of proposals) answers.set(proposal.branch, findPr(dir, proposal));
+  return answers;
+}
+
+/** Forget PRs whose pending note is gone (deleted by hand, or dropped by an interrupted sync). */
+function pruneLedger(dir: string, ledger: Ledger, done: string[]): void {
+  const present = new Set(pendingNotes(dir).map((file) => basename(file, ".md")));
+  const gone = Object.keys(ledger.notes).filter((slug) => !present.has(slug));
+  if (gone.length === 0) return;
+  for (const slug of gone) {
+    const { url, merged } = ledger.notes[slug];
+    delete ledger.notes[slug];
+    if (url && !merged) done.push(`forgot the PR for ${slug}, since pending/${slug}.md is gone; close ${url} if it's still open`);
+  }
+  writeLedger(dir, ledger);
 }
 
 /**
@@ -394,12 +491,12 @@ function proposeNote(
     entry = ledger.notes[slug] = { branch: `knowledge/${slug}-${randomBytes(2).toString("hex")}` };
     writeLedger(dir, ledger);
   }
-  if (entry.blob !== local) {
+  if (entry.blob !== local || lostBranch(dir, entry)) {
     const path = `notes/${slug}.md`;
     const pushed = pushToBranch(dir, remote, entry, message.endsWith(slug) ? message : `knowledge: add ${slug}`, {
       has: (ref) => blobId(dir, ref, path) === local,
       fill: (worktree) => writeOrRemove(resolve(worktree, path), text),
-    });
+    }, () => writeLedger(dir, ledger));
     if (pushed.foreign) {
       fall(`${entry.url ?? entry.branch} has commits from someone else, so Mahler leaves it alone; your newer edits to pending/${slug}.md wait until it merges or closes`);
       return;
@@ -408,7 +505,7 @@ function proposeNote(
       fall(`couldn't push ${slug} for review (${pushed.error}); run \`mahler knowledge sync\` later`);
       return;
     }
-    Object.assign(entry, { head: pushed.head, blob: local });
+    Object.assign(entry, { head: pushed.head, blob: local, pushing: undefined });
     writeLedger(dir, ledger);
     if (entry.url) done.push(`updated ${entry.url} for ${slug}`);
   }
@@ -467,7 +564,8 @@ function proposeEdits(
     fall(`${name(proposal)} has commits from someone else, so Mahler leaves it alone; your newer edits wait until it merges or closes`);
   if (batch && paths.length === 0) {
     // Every edit was undone: withdraw the PR.
-    if (tip(dir, batch.branch) !== batch.head) {
+    const current = tip(dir, batch.branch);
+    if (current !== batch.head && current !== batch.pushing) {
       if (batch.head) return foreign(batch);
     } else if (batch.url) {
       const closed = gh(dir, ["pr", "close", batch.url, "--delete-branch", "--comment", "Mahler withdrew this PR: its edits were undone."]);
@@ -490,7 +588,7 @@ function proposeEdits(
     "",
     "Proposed by Mahler, which updates this PR as the edits change. Merge to publish them to every clone of this store; close the PR to drop them.",
   ].join("\n");
-  const changed = !batch || !sameFiles(batch.files, files);
+  const changed = !batch || !sameFiles(batch.files, files) || lostBranch(dir, batch);
   if (!batch) {
     batch = ledger.batch = { branch: `knowledge/update-${new Date().toISOString().slice(0, 10)}-${randomBytes(3).toString("hex")}`, files: {} };
     writeLedger(dir, ledger);
@@ -505,13 +603,13 @@ function proposeEdits(
         for (const path of paths) writeOrRemove(resolve(worktree, path), files[path] === null ? null : readFileSync(resolve(dir, path), "utf8"));
         for (const path of undone) writeOrRemove(resolve(worktree, path), blobId(dir, base, path) === null ? null : gitText(dir, ["show", `${base}:${path}`]) ?? "");
       },
-    });
+    }, () => writeLedger(dir, ledger));
     if (pushed.foreign) return foreign(batch);
     if (pushed.error) {
       fall(`couldn't push your edits for review (${pushed.error}); run \`mahler knowledge sync\` later`);
       return;
     }
-    Object.assign(batch, { head: pushed.head, files });
+    Object.assign(batch, { head: pushed.head, files, pushing: undefined });
     writeLedger(dir, ledger);
     if (batch.url) {
       const edit = gh(dir, ["pr", "edit", batch.url, "--title", title, "--body", body]);
@@ -536,6 +634,11 @@ function sameFiles(a: Record<string, string | null>, b: Record<string, string | 
   return keys.length === Object.keys(b).length && keys.every((key) => key in b && a[key] === b[key]);
 }
 
+/** A branch pushed but gone from the remote before its PR opened. */
+function lostBranch(dir: string, proposal: Proposal): boolean {
+  return !proposal.url && proposal.head !== undefined && tip(dir, proposal.branch) === undefined;
+}
+
 /** The remote-tracking tip of a PR branch, as of the last fetch. */
 function tip(dir: string, head: string): string | undefined {
   const result = git(dir, ["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${head}`]);
@@ -547,8 +650,9 @@ function tip(dir: string, head: string): string | undefined {
  * the branch (or the remote branch, for a new one), and push it without
  * force. `has` says whether a commit already holds the change (a push whose
  * reply was lost); `base` is where the branch left the remote branch. A
- * branch whose tip isn't Mahler's last push has someone else's commits, and
- * is left alone. The clone's own checkout and working tree are untouched.
+ * branch whose tip isn't Mahler's last push (or the one it last tried) has
+ * someone else's commits, and is left alone. The caller records the new
+ * head and clears `pushing`. The clone's own checkout and working tree are untouched.
  */
 function pushToBranch(
   dir: string,
@@ -556,12 +660,14 @@ function pushToBranch(
   proposal: Proposal,
   message: string,
   change: { has: (ref: string, base: string) => boolean; fill: (worktree: string, base: string) => void },
+  save: () => void,
 ): { head?: string; foreign?: boolean; error?: string } {
   const current = tip(dir, proposal.branch);
-  if (current === undefined && proposal.head) return { error: `its branch ${proposal.branch} is gone from the remote` };
+  // A branch gone before its PR opened is simply pushed again.
+  if (current === undefined && proposal.head && proposal.url) return { error: `its branch ${proposal.branch} is gone from the remote` };
   const base = current === undefined ? remote : git(dir, ["merge-base", remote, current]).stdout || remote;
   if (current !== undefined && change.has(current, base)) return { head: current };
-  if (current !== undefined && current !== proposal.head) return { foreign: true };
+  if (current !== undefined && current !== proposal.head && current !== proposal.pushing) return { foreign: true };
   const scratch = mkdtempSync(resolve(tmpdir(), "mahler-knowledge-pr-"));
   const worktree = resolve(scratch, "tree");
   try {
@@ -571,6 +677,9 @@ function pushToBranch(
     if (git(worktree, ["diff", "--cached", "--quiet"]).ok) return { head: current ?? undefined, error: current ? undefined : "nothing to propose" };
     gitOrThrow(worktree, ["commit", "--quiet", "-m", message]);
     const head = gitOrThrow(worktree, ["rev-parse", "HEAD"]);
+    // Recorded first: a push that lands without Mahler hearing back is still its own.
+    proposal.pushing = head;
+    save();
     const push = git(worktree, ["push", "--quiet", "origin", `HEAD:refs/heads/${proposal.branch}`], NETWORK_TIMEOUT_MS);
     if (!push.ok) return { error: firstLine(push.stderr) };
     git(dir, ["update-ref", `refs/remotes/origin/${proposal.branch}`, head]);
@@ -603,23 +712,39 @@ function openOrFindPr(dir: string, branch: string, head: string, title: string, 
  * left behind. A pending note whose PR is open (or never opened) moves into
  * `notes/`, to be pushed like any other change; one whose PR closed is
  * dropped, unless it changed since; one whose PR merged arrives with the pull.
- * A batch's edits are published directly, unless its PR merged or closed.
- * Notes the forge can't settle wait in `pending/`. Returns what happened,
- * for the sync summary.
+ * A batch's edits are published directly, unless its PR merged or closed;
+ * when the forge can't say which, nothing is published (`blocked`). Notes
+ * the forge can't settle wait in `pending/`. Returns what happened, for the
+ * sync summary.
  */
-export function leavePrMode(dir: string, branch: string): string[] {
+export function leavePrMode(dir: string, branch: string): { done: string[]; blocked?: string } {
   const ledger = readLedger(dir);
-  const files = pendingNotes(dir);
-  if (files.length === 0 && !ledger.batch && Object.keys(ledger.notes).length === 0) return [];
   const done: string[] = [];
+  pruneLedger(dir, ledger, done);
+  const files = pendingNotes(dir);
+  if (files.length === 0 && !ledger.batch && Object.keys(ledger.notes).length === 0 && !ledger.settling?.length) return { done };
+  if (ledger.settling?.length) {
+    return {
+      done,
+      blocked: `an interrupted PR-publish sync left edits to put back (${ledger.settling.map((carry) => carry.path).join(", ")}); set knowledge.publish to "pr" and sync once before publishing directly`,
+    };
+  }
+  const answers = askForge(dir, ledger);
+  const ask = (proposal: Proposal) => answers.get(proposal.branch);
   const remote = `refs/remotes/origin/${branch}`;
   git(dir, ["fetch", "--quiet", "--prune", "origin"], NETWORK_TIMEOUT_MS);
   const withdraw: string[] = [];
+  let blocked: string | undefined;
   if (ledger.batch) {
     const batch = ledger.batch;
-    const { state } = settleBatch(dir, remote, true, ledger, false, done);
-    if (state !== "MERGED" && state !== "CLOSED" && batch.url) withdraw.push(batch.url);
-    delete ledger.batch;
+    const { state } = settleBatch(dir, remote, ledger, ask, false, done);
+    if (state === undefined) {
+      // It may have closed: don't publish edits a reviewer turned down.
+      blocked = `couldn't check ${batch.url ?? batch.branch}, the PR holding your edits; nothing was published. Make sure \`gh\` works, or close that PR and delete pending/prs.json, then sync again`;
+    } else {
+      if (state === "OPEN" && batch.url) withdraw.push(batch.url);
+      delete ledger.batch;
+    }
   }
   let moved = 0;
   for (const file of files) {
@@ -630,7 +755,7 @@ export function leavePrMode(dir: string, branch: string): string[] {
       ? { state: "NONE" }
       : entry.merged
         ? { state: "MERGED", head: entry.mergedHead }
-        : noteState(dir, remote, true, entry, path);
+        : noteState(dir, remote, ask, entry, path);
     if (!info) {
       done.push(`left pending/${slug}.md: couldn't check its PR, ${entry!.url ?? entry!.branch}`);
       continue;
@@ -665,7 +790,7 @@ export function leavePrMode(dir: string, branch: string): string[] {
   writeLedger(dir, ledger);
   if (moved > 0) done.push(`moved ${moved} pending ${moved === 1 ? "note" : "notes"} into notes/`);
   if (withdraw.length > 0) done.push(`close ${withdraw.join(", ")} on the forge: this sync publishes ${withdraw.length === 1 ? "its" : "their"} changes directly`);
-  return done;
+  return { done, blocked };
 }
 
 // ---------------------------------------------------------------------------
@@ -723,7 +848,7 @@ export function pendingNotes(dir: string): string[] {
 function readLedger(dir: string): Ledger {
   try {
     const parsed = JSON.parse(readFileSync(resolve(dir, "pending", LEDGER), "utf8")) as Partial<Ledger>;
-    return { notes: parsed.notes ?? {}, batch: parsed.batch };
+    return { notes: parsed.notes ?? {}, batch: parsed.batch, settling: parsed.settling };
   } catch {
     return { notes: {} };
   }
@@ -731,7 +856,7 @@ function readLedger(dir: string): Ledger {
 
 function writeLedger(dir: string, ledger: Ledger): void {
   const file = resolve(dir, "pending", LEDGER);
-  if (!ledger.batch && Object.keys(ledger.notes).length === 0) {
+  if (!ledger.batch && Object.keys(ledger.notes).length === 0 && !ledger.settling?.length) {
     rmSync(file, { force: true });
     return;
   }
@@ -779,12 +904,11 @@ function isMachineLocal(path: string): boolean {
 }
 
 /** The files git refused to overwrite, from a failed merge's stderr. */
-function overwrittenFiles(stderr: string): string {
+function overwrittenPaths(stderr: string): string[] {
   return stderr
     .split("\n")
     .filter((line) => /^\s+\S/.test(line) && !/^\s*(Please|Aborting)/.test(line))
-    .map((line) => line.trim())
-    .join(", ");
+    .map((line) => line.trim());
 }
 
 function blobId(dir: string, ref: string, path: string): string | null {

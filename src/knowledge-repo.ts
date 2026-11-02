@@ -270,8 +270,10 @@ export function syncKnowledge(workspace: string, config: HarnessConfig, options:
 /** Direct publish: commit, rebase onto the remote branch, push (one retry). */
 function directSync(dir: string, branch: string, repo: string, message: string): { done: string[]; published: boolean } {
   // Left over from PR publish: settle its PRs, and publish what's still pending.
-  const done: string[] = leavePrMode(dir, branch);
+  const left = leavePrMode(dir, branch);
+  const done = left.done;
   const unpublished = (why: string) => ({ done: [...done, why], published: false });
+  if (left.blocked) return unpublished(left.blocked);
   // Ignoring a file the repo already tracks does nothing, so untrack it too.
   gitOrThrow(dir, ["rm", "-r", "--cached", "--quiet", "--ignore-unmatch", "--", ...IGNORED.map(ignoredPathspec)]);
   gitOrThrow(dir, ["add", "--all"]);

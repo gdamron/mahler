@@ -122,9 +122,13 @@ function importLedgerNote(workspace: string, config: HarnessConfig, target: stri
     writeIndexes(workspace, config);
     console.log(`Archived the ledger note: ${archived}`);
   }
-  publish(workspace, config, `knowledge: import ${basename(file, ".md")}`, file);
-  if (archivedText !== undefined) {
-    publishLedger(workspace, config, `decisions: archive ${basename(source, ".md")}`, archived);
+  try {
+    publish(workspace, config, `knowledge: import ${basename(file, ".md")}`, file);
+  } finally {
+    // A knowledge failure doesn't stop the ledger's backup.
+    if (archivedText !== undefined) {
+      publishLedger(workspace, config, `decisions: archive ${basename(source, ".md")}`, archived);
+    }
   }
   if (!title || !description) {
     console.log(

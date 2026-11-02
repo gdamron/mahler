@@ -120,7 +120,7 @@ export interface KnowledgeConfig {
 
 /** The decisions ledger stays at `.harness/decisions`; a repo only backs it up. */
 export interface DecisionsConfig {
-  /** A git remote to back the ledger up to; it can differ from `knowledge.repo`. Always publishes directly. */
+  /** A git remote to back the ledger up to; not `knowledge.repo`'s branch. Always publishes directly. */
   repo?: string;
   /** The branch the ledger is pushed to (default "main"). */
   branch?: string;

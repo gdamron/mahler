@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
 import { decisionsDir, knowledgeDir, knowledgeIndex, readLedger, readNotes } from "../knowledge.js";
-import { knowledgeStore, ledgerStore, prPublish, storeState } from "../knowledge-repo.js";
+import { knowledgeStore, ledgerRepoProblem, ledgerStore, prPublish, storeState } from "../knowledge-repo.js";
 import { frontmatterField, pendingNotes, proposalStatus } from "../knowledge-pr.js";
 import { modelConfigProblems, tierVariants } from "../models.js";
 import { spotlightFinding } from "../spotlight.js";
@@ -410,6 +410,8 @@ export function knowledgeFindings(workspace: string, config: HarnessConfig): Fin
 export function ledgerRepoFindings(workspace: string, config: HarnessConfig): Finding[] {
   const store = ledgerStore(workspace, config);
   if (!store.repo) return [];
+  const clash = ledgerRepoProblem(workspace, config);
+  if (clash) return [{ level: "error", message: `decisions ledger: ${clash}` }];
   const state = storeState(workspace, store);
   if (state.problem) return [{ level: "error", message: `decisions ledger: ${state.problem}` }];
   const findings: Finding[] = [

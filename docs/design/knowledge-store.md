@@ -274,8 +274,12 @@ Both stores use the same backend code, and a similar shape:
   - when `gh` can't say what happened to the batch, nothing is published
     until it can.
 - `decisions.repo`: a private backup of the ledger, which can live on a
-  different remote from the knowledge repo. The ledger always publishes
-  directly, with the same clone, lock, and push code as the knowledge store.
+  different remote from the knowledge repo, or on another branch of it (not
+  the same branch: each sync would pull the other store's files). The ledger
+  always publishes directly, with the same clone, lock, and push code as the
+  knowledge store. Ledger notes are named by date and rule, so two machines
+  can pick the same name; the one pushed second is renamed (`-2`) rather
+  than conflicting, at sync and when install carries local notes in.
   Its folder stays `.harness/decisions`, since policies and templates name
   it. `decide` and `knowledge import --archive` push, and briefs and
   `knowledge sync` pull too. A failed backup only warns, because the note is

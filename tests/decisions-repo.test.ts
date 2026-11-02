@@ -23,9 +23,9 @@ function ledgerWorkspace(shared: string): string {
   return dir;
 }
 
-function decide(dir: string, rule: string) {
+function decide(dir: string, rule: string, reason = `It fit here, in ${dir}.`) {
   return run([
-    "decide", "--workspace", dir, "--rule", rule, "--description", `${rule} applied.`, "--reason", "It fit here.",
+    "decide", "--workspace", dir, "--rule", rule, "--description", `${rule} applied.`, "--reason", reason,
   ]);
 }
 
@@ -166,4 +166,82 @@ test("a reinstall keeps decisions.repo", () => {
   assert.equal(setRepo(dir, {}).status, 0);
   const config = JSON.parse(readFileSync(resolve(dir, ".harness/config.json"), "utf8"));
   assert.equal(config.decisions.repo, shared);
+});
+
+test("two machines recording the same rule on the same day keep both notes", () => {
+  const shared = remote();
+  const a = ledgerWorkspace(shared);
+  const b = ledgerWorkspace(shared);
+  assert.equal(decide(a, "scope").status, 0);
+  const second = decide(b, "scope");
+  assert.equal(second.status, 0, second.stderr);
+  assert.match(second.stdout, /renamed (\d{4}-\d{2}-\d{2})-scope\.md to \1-scope-2\.md, a name another machine had used; pulled 1 commit; pushed 1 commit/);
+  const tracked = git(shared, ["ls-tree", "-r", "--name-only", "main"]).split("\n").filter((file) => file.includes("scope"));
+  assert.equal(tracked.length, 2);
+
+  const later = decide(b, "commit-size");
+  assert.equal(later.status, 0, later.stderr);
+  assert.doesNotMatch(later.stderr, /conflict/);
+  assert.equal(run(["knowledge", "sync", "--workspace", a]).status, 0);
+  assert.equal(ledgerNotes(a).length, 3);
+
+  // Again, now that both clones share history.
+  assert.equal(decide(a, "review").status, 0);
+  const again = decide(b, "review");
+  assert.equal(again.status, 0, again.stderr);
+  assert.match(again.stdout, /renamed .*-review\.md to .*-review-2\.md/);
+  assert.equal(git(shared, ["ls-tree", "-r", "--name-only", "main"]).split("\n").filter((file) => file.includes("review")).length, 2);
+});
+
+test("a clash with a decision recorded offline is renamed when it reconnects", () => {
+  const shared = remote();
+  const a = ledgerWorkspace(shared);
+  const b = ledgerWorkspace(shared);
+  const away = `${shared}.away`;
+  renameSync(shared, away);
+  assert.equal(decide(b, "scope").status, 0);
+  assert.equal(decide(b, "commit-size").status, 0);
+  renameSync(away, shared);
+  assert.equal(decide(a, "scope").status, 0);
+
+  const synced = run(["knowledge", "sync", "--workspace", b]);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /renamed .*-scope\.md to .*-scope-2\.md/);
+  assert.equal(git(shared, ["ls-tree", "-r", "--name-only", "main"]).split("\n").filter((file) => /^\d{4}-/.test(file)).length, 3);
+});
+
+test("install carries a local note whose name the repo already has under a new name", () => {
+  const shared = remote();
+  const a = ledgerWorkspace(shared);
+  const dir = workspace();
+  assert.equal(decide(a, "scope").status, 0);
+  assert.equal(decide(dir, "scope").status, 0);
+  const installed = setLedgerRepo(dir, { repo: shared });
+  assert.equal(installed.status, 0, installed.stderr);
+  assert.match(installed.stdout, /copied in under new names: (\d{4}-\d{2}-\d{2})-scope\.md as \1-scope-2\.md/);
+  assert.equal(ledgerNotes(dir).length, 2);
+});
+
+test("the ledger can't share the knowledge store's branch", () => {
+  const shared = remote();
+  const dir = workspace(shared);
+  assert.equal(learn(dir, "Builds need the seed step").status, 0);
+  const installed = setLedgerRepo(dir, { repo: shared });
+  assert.notEqual(installed.status, 0);
+  assert.match(installed.stderr, /decisions\.repo is knowledge\.repo, on the same branch "main"/);
+  assert.match(run(["doctor", dir]).stdout, /decisions ledger: decisions\.repo is knowledge\.repo/);
+
+  assert.equal(setLedgerRepo(dir, { repo: shared, branch: "decisions" }).status, 0);
+  assert.equal(decide(dir, "scope").status, 0);
+  assert.match(git(shared, ["ls-tree", "-r", "--name-only", "decisions"]), /-scope\.md/);
+  assert.doesNotMatch(git(shared, ["ls-tree", "-r", "--name-only", "main"]), /-scope\.md/);
+});
+
+test("decide with an unreadable config saves the note and exits cleanly", () => {
+  const dir = ledgerWorkspace(remote());
+  writeFileSync(resolve(dir, ".harness/config.json"), "{");
+  const result = decide(dir, "scope");
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /is saved locally, but it wasn't backed up/);
+  assert.equal(ledgerNotes(dir).length, 1);
 });

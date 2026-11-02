@@ -198,10 +198,11 @@ passes 20 notes.
 To back the ledger up, set `decisions.repo` (and optionally
 `decisions.branch`) in `.harness/config.json` and rerun `mahler install`,
 which clones the repo into `.harness/decisions/` and carries over the notes
-already there. The repo can differ from the knowledge repo. `mahler decide`
-and `mahler knowledge import --archive` then commit and push. Briefs pull,
-and `mahler knowledge sync` syncs both stores. The ledger always pushes
-directly, never through PRs.
+already there. It can be its own repo, or the knowledge repo on another
+branch. `mahler decide` and `mahler knowledge import --archive` then commit
+and push, and briefs and `mahler knowledge sync` pull and push. The ledger
+always pushes directly, never through PRs. When two machines record notes
+with the same name, the one pushed second is renamed (`-2`), so both are kept.
 
 Install compiles canonical Mahler source into native agent artifacts:
 

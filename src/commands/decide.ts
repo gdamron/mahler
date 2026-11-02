@@ -42,16 +42,30 @@ export function decide(flags: Flags): void {
   console.log(
     `Reference it from the issue's HANDOFF.md under "Workflow Deviations". This ledger is append-only — never edit or delete entries.`,
   );
-  publishLedger(workspace, loadConfig(workspace), `decisions: add ${basename(path, ".md")}`, path);
+  // The note is saved: nothing from here on may fail the command, or a retry would record it twice.
+  let config: HarnessConfig;
+  try {
+    config = loadConfig(workspace);
+  } catch (error) {
+    console.warn(`${path} is saved locally, but it wasn't backed up: ${(error as Error).message}`);
+    return;
+  }
+  publishLedger(workspace, config, `decisions: add ${basename(path, ".md")}`, path, 15_000);
 }
 
 /**
  * With `decisions.repo`, back up what was just written. The note is saved
  * either way, so a failure only warns: the next sync pushes it.
  */
-export function publishLedger(workspace: string, config: HarnessConfig, message: string, file: string): void {
+export function publishLedger(
+  workspace: string,
+  config: HarnessConfig,
+  message: string,
+  file: string,
+  lockWaitMs?: number,
+): void {
   try {
-    const result = syncLedger(workspace, config, { message });
+    const result = syncLedger(workspace, config, { message, lockWaitMs });
     if (!result) return;
     if (result.published) console.log(result.summary);
     else console.warn(result.summary);

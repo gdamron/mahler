@@ -42,15 +42,15 @@ test("selectProjectIssue filters by assignee and label", () => {
     {
       name: "Project",
       issues: [
-        { identifier: "FUG-1", title: "No label", assignee: "gonzo", labels: [], priority: 1 },
-        { identifier: "FUG-2", title: "Wrong assignee", assignee: "human", labels: ["agent"], priority: 1 },
-        { identifier: "FUG-3", title: "Right issue", assignee: "gonzo", labels: ["agent"], priority: 2 }
+        { identifier: "DEV-1", title: "No label", assignee: "gonzo", labels: [], priority: 1 },
+        { identifier: "DEV-2", title: "Wrong assignee", assignee: "human", labels: ["agent"], priority: 1 },
+        { identifier: "DEV-3", title: "Right issue", assignee: "gonzo", labels: ["agent"], priority: 2 }
       ]
     },
     config,
     new Set()
   );
-  assert.equal(selection.issue.identifier, "FUG-3");
+  assert.equal(selection.issue.identifier, "DEV-3");
 });
 
 test("selectProjectIssue sorts by priority then oldest update", () => {
@@ -63,7 +63,7 @@ test("selectProjectIssue sorts by priority then oldest update", () => {
       name: "Project",
       issues: [
         {
-          identifier: "FUG-2",
+          identifier: "DEV-2",
           title: "Newer",
           assignee: "gonzo",
           labels: ["agent"],
@@ -71,7 +71,7 @@ test("selectProjectIssue sorts by priority then oldest update", () => {
           updatedAt: "2026-05-02T00:00:00Z"
         },
         {
-          identifier: "FUG-1",
+          identifier: "DEV-1",
           title: "Older",
           assignee: "gonzo",
           labels: ["agent"],
@@ -79,7 +79,7 @@ test("selectProjectIssue sorts by priority then oldest update", () => {
           updatedAt: "2026-05-01T00:00:00Z"
         },
         {
-          identifier: "FUG-3",
+          identifier: "DEV-3",
           title: "Lower priority",
           assignee: "gonzo",
           labels: ["agent"],
@@ -91,7 +91,7 @@ test("selectProjectIssue sorts by priority then oldest update", () => {
     config,
     new Set()
   );
-  assert.equal(selection.issue.identifier, "FUG-1");
+  assert.equal(selection.issue.identifier, "DEV-1");
 });
 
 test("readProjectFile copies project labels onto issues without their own", () => {
@@ -100,15 +100,15 @@ test("readProjectFile copies project labels onto issues without their own", () =
     name: "Project",
     labels: [" high-risk "],
     issues: [
-      { identifier: "FUG-1", title: "Inherits" },
-      { identifier: "FUG-2", title: "Own labels", projectLabels: [] }
+      { identifier: "DEV-1", title: "Inherits" },
+      { identifier: "DEV-2", title: "Own labels", projectLabels: [] }
     ]
   }));
   const project = readProjectFile(path);
   assert.deepEqual(project?.labels, ["high-risk"]);
   assert.deepEqual(project?.issues[0].projectLabels, ["high-risk"]);
   assert.deepEqual(project?.issues[1].projectLabels, []);
-  assert.equal(normalizeIssue({ identifier: "FUG-3", title: "t" }).projectLabels, undefined);
+  assert.equal(normalizeIssue({ identifier: "DEV-3", title: "t" }).projectLabels, undefined);
 });
 
 test("project template issues inherit the project's labels", () => {

@@ -138,7 +138,7 @@ switch branches.
 Start a fresh agent in the product workspace and prompt it normally:
 
 ```text
-work on FUG-123
+work on DEV-123
 ```
 
 or:

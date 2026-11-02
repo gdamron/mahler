@@ -77,7 +77,7 @@ test("dogfood issue prompt workflow installs native artifacts and creates an iss
   assert.match(claudeSkill, /name: work-on-issue/);
   assert.match(readFileSync(resolve(workspace, "AGENTS.md"), "utf8"), /<!-- HARNESS:START -->/);
   assert.match(readFileSync(resolve(workspace, "CLAUDE.md"), "utf8"), /<!-- HARNESS:START -->/);
-  assert.match(readFileSync(resolve(workspace, "WORKFLOW.md"), "utf8"), /work on FUG-123/);
+  assert.match(readFileSync(resolve(workspace, "WORKFLOW.md"), "utf8"), /work on DEV-123/);
 
   const doctor = run(["doctor", workspace]);
   assert.equal(doctor.status, 0, doctor.stdout);

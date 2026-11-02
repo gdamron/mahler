@@ -4,7 +4,7 @@ This workspace uses Mahler for multi-agent development. A **composer agent** coo
 
 ## What To Do When Prompted
 
-- If asked to "work on FUG-123", run the Mahler issue workflow for that issue brief.
+- If asked to "work on DEV-123", run the Mahler issue workflow for that issue brief.
 - If asked to "work on project X in Linear", use Linear MCP to inspect the project. A composer plans across all eligible issues and dispatches one conductor per issue; any other role selects one eligible issue, then creates the issue brief.
 - If the human describes work in conversation instead, agree on acceptance criteria and a risk level, write a local task with `mahler task <slug>`, and run the same workflow for `local-<slug>` once the human says go. No Linear issue is needed.
 - Confirm the work's risk level before starting, and complete the verification it calls for (`.harness/policies/risk.md`, `.harness/policies/verification.md`).

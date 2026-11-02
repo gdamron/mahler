@@ -7,9 +7,8 @@ record; they merge only when the human explicitly asks for that specific PR.
 
 ## Who Decides
 
-The human no longer reviews code by default. Risk decides how much
-verification a PR needs (see the risk and verification policies); these rules
-decide only who merges it.
+Risk decides how much verification a PR needs (see the risk and verification
+policies); these rules decide only who merges it.
 
 Check labels on both the issue and its project. The issue brief records them
 (`labels` and `projectLabels` in `linear-issue.json`, summarized under `## Merge`

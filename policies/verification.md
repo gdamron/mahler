@@ -1,7 +1,7 @@
 # Verification Policy
 
-The human does not review code. They own the project's acceptance criteria and
-need to trust that what agents merge works. That trust comes from three
+The human does not always review code. They own the project's acceptance criteria
+and need to trust that what agents merge works. That trust comes from three
 things: tests written by an agent that did not write the code, checks that
 grow with risk, and a record of what was verified.
 
@@ -17,7 +17,7 @@ level includes everything in the levels before it.
   changes them.
 - When the work belongs to a project with an acceptance suite, the suite
   passes for this change: `mahler acceptance run --project <slug> --issue
-  <ISSUE>`.
+<ISSUE>`.
 - The verification record is in `HANDOFF.md` and the PR description.
 
 ## Low Risk

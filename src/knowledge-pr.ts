@@ -43,6 +43,8 @@ interface NoteProposal extends Proposal {
   blob?: string;
   /** Merged, but edited here since in a way that conflicts with the merged note. */
   merged?: boolean;
+  /** The PR's head commit as merged, once it has. */
+  mergedHead?: string;
 }
 
 interface BatchProposal extends Proposal {
@@ -147,9 +149,9 @@ export function prModeSync(dir: string, branch: string, repo: string, message: s
 
 /**
  * Settle pending notes whose PR merged or closed. A merged note is dropped
- * once the pull that brings it has succeeded, with any edit made after its
- * last push folded into the merged note; a closed one is dropped unless it
- * changed since, when it's proposed afresh. Returns each still-pending note's
+ * once the pull that brings it has succeeded, with any edit made after the
+ * push that merged folded into the merged note; a closed one is dropped
+ * unless it changed since its last push, when it's proposed afresh. Returns each still-pending note's
  * PR state (absent when the forge couldn't say), and the merged notes that
  * wait on a pull or a hand merge, which must not be proposed again.
  */
@@ -173,7 +175,7 @@ function settlePendingNotes(
       continue;
     }
     const path = `notes/${slug}.md`;
-    const info: PrInfo | undefined = entry.merged ? { state: "MERGED", head: entry.head } : noteState(dir, remote, forge, entry, path);
+    const info: PrInfo | undefined = entry.merged ? { state: "MERGED", head: entry.mergedHead } : noteState(dir, remote, forge, entry, path);
     if (!info) continue;
     if (info.url && !entry.url) {
       // A PR opened without Mahler hearing back.
@@ -186,12 +188,10 @@ function settlePendingNotes(
     }
     const name = entry.url ?? entry.branch;
     ensureCommit(dir, info.head);
-    const proposed = proposedBlob(dir, info.head, path, entry.blob);
     const text = readFileSync(file, "utf8");
-    const local = blobIdOf(dir, text);
     if (info.state === "CLOSED") {
       delete ledger.notes[slug];
-      if (local === proposed) {
+      if (blobIdOf(dir, text) === entry.blob) {
         rmSync(file);
         done.push(`dropped pending note ${slug} (its PR was closed unmerged)`);
       } else {
@@ -204,28 +204,26 @@ function settlePendingNotes(
       waiting.add(slug);
       continue;
     }
-    if (local === proposed) {
-      rmSync(file);
-      delete ledger.notes[slug];
-      merged += 1;
-      continue;
-    }
-    // Edited after its last push: fold the edit into the note as merged, where
-    // it goes up with the other edits.
+    // An edit made after the last push that merged is folded into the note as
+    // merged (keeping any reviewer's changes), to go up with the other edits.
+    const base = baseBlob(dir, info.head, entry.head, path, entry.blob);
+    const baseText = base ? readBlob(dir, base) : undefined;
     const theirs = existsSync(resolve(dir, path)) ? readFileSync(resolve(dir, path), "utf8") : undefined;
-    const base = proposed ? readBlob(dir, proposed) : undefined;
-    const folded = theirs === undefined || base === undefined ? undefined : theirs === base ? text : merge3(dir, text, base, theirs);
-    if (folded === undefined) {
-      Object.assign(entry, { merged: true, head: info.head, blob: proposed ?? entry.blob });
+    const unchanged = text === baseText || text === theirs;
+    const folded = unchanged || theirs === undefined || baseText === undefined ? undefined : merge3(dir, text, baseText, theirs);
+    if (!unchanged && folded === undefined) {
+      Object.assign(entry, { merged: true, mergedHead: info.head });
       waiting.add(slug);
       fall(`pending/${slug}.md changed after ${name} merged, in ways that conflict with the merged ${path}; fold your changes into it by hand and delete pending/${slug}.md`);
       continue;
     }
-    writeFileSync(resolve(dir, path), folded);
+    if (folded !== undefined && folded !== theirs) {
+      writeFileSync(resolve(dir, path), folded);
+      done.push(`kept your later edits to ${slug}`);
+    }
     rmSync(file);
     delete ledger.notes[slug];
     merged += 1;
-    done.push(`kept your later edits to ${slug}`);
   }
   writeLedger(dir, ledger);
   if (merged > 0) done.push(`${merged} pending ${merged === 1 ? "note" : "notes"} merged`);
@@ -285,22 +283,27 @@ function settleBatch(
   const carries: Carry[] = [];
   let kept = 0;
   for (const [path, recorded] of entries) {
-    const proposed = proposedBlob(dir, info.head, path, recorded);
     const local = localBlobId(dir, path);
-    if (local === proposed) {
+    const base = info.state === "MERGED" ? baseBlob(dir, info.head, batch.head, path, recorded) : recorded;
+    const theirs = blobId(dir, remote, path);
+    if (local === base || local === theirs) {
+      restore(dir, path);
+      continue;
+    }
+    const localText = local === null ? null : readFileSync(resolve(dir, path), "utf8");
+    let text: string | null | undefined;
+    if (info.state === "MERGED" && carry) {
+      if (theirs === base) {
+        text = localText;
+      } else if (localText !== null && base && theirs) {
+        text = merge3(dir, localText, readBlob(dir, base) ?? "", readBlob(dir, theirs) ?? "");
+      }
+    }
+    if (text !== undefined && text === (theirs === null ? null : readBlob(dir, theirs))) {
       restore(dir, path);
       continue;
     }
     kept += 1;
-    if (info.state !== "MERGED" || !carry) continue;
-    const theirs = blobId(dir, remote, path);
-    const localText = local === null ? null : readFileSync(resolve(dir, path), "utf8");
-    let text: string | null | undefined;
-    if (theirs === proposed) {
-      text = localText;
-    } else if (localText !== null && proposed && theirs) {
-      text = merge3(dir, localText, readBlob(dir, proposed) ?? "", readBlob(dir, theirs) ?? "");
-    }
     if (text === undefined) continue;
     restore(dir, path);
     carries.push({ path, local: localText, text });
@@ -340,12 +343,20 @@ function isState(value: string | undefined): value is PrState {
 }
 
 /**
- * A file's blob id as the PR last proposed it: at the PR's head commit when
- * that's known and here, else as Mahler recorded pushing it.
+ * A file's blob id where a later local edit started from: where Mahler's
+ * last push and the PR's merged head meet. That's Mahler's push when a
+ * reviewer's commits followed it, and the merged head when Mahler pushed
+ * again after the merge. Falls back to what Mahler recorded pushing.
  */
-function proposedBlob(dir: string, head: string | undefined, path: string, recorded: string | null | undefined): string | null | undefined {
-  if (head && git(dir, ["cat-file", "-e", `${head}^{commit}`]).ok) return blobId(dir, head, path);
-  return recorded;
+function baseBlob(
+  dir: string,
+  merged: string | undefined,
+  ours: string | undefined,
+  path: string,
+  recorded: string | null | undefined,
+): string | null | undefined {
+  const meet = merged && ours ? git(dir, ["merge-base", merged, ours]) : undefined;
+  return meet?.ok && meet.stdout ? blobId(dir, meet.stdout, path) : recorded;
 }
 
 /** Fetch a PR's head commit when a deleted branch took it out of reach. */
@@ -618,7 +629,7 @@ export function leavePrMode(dir: string, branch: string): string[] {
     const info: PrInfo | undefined = !entry
       ? { state: "NONE" }
       : entry.merged
-        ? { state: "MERGED", head: entry.head }
+        ? { state: "MERGED", head: entry.mergedHead }
         : noteState(dir, remote, true, entry, path);
     if (!info) {
       done.push(`left pending/${slug}.md: couldn't check its PR, ${entry!.url ?? entry!.branch}`);
@@ -626,8 +637,10 @@ export function leavePrMode(dir: string, branch: string): string[] {
     }
     const text = readFileSync(file, "utf8");
     const changed = () => {
+      const local = blobIdOf(dir, text);
+      if (info.state === "CLOSED") return local !== entry?.blob;
       ensureCommit(dir, info.head);
-      return blobIdOf(dir, text) !== proposedBlob(dir, info.head, path, entry?.blob);
+      return local !== baseBlob(dir, info.head, entry?.head, path, entry?.blob) && local !== blobId(dir, remote, path);
     };
     if (info.state === "MERGED" && changed()) {
       done.push(`left pending/${slug}.md: it changed after its PR merged; fold your changes into ${path} by hand and delete it`);

@@ -399,7 +399,8 @@ test("a reviewer's commits on a PR branch are never overwritten", () => {
   const { shared, ws, gh } = prWorkspace();
   assert.equal(learn(ws, "Reviewed note", gh.env).status, 0);
   const [pr] = gh.prs();
-  pushToBranch(shared, pr, "notes/reviewed-note.md", "---\ntitle: Reviewed note\n---\nReviewer wording.\n");
+  const proposed = readFileSync(pending(ws, "reviewed-note"), "utf8");
+  pushToBranch(shared, pr, "notes/reviewed-note.md", proposed.replace(/^description: .*$/m, 'description: "Reviewer wording."'));
   const suggested = tipOf(shared, pr);
 
   assert.match(sync(ws, gh).stdout, /already up to date/, "an unchanged note pushes nothing");
@@ -411,6 +412,15 @@ test("a reviewer's commits on a PR branch are never overwritten", () => {
   assert.equal(synced.status, 0, synced.stderr);
   assert.match(synced.stderr, /pr\/1 has commits from someone else, so Mahler leaves it alone/);
   assert.equal(tipOf(shared, pr), suggested, "the reviewer's commit stays the branch tip");
+
+  // Merged with the reviewer's commit: both their wording and the addition survive.
+  merge(shared, gh, pr);
+  const merged = sync(ws, gh);
+  assert.equal(merged.status, 0, merged.stderr);
+  assert.match(merged.stdout, /kept your later edits to reviewed-note; 1 pending note merged; proposed 1 edit in https:\/\/forge\.example\/pr\/2/);
+  const note = readFileSync(noteFile(ws, "reviewed-note"), "utf8");
+  assert.match(note, /Reviewer wording\./);
+  assert.match(note, /My addition\./);
 });
 
 test("an edit to a pending note after its PR merged is kept, folded into the merged note", () => {

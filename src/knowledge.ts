@@ -265,6 +265,8 @@ export interface LedgerEntry {
   /** The `description` line, or the body's first sentence for older notes. */
   summary: string;
   body: string;
+  /** The knowledge note this entry was imported to, if any. */
+  importedTo?: string;
 }
 
 /** Read one decisions ledger note. */
@@ -281,6 +283,7 @@ export function readLedgerNote(file: string): LedgerEntry {
     date: text("date"),
     summary: text("description") || firstSentence(body),
     body: body.trim(),
+    importedTo: text("imported-to") || undefined,
   };
 }
 

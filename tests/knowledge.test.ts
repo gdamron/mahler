@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -331,4 +331,37 @@ test("doctor suggests an audit once the ledger passes 20 notes", () => {
   const long = ledgerFinding(21);
   assert.equal(long.level, "warn");
   assert.match(long.message, /21 active notes .* run the audit skill .*`mahler knowledge import`/);
+});
+
+test("knowledge import only takes ledger notes, and checks --archive before writing", () => {
+  const workspace = workspaceWith(["app"]);
+  const ledger = resolve(workspace, ".harness/decisions");
+  learn(workspace, ["--title", "Existing fact", "--description", "d"]);
+  const knowledgeNote = resolve(workspace, ".harness/knowledge/notes/existing-fact.md");
+  const stray = run(["knowledge", "import", knowledgeNote, "--slug", "moved", "--archive", "--workspace", workspace]);
+  assert.notEqual(stray.status, 0);
+  assert.match(stray.stderr, /No ledger note/);
+  assert.ok(existsSync(knowledgeNote));
+  assert.notEqual(run(["knowledge", "import", "../config.json", "--workspace", workspace]).status, 0);
+  assert.notEqual(run(["knowledge", "import", "INDEX", "--workspace", workspace]).status, 0);
+  assert.match(run(["knowledge", "import", "archive", "--workspace", workspace]).stderr, /No ledger note/);
+
+  writeFileSync(resolve(ledger, "2026-01-01-loose.md"), "No frontmatter here.\n");
+  const loose = run(["knowledge", "import", "2026-01-01-loose", "--archive", "--workspace", workspace]);
+  assert.notEqual(loose.status, 0);
+  assert.match(loose.stderr, /no frontmatter/);
+  assert.ok(!existsSync(resolve(workspace, ".harness/knowledge/notes/2026-01-01-loose.md")), "nothing written");
+
+  writeFileSync(resolve(ledger, "2026-01-02-empty.md"), "---\ndate: 2026-01-02\nrule: empty-reason\n---\n");
+  assert.equal(run(["knowledge", "import", "2026-01-02-empty", "--workspace", workspace]).status, 0);
+  assert.match(readFileSync(resolve(workspace, ".harness/knowledge/notes/empty-reason.md"), "utf8"), /description: "empty-reason"/);
+
+  mkdirSync(resolve(ledger, "archive"), { recursive: true });
+  writeFileSync(resolve(ledger, "archive/2026-01-03-old.md"), "---\ndate: 2026-01-03\nrule: old-rule\n---\nOld fact.\n");
+  const fromArchive = run(["knowledge", "import", "archive/2026-01-03-old.md", "--archive", "--workspace", workspace]);
+  assert.equal(fromArchive.status, 0, fromArchive.stderr);
+  assert.match(readFileSync(resolve(ledger, "archive/2026-01-03-old.md"), "utf8"), /imported-to: old-rule\n---/);
+  const twice = run(["knowledge", "import", "archive/2026-01-03-old", "--slug", "old-rule-2", "--workspace", workspace]);
+  assert.notEqual(twice.status, 0);
+  assert.match(twice.stderr, /already imported to knowledge note "old-rule"/);
 });

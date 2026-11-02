@@ -159,7 +159,7 @@ const commands: Record<string, Command> = {
   },
   knowledge: {
     usage:
-      "mahler knowledge index | search [terms...] [--paths file,file | --changed] [--repo r] [--limit n] | verify <slug> | import <ledger-note> [--title t] [--description d] [--tags a,b] [--repos r] [--paths glob,glob] [--slug s] [--archive] [--workspace <path>]",
+      "mahler knowledge index | search [terms...] [--paths file,file | --changed] [--repo r] [--limit n] | verify <slug> | import <ledger-note> [--title t] [--description d] [--tags a,b] [--repos r] [--paths glob,glob] [--slug s] [--source ISSUE] [--archive] [--workspace <path>]",
     summary:
       "Rebuild the knowledge and ledger indexes, search notes by terms or changed files, mark a note verified today, or import a decisions ledger note as knowledge.",
     positionals: 50,

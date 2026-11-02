@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { basename, dirname, resolve } from "node:path";
 import {
@@ -62,20 +62,32 @@ export function learn(flags: Flags): void {
  * summary; the agent rewrites them as a claim, unless it passed them.
  */
 function importLedgerNote(workspace: string, config: HarnessConfig, target: string, flags: Flags): void {
-  const ledger = decisionsDir(workspace);
-  const source = [resolve(target), resolve(ledger, target), resolve(ledger, `${target}.md`)].find(
-    (candidate) => existsSync(candidate) && !candidate.endsWith("INDEX.md") && !candidate.endsWith("README.md"),
-  );
-  if (!source) throw new Error(`No ledger note "${target}" (give its path, or its file name in ${ledger})`);
+  const source = ledgerNoteFile(workspace, target);
+  const ledger = realpathSync(decisionsDir(workspace));
   const entry = readLedgerNote(source);
+  if (entry.importedTo) {
+    throw new Error(
+      `${basename(source)} was already imported to knowledge note "${entry.importedTo}". Update that note instead.`,
+    );
+  }
+  const slug = slugify(stringFlag(flags, "slug") ?? entry.rule);
+  // Check everything --archive needs before writing anything, so a failure
+  // can't leave a knowledge note behind with the ledger note still active.
+  const inArchive = dirname(source) === resolve(ledger, "archive");
+  const archived = resolve(ledger, "archive", basename(source));
+  let archivedText: string | undefined;
+  if (flags.archive === true) {
+    if (!inArchive && existsSync(archived)) throw new Error(`Can't archive: ${archived} already exists`);
+    archivedText = setFrontmatterField(readFileSync(source, "utf8"), "imported-to", slug || "x");
+  }
   const title = stringFlag(flags, "title");
   const description = stringFlag(flags, "description");
   const issue = entry.issue && entry.issue !== "unassigned" ? [entry.issue] : [];
   const file = recordNote(workspace, config, {
     ...scope(config, flags),
-    slug: slugify(stringFlag(flags, "slug") ?? entry.rule),
+    slug,
     title: oneLine(title ?? entry.rule),
-    description: oneLine(description ?? entry.summary),
+    description: oneLine(description ?? (entry.summary || entry.rule)),
     sources: [...new Set([...issue, ...listFlag(flags, "source")])],
     body: `${entry.body}\n\nImported from the decisions ledger (\`${basename(source)}\`).`,
     date: today(),
@@ -83,13 +95,10 @@ function importLedgerNote(workspace: string, config: HarnessConfig, target: stri
     verified: entry.date || undefined,
   });
   console.log(`Imported ${basename(source)} as knowledge: ${file}`);
-  if (flags.archive === true) {
-    const archived = resolve(ledger, "archive", basename(source));
-    if (existsSync(archived)) throw new Error(`Not archived: ${archived} already exists`);
+  if (archivedText !== undefined) {
     mkdirSync(dirname(archived), { recursive: true });
-    const slug = basename(file, ".md");
-    writeFileSync(archived, setFrontmatterField(readFileSync(source, "utf8"), "imported-to", slug));
-    rmSync(source);
+    writeFileSync(archived, archivedText);
+    if (!inArchive) rmSync(source);
     writeIndexes(workspace, config);
     console.log(`Archived the ledger note: ${archived}`);
   }
@@ -98,6 +107,26 @@ function importLedgerNote(workspace: string, config: HarnessConfig, target: stri
       "Now rewrite the note for readers outside the issue: a title that states the fact as a claim, and a description that carries it (see .harness/policies/knowledge.md).",
     );
   }
+}
+
+/**
+ * A decisions ledger note, given as its file name (with or without `.md`,
+ * optionally under `archive/`) or a path to it. Only notes directly in the
+ * ledger or its `archive/` qualify, so a stray path can't move another file.
+ */
+function ledgerNoteFile(workspace: string, target: string): string {
+  if (!existsSync(decisionsDir(workspace))) throw new Error(`No decisions ledger at ${decisionsDir(workspace)}`);
+  const ledger = realpathSync(decisionsDir(workspace));
+  const folders = [ledger, resolve(ledger, "archive")];
+  const name = target.endsWith(".md") ? target : `${target}.md`;
+  for (const candidate of [resolve(ledger, name), resolve(name)]) {
+    if (!existsSync(candidate) || !statSync(candidate).isFile()) continue;
+    const real = realpathSync(candidate);
+    if (folders.includes(dirname(real)) && !["INDEX.md", "README.md"].includes(basename(real))) return real;
+  }
+  throw new Error(
+    `No ledger note "${target}": give the file name of a note in ${ledger} (or archive/), or a path to one`,
+  );
 }
 
 /** Tags, repos, and paths from flags, with repos checked against the config. */

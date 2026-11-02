@@ -358,7 +358,6 @@ function report(results: Finding[]): void {
   if (errors > 0) process.exit(1);
 }
 
-/** Compare the Mahler version that generated the workspace with the running CLI. */
 /** Sessions read the ledger's index at start, so a long ledger costs every session. */
 export const LEDGER_AUDIT_THRESHOLD = 20;
 
@@ -372,6 +371,7 @@ export function ledgerFinding(active: number): Finding {
   return { level: "ok", message: `.harness/decisions/ present (${active} active ${active === 1 ? "note" : "notes"})` };
 }
 
+/** Compare the Mahler version that generated the workspace with the running CLI. */
 export function installVersionFinding(harness: string, running = mahlerVersion()): Finding {
   const path = resolve(harness, "install.json");
   let installed: string | undefined;

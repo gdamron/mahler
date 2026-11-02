@@ -54,7 +54,8 @@ Use judgment about depth: a quick pass over a small workspace is fine.
     gotcha with its topic in the `rule` field. Import it, rewritten for
     readers outside the issue: a claim title, a description that carries the
     fact, and tags, repos, and paths. Check `mahler knowledge search` first;
-    if a note already covers it, propose merging into that note instead.
+    if a note already covers it, propose adding anything new to that note
+    (and the issue to its `sources`), then archiving the ledger note.
   - **Policy or overlay change:** the norm was wrong for this workspace, or a
     recurring theme across notes is really a rule.
   - **Repo docs:** design rationale that belongs next to the code.

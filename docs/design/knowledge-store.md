@@ -1,0 +1,289 @@
+# Design: Knowledge Store and Decisions Ledger
+
+Status: agreed design, ready to split into issues (2026-11-02)
+
+## Problem
+
+`.harness/decisions/` was meant for Tier 1 deviations, but in practice it has
+become the workspace's knowledge base. In 84000, 94 notes hold about 18k words,
+and nearly all are codebase gotchas (`storage-exists-fails-open`,
+`worktree-env-points-at-production`), with the topic written into the `rule`
+field. Every session is told to read the whole active ledger at start, which
+is about 25k tokens there today and grows with every note. Because the ledger
+is append-only, a gotcha that turns out wrong or stale can't be fixed, only
+archived by a human.
+
+Fugue's 2026-10-22 audit started fixing this by hand. It archived notes
+already folded in elsewhere, promoted standing rules to `CLAUDE.md`, and began
+moving design notes into the repos. Its goal is for each session to read about
+6 KB of ledger instead of about 38 KB. The active ledger is about 29 KB today,
+with the rest waiting on those PRs. This design builds that sorting into
+Mahler.
+
+## Goals
+
+- Sessions read only the knowledge relevant to their work, not every note.
+- Knowledge can be corrected: agents update or retire notes instead of adding
+  near-duplicates.
+- The knowledge store lives in a local folder or a git repo, and in repo mode
+  it publishes directly or through PRs, as config says.
+- The decisions ledger goes back to recording deviations, and the audit
+  promotes the notes worth sharing.
+- Notes stay plain markdown with frontmatter and `[[links]]`, so either folder
+  opens as an Obsidian vault. Mahler doesn't need Obsidian.
+
+## Non-Goals
+
+- Embedding or vector search. `mahler knowledge search` is the interface, so a
+  hybrid backend can replace the text search later without changing any skill
+  or policy. Revisit if agents miss notes because they searched with different
+  words, or once a store reaches thousands of notes.
+- Syncing preferences. What one human wants stays in `.harness/custom/`
+  overlays and instruction files, which the audit already reviews.
+- Classifying notes automatically when migrating. The audit proposes, and the
+  human approves.
+
+## Three Kinds of Record
+
+| Record | What it holds | Who reads it | Where it lives |
+|---|---|---|---|
+| Decision | A Tier 1 deviation and why: the norm didn't fit here | The audit; sessions read only its index | Ledger: local by default, optionally a private repo |
+| Knowledge | What is true of the code, tools, or project | Sessions, chosen by relevance | Knowledge store: local folder or shared repo |
+| Preference | How this human wants work done | Every session, through instruction files | `.harness/custom/` and instruction files (unchanged) |
+
+Test for the agent writing a note: a deviation is about Mahler's rules ("I
+skipped X because…"). Knowledge is about the world ("Y behaves like Z").
+
+## Note Format
+
+One note per fact, named by a stable slug: `notes/<slug>.md`.
+
+```md
+---
+title: Supabase storage exists() can't tell denied from absent
+description: exists() returns false for 400 and 404, and an RLS-denied read returns 400, so archive-on-write skips the archive. Use list() with an exact-name filter.
+tags: [supabase, storage]
+repos: [web]
+paths: ["supabase/functions/**", "apps/studio/src/storage/**"]
+status: active
+sources: [DEV-783]
+created: 2026-09-08
+updated: 2026-09-08
+verified: 2026-10-30
+---
+
+<the explanation, written so it makes sense without the issue that found it>
+
+Related: [[storage-list-prefix-match]]
+```
+
+- **Title:** the claim itself, not the topic.
+- **Description:** one or two sentences that carry the fact, since the index
+  and search results show it. An agent should often be able to act on the
+  description alone.
+- **Tags:** free-form areas. **Repos:** workspace repo names, optional (empty
+  means workspace-wide). **Paths:** repo-relative globs for the files the note
+  is about, optional. Briefs match on repos and tags; searches during the
+  work match on paths.
+- **Status:** `active` or `retired`. A retired note moves to `archive/` and
+  says what replaced it, if anything (`superseded-by: <slug>`).
+- **Verified:** the last date an agent confirmed the note still holds, for
+  example by hitting the behavior again or reading the code it describes.
+  `created` and `updated` track edits; `verified` tracks truth. The audit
+  uses it to find notes nobody has confirmed in a long time.
+- **No secrets, no credentials, no customer data.** A store may be shared.
+
+The ledger keeps its current format (`date`, `issue`, `agent`, `rule`) and
+adds a `description` line so it can be indexed too.
+
+## Layout
+
+```
+<knowledge path>/            default: .harness/knowledge
+  README.md                  conventions (installed by Mahler)
+  INDEX.md                   generated; gitignored in repo mode
+  notes/<slug>.md
+  archive/<slug>.md
+  pending/<slug>.md          PR mode only: published but not merged; gitignored
+
+<decisions path>/            default: .harness/decisions
+  README.md
+  INDEX.md                   generated
+  <date>-<slug>.md
+  archive/
+```
+
+`INDEX.md` is one line per note, `- [title](notes/slug.md): description
+#tags`, grouped by tag. It is generated, never edited, so two agents adding
+notes never conflict over it. `mahler` rebuilds it after every write and every
+sync.
+
+## How Sessions Use It
+
+1. **At brief time:** `mahler issue` and `mahler task` write a `## Relevant
+   Knowledge` section into `AGENT_SESSION.md`. Mahler knows only the issue's
+   text, labels, and repos then, so this is a first pass. Notes whose tags
+   appear in the issue's title, description, or labels come first. Notes
+   that only match the issue's repos fill the rest, up to about 30 lines. The
+   section says how many notes matched in all.
+2. **At session start:** read that section and the ledger's `INDEX.md`. The
+   ledger index stays short once the knowledge is moved out. Sessions no
+   longer read every note.
+3. **After planning:** once the conductor knows which files it will change,
+   it runs `mahler knowledge search --paths <files>` and reads the matches.
+   Paths have no synonyms, so this finds notes that the brief's word matching
+   missed.
+4. **While working:** before changing an unfamiliar area, run `mahler
+   knowledge search <terms>`, and open the notes that match.
+5. **At review:** the reviewer runs `mahler knowledge search --paths` on the
+   diff's changed files, and checks the change against each matching note.
+   A diff that walks into a known trap is a finding.
+6. **On learning something:** search first. If a note covers it, update that
+   note (`updated:` and the body). Otherwise run `mahler learn`. Correcting a
+   wrong note is expected, not a deviation.
+7. **On confirming a note:** when the work shows a note still holds, set its
+   `verified:` date (`mahler knowledge verify <slug>`). In PR mode, verify
+   dates batch into the next knowledge PR rather than opening one each.
+8. **On deviating from a norm:** unchanged. Record it in `HANDOFF.md`, and run
+   `mahler decide` when the reason generalizes beyond the issue.
+
+## Commands
+
+- `mahler learn --title <t> --description <d> [--tags a,b] [--repos r]
+  [--paths 'glob,glob'] [--body-file f] [--slug s] [--source ISSUE]`: writes the note, rebuilds the
+  index, and publishes it in repo mode. It refuses a slug that already exists
+  and prints the existing note instead, so the agent updates it.
+- `mahler knowledge search <terms> [--repo r] [--limit n]`: ranks title and tag
+  matches over description over body, prints index lines with paths, and
+  includes `pending/`. With `--paths <file...>` (or `--diff <base>`, which
+  takes the changed files from git), it returns the notes whose `paths`
+  globs match those files, in the matching repo. No dependencies. This is where a hybrid backend would
+  plug in.
+- `mahler knowledge index`: rebuilds `INDEX.md` for both stores.
+- `mahler knowledge sync`: in repo mode, pulls, publishes anything unpushed,
+  clears pending notes once merged, and rebuilds the indexes. It runs
+  automatically in `mahler issue` and `mahler task`, and after `learn`.
+- `mahler knowledge verify <slug>`: sets `verified:` to today.
+- `mahler knowledge import <ledger-note>`: converts a ledger note into a
+  knowledge note draft. `rule` becomes the slug, `issue` becomes `sources`,
+  and the body is copied. The agent then writes the title and description. Used
+  by the audit during migration.
+- `mahler doctor`: reports each store's mode, whether the clone exists and
+  tracks its remote, whether the index is fresh, and how many pending notes
+  have waited more than a week.
+
+## Configuration
+
+Both stores use the same shape and backend code:
+
+```json
+"knowledge": {
+  "path": ".harness/knowledge",
+  "repo": "git@github.com:gdamron/84000-knowledge.git",
+  "branch": "main",
+  "publish": "direct"
+},
+"decisions": {
+  "path": ".harness/decisions"
+}
+```
+
+- No `repo`: a local folder. `publish` is ignored.
+- With `repo`: install clones it into `path` when the folder is missing, and
+  doctor reports a folder that exists but isn't a clone of that repo. Each
+  workspace has its own store; the repo is how that store is shared between
+  machines and people working in the same workspace.
+- `publish: "direct"` (the default): `learn` commits on `branch` and pushes. On
+  a non-fast-forward it pulls with rebase and retries once. New notes are new
+  files, so this rarely conflicts. A conflict on an edited note stops and is
+  reported.
+- `publish: "pr"`: `learn` commits in a temporary worktree on
+  `knowledge/<agent>-<slug>`, pushes, and opens a PR with the note and its
+  source issue. It also copies the note to `pending/`, so sessions on this
+  machine find it before the PR merges. The human reviews and merges
+  knowledge PRs; no agent merges them, whatever the merge policy allows for
+  code, because the store is shared between agents and the human. `sync` drops a pending note once `branch` contains it, or once
+  its PR is closed unmerged.
+- `decisions.repo`: a private backup of the ledger, which can live on a
+  different remote from the knowledge repo. The ledger always publishes directly.
+- Writes take a lock under `.harness/tmp/locks/` so parallel agents on one
+  machine don't collide on the git index.
+
+## Audit Changes
+
+The audit skill becomes the step that promotes notes. For each active ledger
+note, it proposes one outcome:
+
+- **Knowledge:** `mahler knowledge import`, then rewrite it for readers outside
+  the issue. Archive the ledger note.
+- **Policy or overlay change:** the norm was wrong for this workspace.
+- **Repo docs:** design rationale that belongs next to the code.
+- **Preference:** an overlay or instruction-file rule.
+- **Archive:** a one-off with nothing left to learn.
+- **Keep:** a precedent still worth showing sessions.
+
+It also reviews the knowledge store: duplicates to merge, notes that
+contradict, notes whose repos or `paths` globs no longer match any file, and
+notes whose
+`verified:` date is old (or missing) in areas that change often. As today,
+the audit applies only what the human approves. In PR mode, its knowledge edits
+go through one PR per audit.
+
+## Migration
+
+Nothing breaks on upgrade. Install creates `.harness/knowledge/`, and sessions
+read the brief's Relevant Knowledge section (empty until notes exist) plus the
+ledger index. Doctor warns when the active ledger has more than about 20 notes
+and suggests an audit. For 84000, the first audit sorts the 94 notes using the
+outcomes above. Most become knowledge through `import`.
+
+## Policy and Template Changes
+
+- New `policies/knowledge.md`: what counts as knowledge, how to write a note
+  (claim title, self-contained description, one fact, search before writing,
+  no secrets), and when to update or retire one.
+- `policies/judgment.md` and `policies/handoff.md`: the ledger is for
+  deviations only, and sessions read its index rather than every note.
+- Templates `root-agent-block`, `adapter`, `workflow`, `agent-session`, and
+  `decisions-readme` get the new session-start steps. There's also a new
+  `knowledge-readme`.
+- `skills/audit`: the outcomes above.
+- `skills/work-on-issue` and `skills/handoff`: the learn step, and the search
+  step before working in an unfamiliar area.
+- `skills/conduct`: a paths search after deciding the shape, before
+  implementing.
+- `policies/review.md` and the reviewer brief: a paths search on the diff,
+  with any note the change contradicts reported as a finding.
+
+## Delivery
+
+Each item is one issue, risk medium unless noted:
+
+1. **Local knowledge store.** Note format, `learn`, `verify`, `knowledge
+   index` and `search` (terms and paths), the Relevant Knowledge section in
+   briefs, the knowledge policy, the session-start changes, and the paths
+   searches in conduct and review. Done when a fresh workspace can learn a
+   note, find it by terms and by a changed file, see it in a new brief, and no
+   session instruction still says to read the whole ledger.
+2. **Ledger narrowing and audit promotion.** `knowledge import`, the ledger
+   `description` line and index, audit outcomes, and the doctor warning. Done
+   when a copy of 84000's ledger can be sorted by an audit with every note
+   reaching an outcome.
+3. **Repo mode, direct publish.** Clone on install, `sync`, push with one
+   rebase retry, gitignored index, lock. Done when two clones of one
+   workspace's knowledge repo each see the other's new note after `sync`.
+4. **Repo mode, PR publish.** Branch and PR per note, `pending/`, cleanup on
+   merge or close. Done when a pending note is searchable locally before its
+   PR merges and disappears from `pending/` after.
+5. **Ledger repo backup** (low). `decisions.repo` with direct publish.
+
+## Decided
+
+- **Knowledge PRs:** the human reviews and merges them, since the store is
+  shared between agents and the human.
+- **Scope:** one knowledge store per workspace.
+- **Verified dates:** notes carry `verified:`, refreshed when an agent
+  confirms a note still holds.
+- **Name:** "knowledge" in commands and paths.
+- **Relevance:** briefs match on tags, then repos; conductors and reviewers
+  match on `paths` against the files being changed.

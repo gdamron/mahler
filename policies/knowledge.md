@@ -7,8 +7,8 @@ session doesn't rediscover it. It lives at `knowledge.path` in
 
 ## What Goes Where
 
-- **Knowledge** is about the world: "Supabase storage `exists()` returns
-  false for a denied read." Record it with `mahler learn`.
+- **Knowledge** is about the world: "The cache client's `get()` returns
+  null on a timeout." Record it with `mahler learn`.
 - **A deviation** is about Mahler's rules: "I skipped the tester because the
   change was docs-only." Record it in `HANDOFF.md`, and with `mahler decide`
   when it generalizes (see the judgment policy).
@@ -40,15 +40,15 @@ code or its docs already say plainly.
    fact, update it: correct the body, and set `updated:` to today.
 2. **One fact per note.** Two facts that could be true or false separately
    are two notes; link them with `[[slug]]`.
-3. **The title is the claim**, not the topic: "list() matches by prefix", not
-   "Storage listing".
+3. **The title is the claim**, not the topic: "get() returns null on a timeout",
+   not "Cache behavior".
 4. **The description carries the fact** in one or two sentences, including
    what to do instead. The index and search show only this line.
 5. **The body stands alone.** Write it for someone who never saw the issue:
    no "as above", no issue-only context. Put issue IDs in `sources`.
 6. **Scope it.** `--tags` for the areas it touches, `--repos` when it is true
    of only some repos, and `--paths` with globs for the files it is about,
-   relative to the repo (`src/storage/**`), so path searches find it.
+   relative to the repo (`src/cache/**`), so path searches find it.
 7. **No secrets, credentials, or customer data.** The store may be shared.
 
 Conductors and composers run `mahler learn`. Slice conductors, testers, and

@@ -23,7 +23,7 @@ title: "The fact itself, as a claim"
 description: "One or two sentences an agent can act on from the index alone."
 tags: [area, tool]
 repos: [repo-name]          # empty: the whole workspace
-paths: ["src/storage/**"]   # files the note is about, relative to the repo
+paths: ["src/cache/**"]     # files the note is about, relative to the repo
 status: active              # or retired (then move it to archive/)
 sources: [DEV-123]
 created: 2026-11-02

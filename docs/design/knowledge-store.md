@@ -4,21 +4,18 @@ Status: agreed design, ready to split into issues (2026-11-02)
 
 ## Problem
 
-`.harness/decisions/` was meant for Tier 1 deviations, but in practice it has
-become the workspace's knowledge base. In 84000, 94 notes hold about 18k words,
-and nearly all are codebase gotchas (`storage-exists-fails-open`,
-`worktree-env-points-at-production`), with the topic written into the `rule`
+`.harness/decisions/` was meant for Tier 1 deviations, but in practice it
+becomes the workspace's knowledge base. In a long-running workspace, most
+notes turn out to be codebase gotchas, with the topic written into the `rule`
 field. Every session is told to read the whole active ledger at start, which
-is about 25k tokens there today and grows with every note. Because the ledger
-is append-only, a gotcha that turns out wrong or stale can't be fixed, only
-archived by a human.
+can cost tens of thousands of tokens and grows with every note. Because the
+ledger is append-only, a gotcha that turns out wrong or stale can't be fixed,
+only archived by a human.
 
-Fugue's 2026-10-22 audit started fixing this by hand. It archived notes
-already folded in elsewhere, promoted standing rules to `CLAUDE.md`, and began
-moving design notes into the repos. Its goal is for each session to read about
-6 KB of ledger instead of about 38 KB. The active ledger is about 29 KB today,
-with the rest waiting on those PRs. This design builds that sorting into
-Mahler.
+Sorting a ledger by hand works: archive notes already folded in elsewhere,
+promote standing rules to `CLAUDE.md`, and move design notes into the repos.
+That can shrink what each session reads several times over. This design
+builds that sorting into Mahler.
 
 ## Goals
 
@@ -60,13 +57,13 @@ One note per fact, named by a stable slug: `notes/<slug>.md`.
 
 ```md
 ---
-title: Supabase storage exists() can't tell denied from absent
-description: exists() returns false for 400 and 404, and an RLS-denied read returns 400, so archive-on-write skips the archive. Use list() with an exact-name filter.
-tags: [supabase, storage]
-repos: [web]
-paths: ["supabase/functions/**", "apps/studio/src/storage/**"]
+title: The cache client's get() returns null for a timeout as well as a miss
+description: get() swallows timeouts and returns null, so callers treat a slow cache as empty and recompute. Use getOrThrow() where a timeout must surface.
+tags: [cache]
+repos: [api]
+paths: ["src/cache/**"]
 status: active
-sources: [DEV-783]
+sources: [DEV-123]
 created: 2026-09-08
 updated: 2026-09-08
 verified: 2026-10-30
@@ -74,7 +71,7 @@ verified: 2026-10-30
 
 <the explanation, written so it makes sense without the issue that found it>
 
-Related: [[storage-list-prefix-match]]
+Related: [[cache-keys-are-case-sensitive]]
 ```
 
 - **Title:** the claim itself, not the topic.
@@ -183,7 +180,7 @@ Both stores use the same shape and backend code:
 ```json
 "knowledge": {
   "path": ".harness/knowledge",
-  "repo": "git@github.com:gdamron/84000-knowledge.git",
+  "repo": "git@github.com:example/workspace-knowledge.git",
   "branch": "main",
   "publish": "direct"
 },
@@ -238,8 +235,8 @@ go through one PR per audit.
 Nothing breaks on upgrade. Install creates `.harness/knowledge/`, and sessions
 read the brief's Relevant Knowledge section (empty until notes exist) plus the
 ledger index. Doctor warns when the active ledger has more than about 20 notes
-and suggests an audit. For 84000, the first audit sorts the 94 notes using the
-outcomes above. Most become knowledge through `import`.
+and suggests an audit. For a workspace with a large ledger, the first audit
+sorts its notes using the outcomes above. Most become knowledge through `import`.
 
 ## Policy and Template Changes
 
@@ -271,7 +268,7 @@ Each item is one issue, risk medium unless noted:
    session instruction still says to read the whole ledger.
 2. **Ledger narrowing and audit promotion.** `knowledge import`, the ledger
    `description` line and index, audit outcomes, and the doctor warning. Done
-   when a copy of 84000's ledger can be sorted by an audit with every note
+   when a copy of a large existing ledger can be sorted by an audit with every note
    reaching an outcome.
 3. **Repo mode, direct publish.** Clone on install, `sync`, push with one
    rebase retry, gitignored index, lock. Done when two clones of one

@@ -50,7 +50,9 @@ export function decide(flags: Flags): void {
     console.warn(`${path} is saved locally, but it wasn't backed up: ${(error as Error).message}`);
     return;
   }
-  publishLedger(workspace, config, `decisions: add ${basename(path, ".md")}`, path, 15_000);
+  const renamed = publishLedger(workspace, config, `decisions: add ${basename(path, ".md")}`, path, 15_000);
+  const now = renamed?.[basename(path)];
+  if (now) console.log(`Another machine had already used that name, so the note is now ${resolve(dir, now)}; reference that.`);
 }
 
 /**
@@ -63,14 +65,16 @@ export function publishLedger(
   message: string,
   file: string,
   lockWaitMs?: number,
-): void {
+): Record<string, string> | undefined {
   try {
     const result = syncLedger(workspace, config, { message, lockWaitMs });
-    if (!result) return;
+    if (!result) return undefined;
     if (result.published) console.log(result.summary);
     else console.warn(result.summary);
+    return result.renamed;
   } catch (error) {
     console.warn(`${file} is saved locally, but backing it up failed: ${(error as Error).message}`);
+    return undefined;
   }
 }
 
@@ -79,7 +83,8 @@ function uniqueDecisionPath(dir: string, date: string, slug: string): string {
   const base = `${date}-${slug}`;
   let candidate = resolve(dir, `${base}.md`);
   let counter = 2;
-  while (existsSync(candidate)) {
+  // archive/ too: a note can't be archived over another of the same name.
+  while (existsSync(candidate) || existsSync(resolve(dir, "archive", basename(candidate)))) {
     candidate = resolve(dir, `${base}-${counter}.md`);
     counter += 1;
   }

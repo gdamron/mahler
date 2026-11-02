@@ -175,7 +175,8 @@ test("two machines recording the same rule on the same day keep both notes", () 
   assert.equal(decide(a, "scope").status, 0);
   const second = decide(b, "scope");
   assert.equal(second.status, 0, second.stderr);
-  assert.match(second.stdout, /renamed (\d{4}-\d{2}-\d{2})-scope\.md to \1-scope-2\.md, a name another machine had used; pulled 1 commit; pushed 1 commit/);
+  assert.match(second.stdout, /renamed (\d{4}-\d{2}-\d{2})-scope\.md \(another machine had used the name\) to \1-scope-2\.md; pulled 1 commit; pushed 1 commit/);
+  assert.match(second.stdout, /the note is now .*-scope-2\.md; reference that\./);
   const tracked = git(shared, ["ls-tree", "-r", "--name-only", "main"]).split("\n").filter((file) => file.includes("scope"));
   assert.equal(tracked.length, 2);
 
@@ -189,7 +190,7 @@ test("two machines recording the same rule on the same day keep both notes", () 
   assert.equal(decide(a, "review").status, 0);
   const again = decide(b, "review");
   assert.equal(again.status, 0, again.stderr);
-  assert.match(again.stdout, /renamed .*-review\.md to .*-review-2\.md/);
+  assert.match(again.stdout, /renamed .*-review\.md \(another machine had used the name\) to .*-review-2\.md/);
   assert.equal(git(shared, ["ls-tree", "-r", "--name-only", "main"]).split("\n").filter((file) => file.includes("review")).length, 2);
 });
 
@@ -206,7 +207,7 @@ test("a clash with a decision recorded offline is renamed when it reconnects", (
 
   const synced = run(["knowledge", "sync", "--workspace", b]);
   assert.equal(synced.status, 0, synced.stderr);
-  assert.match(synced.stdout, /renamed .*-scope\.md to .*-scope-2\.md/);
+  assert.match(synced.stdout, /renamed .*-scope\.md \(another machine had used the name\) to .*-scope-2\.md/);
   assert.equal(git(shared, ["ls-tree", "-r", "--name-only", "main"]).split("\n").filter((file) => /^\d{4}-/.test(file)).length, 3);
 });
 
@@ -244,4 +245,35 @@ test("decide with an unreadable config saves the note and exits cleanly", () => 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stderr, /is saved locally, but it wasn't backed up/);
   assert.equal(ledgerNotes(dir).length, 1);
+});
+
+test("archiving one note on two machines is a conflict, not a renamed copy", () => {
+  const shared = remote();
+  const a = ledgerWorkspace(shared);
+  const b = ledgerWorkspace(shared);
+  assert.equal(decide(a, "shared-note").status, 0);
+  assert.equal(run(["knowledge", "sync", "--workspace", b]).status, 0);
+  const [note] = ledgerNotes(a);
+  assert.equal(run(["knowledge", "import", note, "--archive", "--slug", "from-a", "--workspace", a]).status, 0);
+  const away = `${shared}.away`;
+  renameSync(shared, away);
+  assert.equal(run(["knowledge", "import", note, "--archive", "--slug", "from-b", "--workspace", b]).status, 0);
+  renameSync(away, shared);
+
+  const synced = run(["knowledge", "sync", "--workspace", b]);
+  assert.notEqual(synced.status, 0);
+  assert.match(synced.stderr, /Ledger sync stopped: your changes conflict with the remote in archive\//);
+  assert.ok(!git(shared, ["ls-tree", "-r", "--name-only", "main"]).includes("-2.md"));
+});
+
+test("with no shared history, the remote's README wins instead of conflicting", () => {
+  const shared = remote();
+  const a = ledgerWorkspace(shared);
+  const b = ledgerWorkspace(shared);
+  writeFileSync(resolve(ledger(b), "README.md"), "# Our own readme\n");
+  assert.equal(decide(a, "scope").status, 0);
+  const second = decide(b, "scope");
+  assert.equal(second.status, 0, second.stderr);
+  assert.match(second.stdout, /pushed 1 commit/);
+  assert.equal(readFileSync(resolve(ledger(b), "README.md"), "utf8"), readFileSync(resolve(ledger(a), "README.md"), "utf8"));
 });

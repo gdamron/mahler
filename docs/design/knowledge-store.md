@@ -279,7 +279,9 @@ Both stores use the same backend code, and a similar shape:
   always publishes directly, with the same clone, lock, and push code as the
   knowledge store. Ledger notes are named by date and rule, so two machines
   can pick the same name; the one pushed second is renamed (`-2`) rather
-  than conflicting, at sync and when install carries local notes in.
+  than conflicting, at sync and when install carries local notes in, and
+  `decide` prints the new name. Only new notes are renamed: archiving the
+  same note on two machines is a conflict to resolve by hand.
   Its folder stays `.harness/decisions`, since policies and templates name
   it. `decide` and `knowledge import --archive` push, and briefs and
   `knowledge sync` pull too. A failed backup only warns, because the note is

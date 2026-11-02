@@ -149,7 +149,13 @@ export function cloneStore(workspace: string, store: RepoStore): string | undefi
   });
   if (clone.status !== 0) {
     rmSync(temp, { recursive: true, force: true });
-    const why = clone.error ? `timed out after ${CLONE_TIMEOUT_MS / 1000} s` : (clone.stderr ?? "").trim();
+    const code = (clone.error as NodeJS.ErrnoException | undefined)?.code;
+    const why =
+      code === "ETIMEDOUT"
+        ? `timed out after ${CLONE_TIMEOUT_MS / 1000} s`
+        : code === "ENOENT"
+          ? "git is not installed"
+          : (clone.stderr ?? "").trim();
     throw new Error(`Couldn't clone the ${store.name} repo ${repo}: ${why}`);
   }
   try {
@@ -355,7 +361,7 @@ function syncStore(
   if (state.problem) throw new Error(state.problem);
   const { dir, branch, repo } = store;
   if (!repo) throw new Error(`The ${store.label} has no repo to sync with`);
-  const { done, published } = withLock(
+  const { done, published, renamed } = withLock<{ done: string[]; published: boolean; renamed?: Record<string, string> }>(
     workspace,
     store.name,
     () => {
@@ -366,20 +372,25 @@ function syncStore(
     options.lockWaitMs,
   );
   writeIndexes(workspace, config);
-  return { summary: `${title}: ${done.length > 0 ? done.join("; ") : "already up to date"}.`, published };
+  return { summary: `${title}: ${done.length > 0 ? done.join("; ") : "already up to date"}.`, published, renamed };
 }
 
 /**
  * Direct publish: commit, rebase onto the remote branch, push (one retry).
  * For the knowledge store, first settle anything left from PR publish.
  */
-function directSync(store: RepoStore, repo: string, message: string): { done: string[]; published: boolean } {
+function directSync(
+  store: RepoStore,
+  repo: string,
+  message: string,
+): { done: string[]; published: boolean; renamed: Record<string, string> } {
   const { dir, branch } = store;
+  const renamed: Record<string, string> = {};
   // Left over from PR publish: settle its PRs, and publish what's still pending.
   const left: { done: string[]; blocked?: string } =
     store.name === "knowledge" ? leavePrMode(dir, branch) : { done: [] };
   const done = left.done;
-  const unpublished = (why: string) => ({ done: [...done, why], published: false });
+  const unpublished = (why: string) => ({ done: [...done, why], published: false, renamed });
   if (left.blocked) return unpublished(left.blocked);
   // Ignoring a file the repo already tracks does nothing, so untrack it too.
   gitOrThrow(dir, ["rm", "-r", "--cached", "--quiet", "--ignore-unmatch", "--", ...IGNORED.map(ignoredPathspec)]);
@@ -397,7 +408,12 @@ function directSync(store: RepoStore, repo: string, message: string): { done: st
     if (git(dir, ["rev-parse", "--verify", "--quiet", remote]).ok) {
       const behind = Number(git(dir, ["rev-list", "--count", `HEAD..${remote}`]).stdout || 0);
       if (behind > 0) {
-        if (store.renameClashes) done.push(...renameClashes(store, remote, message));
+        if (store.renameClashes) {
+          for (const [from, to] of Object.entries(renameClashes(store, remote, message))) {
+            renamed[from] = to;
+            done.push(`renamed ${from} (another machine had used the name) to ${to}`);
+          }
+        }
         const rebase = git(dir, ["rebase", "--quiet", remote]);
         if (!rebase.ok && !rebaseInProgress(dir)) {
           // It never started: a note was edited after this sync committed.
@@ -416,9 +432,9 @@ function directSync(store: RepoStore, repo: string, message: string): { done: st
     const ahead = git(dir, ["rev-parse", "--verify", "--quiet", remote]).ok
       ? Number(git(dir, ["rev-list", "--count", `${remote}..HEAD`]).stdout || 0)
       : commitCount(dir);
-    if (ahead === 0) return { done, published: true };
+    if (ahead === 0) return { done, published: true, renamed };
     const push = git(dir, ["push", "--quiet", "-u", "origin", `HEAD:refs/heads/${branch}`], NETWORK_TIMEOUT_MS);
-    if (push.ok) return { done: [...done, `pushed ${ahead} ${ahead === 1 ? "commit" : "commits"}`], published: true };
+    if (push.ok) return { done: [...done, `pushed ${ahead} ${ahead === 1 ? "commit" : "commits"}`], published: true, renamed };
     const rejected = /\[rejected\]|non-fast-forward|fetch first/i.test(push.stderr);
     if (!rejected) {
       return unpublished(`couldn't push to ${repo} (${firstLine(push.stderr)}); run \`mahler knowledge sync\` later to publish`);
@@ -429,6 +445,8 @@ function directSync(store: RepoStore, repo: string, message: string): { done: st
 
 export interface SyncResult {
   summary: string;
+  /** Ledger notes renamed because another machine had used the name: old path → new, relative to the store. */
+  renamed?: Record<string, string>;
   /** False when local commits couldn't reach the remote (offline, say). */
   published: boolean;
 }
@@ -438,28 +456,36 @@ export interface SyncResult {
  * other content, so the rebase doesn't stop on them. The local commits are
  * squashed into one with the new names.
  */
-function renameClashes(store: RepoStore, remote: string, message: string): string[] {
+function renameClashes(store: RepoStore, remote: string, message: string): Record<string, string> {
   const { dir } = store;
   const base = git(dir, ["merge-base", "HEAD", remote]);
+  // With rename detection on, an archive move isn't an add: archiving the
+  // same note on two machines is a real conflict, not a name clash.
   const added = base.ok
-    ? git(dir, ["diff", "--name-only", "--no-renames", "--diff-filter=A", base.stdout, "HEAD"]).stdout
+    ? git(dir, ["diff", "--name-only", "--find-renames", "--diff-filter=A", base.stdout, "HEAD"]).stdout
     : git(dir, ["ls-tree", "-r", "--name-only", "HEAD"]).stdout;
+  const files = added.split("\n").filter((file) => file !== "");
   const blob = (ref: string, file: string) => git(dir, ["rev-parse", "--verify", "--quiet", `${ref}:${file}`]);
-  const clashes = added
-    .split("\n")
-    .filter((file) => file !== "" && store.isNote(file))
-    .filter((file) => {
-      const theirs = blob(remote, file);
-      return theirs.ok && theirs.stdout !== blob("HEAD", file).stdout;
-    });
-  if (clashes.length === 0) return [];
+  const differs = (file: string) => {
+    const theirs = blob(remote, file);
+    return theirs.ok && theirs.stdout !== blob("HEAD", file).stdout;
+  };
+  // Only new notes, which sit at the top level; archive/ holds moved ones.
+  const clashes = files.filter((file) => store.isNote(file) && !/[\\/]/.test(file) && differs(file));
+  // No shared history: the README and .gitignore are both sides' own, and the remote's win, as at clone.
+  const theirs = base.ok ? [] : files.filter((file) => !store.isNote(file) && differs(file));
+  if (clashes.length === 0 && theirs.length === 0) return {};
   if (base.ok) gitOrThrow(dir, ["reset", "--soft", "--quiet", base.stdout]);
   else gitOrThrow(dir, ["update-ref", "-d", "HEAD"]);
-  const renamed = clashes.map((file) => {
-    const target = freeName(file, (candidate) => existsSync(resolve(dir, candidate)) || blob(remote, candidate).ok);
+  if (theirs.length > 0) gitOrThrow(dir, ["checkout", remote, "--", ...theirs]);
+  const taken = (candidate: string) =>
+    [candidate, `archive/${candidate}`].some((path) => existsSync(resolve(dir, path)) || blob(remote, path).ok);
+  const renamed: Record<string, string> = {};
+  for (const file of clashes) {
+    const target = freeName(file, taken);
     gitOrThrow(dir, ["mv", file, target]);
-    return `renamed ${file} to ${target}, a name another machine had used`;
-  });
+    renamed[file] = target;
+  }
   gitOrThrow(dir, ["commit", "--quiet", "-m", message]);
   return renamed;
 }

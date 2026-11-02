@@ -42,6 +42,10 @@ The review should assess the following criteria:
 - Security: Are there any security vulnerabilities or concerns?
 - Style: Does the code adhere to the project's coding style and conventions?
 - Tests: Are there sufficient tests, and do they cover the relevant cases?
+- Known traps: run `mahler knowledge search --changed` from the worktree (or
+  `--paths` with the changed files) and check the diff against each note it
+  finds. A change that walks into a trap a note describes is a finding; cite
+  the note.
 
 ### 3. Fix-it forward
 

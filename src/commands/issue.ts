@@ -16,6 +16,13 @@ import {
   sessionMarkdown,
   taskMarkdown,
 } from "../render.js";
+import {
+  knowledgeDir,
+  readNotes,
+  relevantKnowledgeMarkdown,
+  relevantNotes,
+  writeIndexes,
+} from "../knowledge.js";
 import { issueRisk } from "../risk.js";
 import type { LinearIssue, RiskConfig } from "../types.js";
 import {
@@ -87,6 +94,14 @@ function writeBrief(
     );
   }
   ensureDir(paths.meta);
+  // Notes may have been edited by hand (in Obsidian, say) since the last write.
+  writeIndexes(workspace, config);
+  const notes = readNotes(knowledgeDir(workspace, config));
+  const knowledge = relevantKnowledgeMarkdown(
+    relevantNotes(notes, issue, config.repos),
+    notes.length,
+    workspace,
+  );
   writeFileEnsured(
     resolve(paths.meta, "TASK.md"),
     taskMarkdown(issue, source, config.definitionOfDone),
@@ -103,6 +118,7 @@ function writeBrief(
       config.definitionOfDone,
       config.merge,
       config.risk,
+      knowledge,
     ),
   );
   writeFileEnsured(resolve(paths.meta, "HANDOFF.md"), handoffMarkdown(issue));

@@ -201,6 +201,16 @@ function humanReviewChanges(
 ): string[] {
   const patterns = config.merge.humanReviewPaths;
   if (patterns.length === 0) return [];
+  return changedFiles(workspace, repo, cwd).filter((file) =>
+    patterns.some((pattern) => matchesGlob(file, pattern)),
+  );
+}
+
+/**
+ * Repo-relative files changed since the branch in `cwd` left its base,
+ * including uncommitted and untracked ones. Empty on the base branch itself.
+ */
+export function changedFiles(workspace: string, repo: RepoConfig, cwd: string): string[] {
   const base = spawnSync(
     "git", ["merge-base", "HEAD", baseRef(abs(workspace, repo.path), repo)],
     { cwd, encoding: "utf8" },
@@ -214,10 +224,7 @@ function humanReviewChanges(
     cwd,
     encoding: "utf8",
   });
-  return `${diff.stdout}\n${untracked.stdout}`
-    .split("\n")
-    .filter(Boolean)
-    .filter((file) => patterns.some((pattern) => matchesGlob(file, pattern)));
+  return [...new Set(`${diff.stdout}\n${untracked.stdout}`.split("\n").filter(Boolean))];
 }
 
 function targetLabel(repo: RepoConfig, cwd: string): string {

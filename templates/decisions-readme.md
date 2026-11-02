@@ -7,7 +7,8 @@ session and never read a prior issue's `HANDOFF.md`; this ledger is the durable
 
 ## Convention
 
-- One file per deviation: `<YYYY-MM-DD>-<slug>.md`.
+- One file per deviation: `<YYYY-MM-DD>-<slug>.md`. Mahler regenerates
+  `INDEX.md` (one line per note) after each `mahler decide` and on install.
 - Frontmatter: `date`, `issue`, `agent`, `rule`. Body: the reason — what was
   decided, why it improves outcome/safety/efficiency, the risk, and any follow-up.
 - Write entries with `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`.
@@ -15,19 +16,21 @@ session and never read a prior issue's `HANDOFF.md`; this ledger is the durable
 
 ## Keep it lean
 
-The ledger is read at the start of every session, so it must stay small enough to
-be worth reading. Record a deviation here **only when its reason generalizes
+Sessions read `INDEX.md` at start, so the ledger must stay small enough to be
+worth reading. Record a deviation here **only when its reason generalizes
 beyond the issue that produced it** — a decision a future, unrelated session
-should know. Purely issue-local judgment calls belong in `HANDOFF.md` only.
+should know. Purely issue-local judgment calls belong in `HANDOFF.md` only, and
+what you learned about the code or tools belongs in the knowledge store
+(`mahler learn`).
 
 - **Append-only:** agents never edit, delete, or move entries on their own;
   an audit moves notes to `archive/` only once the human approves.
-- **Read the active ledger** (this directory, not `archive/`); filter by the
-  `issue:` or `rule:` frontmatter when you only need a slice.
+- **Read `INDEX.md`**, and open the notes that bear on your work (`archive/`
+  is not indexed).
 - **Humans curate.** Recurring decisions get promoted into a policy or
   `CLAUDE.md` rule; folded or stale notes move to `archive/`, which sessions do
   not read by default. The `audit` skill prepares those proposals for the
   human (reports in `.harness/audits/`).
 
-This is interim, designed to fold into a future Obsidian-based shared memory
-store with no migration.
+Knowledge lives separately, in the knowledge store (`.harness/knowledge/` by
+default).

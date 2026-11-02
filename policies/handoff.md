@@ -2,9 +2,10 @@
 
 Every agent session must leave a useful handoff.
 
-At the start of a session, read the active `.harness/decisions/` ledger (not
-`archive/`) to recover durable decisions and intent recorded by earlier
-sessions — `HANDOFF.md` is per-issue and does not carry across issues.
+At the start of a session, read the brief's `Relevant Knowledge` section and
+`.harness/decisions/INDEX.md`, and open the notes that bear on your work (see
+the knowledge and judgment policies). `HANDOFF.md` is per-issue and does not
+carry across issues.
 
 When several agents work on one issue, the issue's conductor owns
 `HANDOFF.md`: slice conductors and reviewers report status and results to it rather than

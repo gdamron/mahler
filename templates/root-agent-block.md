@@ -22,7 +22,8 @@ Recommended routing:
 - Machine load: before launching agents in parallel or running full test suites and builds, run `{{mahlerCommand}} capacity` and stay within the `concurrency` caps in `.harness/config.json`.
 - Create git worktrees only for repos needed by the task, preferably under `{{workspaceDir}}/issues/<ISSUE>/repos/<repo>`.
 - Choose branch names using `.harness/policies/branching.md`; Mahler does not choose branch names for agents.
-- Record deliberate workflow deviations in `.harness/issues/<ISSUE>/HANDOFF.md`; only when the reason generalizes beyond this issue, also append a note with `mahler decide` to `.harness/decisions/`. Read the active ledger (not `archive/`) at session start to recover durable decisions.
+- Record deliberate workflow deviations in `.harness/issues/<ISSUE>/HANDOFF.md`; only when the reason generalizes beyond this issue, also append a note with `mahler decide` to `.harness/decisions/`. At session start, read the brief's `Relevant Knowledge` and `.harness/decisions/INDEX.md`, and open the notes that bear on your work.
+- Knowledge: record what you learn about the code, tools, or project with `{{mahlerCommand}} learn`, and find what earlier sessions learned with `{{mahlerCommand}} knowledge search <terms>` or `--changed` (see `.harness/policies/knowledge.md`).
 - If the requested skill is outside the active profile, treat it as a Tier 1 deviation: you may proceed deliberately, but record the reason (see `.harness/policies/judgment.md`). Stop and ask the human if a named Linear issue or project can't be fetched.
 
 Risk decides how much verification a change gets, not who merges it. Every issue or local task carries a risk level ({{riskLabels}}) set when the work is written and only ever raised (see `.harness/policies/risk.md`); `.harness/policies/verification.md` says what each level requires, including independent acceptance tests from a tester sub-agent for medium and high risk.

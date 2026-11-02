@@ -130,13 +130,14 @@ sync.
    ledger index stays short once the knowledge is moved out. Sessions no
    longer read every note.
 3. **After planning:** once the conductor knows which files it will change,
-   it runs `mahler knowledge search --paths <files>` and reads the matches.
+   it runs `mahler knowledge search --paths <files>` (or `--changed` once
+   work is under way) and reads the matches.
    Paths have no synonyms, so this finds notes that the brief's word matching
    missed.
 4. **While working:** before changing an unfamiliar area, run `mahler
    knowledge search <terms>`, and open the notes that match.
-5. **At review:** the reviewer runs `mahler knowledge search --paths` on the
-   diff's changed files, and checks the change against each matching note.
+5. **At review:** the reviewer runs `mahler knowledge search --changed` on
+   the diff, and checks the change against each matching note.
    A diff that walks into a known trap is a finding.
 6. **On learning something:** search first. If a note covers it, update that
    note (`updated:` and the body). Otherwise run `mahler learn`. Correcting a
@@ -155,9 +156,10 @@ sync.
   and prints the existing note instead, so the agent updates it.
 - `mahler knowledge search <terms> [--repo r] [--limit n]`: ranks title and tag
   matches over description over body, prints index lines with paths, and
-  includes `pending/`. With `--paths <file...>` (or `--diff <base>`, which
-  takes the changed files from git), it returns the notes whose `paths`
-  globs match those files, in the matching repo. No dependencies. This is where a hybrid backend would
+  includes `pending/`. With `--paths <file,...>`, or `--changed` from a
+  worktree (the files its branch changed since leaving its base, as `mahler
+  check` computes them), it returns the notes whose `paths` globs match
+  those files, in the matching repo. No dependencies. This is where a hybrid backend would
   plug in.
 - `mahler knowledge index`: rebuilds `INDEX.md` for both stores.
 - `mahler knowledge sync`: in repo mode, pulls, publishes anything unpushed,
@@ -260,8 +262,8 @@ outcomes above. Most become knowledge through `import`.
 Each item is one issue, risk medium unless noted:
 
 1. **Local knowledge store.** Note format, `learn`, `verify`, `knowledge
-   index` and `search` (terms and paths), the Relevant Knowledge section in
-   briefs, the knowledge policy, the session-start changes, and the paths
+   index` and `search` (terms, paths, and changed files), the ledger's
+   generated index, the Relevant Knowledge section in briefs, the knowledge policy, the session-start changes, and the paths
    searches in conduct and review. Done when a fresh workspace can learn a
    note, find it by terms and by a changed file, see it in a new brief, and no
    session instruction still says to read the whole ledger.

@@ -8,6 +8,7 @@ import {
   serializeConfig,
   withInstallOptions,
 } from "../config.js";
+import { knowledgeDir, writeIndexes } from "../knowledge.js";
 import { agentNameCollisions, defaultModelFor, tierVariants } from "../models.js";
 import { parseProfileSource } from "../profiles.js";
 import {
@@ -59,6 +60,7 @@ export function install(workspaceInput: string, flags: Flags): void {
     acceptance: previous?.acceptance,
     models: previous?.models,
     concurrency: previous?.concurrency,
+    knowledge: previous?.knowledge,
     agents: previous?.agents,
   });
   // Fail before writing anything: a tier agent and a profile sharing a name
@@ -73,6 +75,7 @@ export function install(workspaceInput: string, flags: Flags): void {
   ensureDir(resolve(workspace, ".harness", "policies"));
   ensureDir(resolve(workspace, ".harness", "agents", "profiles"));
   ensureDir(resolve(workspace, ".harness", "decisions"));
+  ensureDir(resolve(knowledgeDir(workspace, config), "notes"));
   ensureDir(resolve(workspace, ".agents", "skills"));
   ensureDir(resolve(workspace, ".codex", "agents"));
   ensureDir(resolve(workspace, ".claude", "skills"));
@@ -89,10 +92,15 @@ export function install(workspaceInput: string, flags: Flags): void {
     resolve(workspace, ".harness", "decisions", "README.md"),
     renderTemplate("decisions-readme"),
   );
+  writeIfMissing(
+    resolve(knowledgeDir(workspace, config), "README.md"),
+    renderTemplate("knowledge-readme"),
+  );
   writeFileEnsured(
     resolve(workspace, ".harness", "config.json"),
     serializeConfig(config),
   );
+  writeIndexes(workspace, config);
   writeFileEnsured(
     resolve(workspace, ".harness", "README.md"),
     renderTemplate("harness-readme"),

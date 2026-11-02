@@ -36,14 +36,14 @@ is the record:
 <agent>` (writes `.harness/decisions/<date>-<slug>.md`).
 
 Keep the ledger lean. `HANDOFF.md` is per-issue and a later session never reads
-a _prior_ issue's handoff, so the ledger exists to carry forward only the durable
-reasons worth re-reading every session. A purely issue-local judgment call stays
-in `HANDOFF.md` only — recording it in the ledger turns the ledger into noise the
-next session must wade through.
+a _prior_ issue's handoff, so the ledger carries forward only deviations whose
+reasons a later session should know. A purely issue-local judgment call stays
+in `HANDOFF.md` only. What you learned about the code or tools is knowledge,
+not a deviation: record it with `mahler learn` (see the knowledge policy).
 
-At the start of a session, read the active ledger in `.harness/decisions/` (not
-`archive/`) to recover earlier intent; filter by the `issue:` or `rule:`
-frontmatter when you only need a slice. The ledger is **append-only**: never
+At the start of a session, read `.harness/decisions/INDEX.md`, which Mahler
+generates with one line per active note, and open the notes that bear on your
+work. The ledger is **append-only**: never
 edit, delete, or move entries on your own. Humans curate — promoting recurring decisions into
 a policy or `CLAUDE.md` rule and moving folded or stale notes to
 `.harness/decisions/archive/` (which sessions do not read by default). The

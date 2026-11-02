@@ -156,21 +156,29 @@ macOS, Spotlight indexing; `mahler doctor` reports when Spotlight is indexing
 the worktree root (exclude it in System Settings → Spotlight → Search Privacy;
 folder markers such as `.metadata_never_index` are not honored there).
 
+`mahler learn` records what an agent learned about the code, tools, or project
+as a note in the knowledge store (`.harness/knowledge/notes/<slug>.md` by
+default): one fact per note, with a title that states the fact, a one-line
+description, tags, repos, and the file paths it is about. Notes are plain
+markdown that opens as an Obsidian vault, and agents correct them in place
+rather than piling up near-duplicates. Sessions don't read every note: each
+brief gets a `Relevant Knowledge` section matched on the issue's words and
+repos, conductors and reviewers run `mahler knowledge search --changed` to
+find notes about the files being changed, and `mahler knowledge search
+<terms>` covers the rest. `mahler knowledge verify` marks a note confirmed, so
+the audit can find ones nobody has checked in a long time.
+
 `mahler decide` appends a note to the decisions ledger
-(`.harness/decisions/<YYYY-MM-DD>-<slug>.md`): the durable, cross-session record
-of Tier-1 deviations and the reasons behind them. A per-issue `HANDOFF.md` is
-not enough — a later session never reads a prior issue's handoff, so the ledger
-carries intent forward (the "experience" an agent otherwise lacks each session).
-Because the ledger is read at the start of every session, it stays lean:
-only deviations whose reason _generalizes beyond the issue that produced them_
-belong here; purely issue-local calls stay in `HANDOFF.md`. It is append-only —
-agents never edit, delete, or move entries on their own — and humans curate, promoting
-recurring decisions into policy and moving stale notes to
-`.harness/decisions/archive/` (not read by default). The composer's `audit`
-skill helps with that curation: now and then it reviews the ledger, overlays,
+(`.harness/decisions/<YYYY-MM-DD>-<slug>.md`): the cross-session record of
+Tier-1 deviations and the reasons behind them. Only deviations whose reason
+_generalizes beyond the issue that produced them_ belong here; purely
+issue-local calls stay in `HANDOFF.md`, and facts about the code go in the
+knowledge store. Sessions read the generated `INDEX.md`, not every note. The
+ledger is append-only, and humans curate it, promoting recurring decisions
+into policy and moving stale notes to `.harness/decisions/archive/`. The
+composer's `audit` skill helps: now and then it reviews the ledger, overlays,
 instruction files, and config, and proposes what to archive, promote, update,
-or drop, for the human to approve. The ledger is designed to fold into a
-future shared memory store with no migration.
+or drop, for the human to approve.
 
 Install compiles canonical Mahler source into native agent artifacts:
 

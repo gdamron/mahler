@@ -47,6 +47,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
     acceptance: { path: "acceptance" },
     models: defaultModels(),
     concurrency: defaultConcurrency(),
+    knowledge: { path: ".harness/knowledge" },
     agents: {
       codex: {
         runtime: "codex",
@@ -78,6 +79,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "interview",
           "issue-selection",
           "judgment",
+          "knowledge",
           "merge",
           "pr",
           "review",
@@ -117,6 +119,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "interview",
           "issue-selection",
           "judgment",
+          "knowledge",
           "merge",
           "pr",
           "review",
@@ -197,6 +200,7 @@ export function withInstallOptions(
     acceptance?: HarnessConfig["acceptance"];
     models?: HarnessConfig["models"];
     concurrency?: HarnessConfig["concurrency"];
+    knowledge?: HarnessConfig["knowledge"];
     agents?: HarnessConfig["agents"];
   },
 ): HarnessConfig {
@@ -212,6 +216,7 @@ export function withInstallOptions(
     acceptance: options.acceptance ?? config.acceptance,
     models: options.models ?? config.models,
     concurrency: options.concurrency ?? config.concurrency,
+    knowledge: options.knowledge ?? config.knowledge,
     agents: withPreservedAgents(config.agents, options.agents),
     linear: {
       acceptedAssignees:
@@ -268,6 +273,7 @@ export function loadConfig(workspace: string): HarnessConfig {
     acceptance: { ...defaults.acceptance, ...parsed.acceptance },
     models: resolveModels(defaults.models, parsed.models as ModelsOverrides | undefined),
     concurrency: { ...defaults.concurrency, ...parsed.concurrency },
+    knowledge: { ...defaults.knowledge, ...parsed.knowledge },
   };
 }
 

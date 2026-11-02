@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Flags, required, stringFlag, workspaceFlag } from "../args.js";
+import { ledgerIndex } from "../knowledge.js";
 import { renderTemplate } from "../templates.js";
 import { ensureDir, slugify, writeFileEnsured } from "../util.js";
 
@@ -31,6 +32,7 @@ export function decide(flags: Flags): void {
       reason: reason.trim(),
     }),
   );
+  writeFileEnsured(resolve(dir, "INDEX.md"), ledgerIndex(dir));
   console.log(`Recorded decision: ${path}`);
   console.log(
     `Reference it from the issue's HANDOFF.md under "Workflow Deviations". This ledger is append-only — never edit or delete entries.`,

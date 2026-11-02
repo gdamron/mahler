@@ -14,7 +14,8 @@ This workspace uses Mahler for multi-agent development. A **composer agent** coo
 - Create git worktrees only for repos needed by the task.
 - Prefer project-local worktrees under `workspaces/issues/<ISSUE>/repos/<repo>`.
 - Choose branch names using `.harness/policies/branching.md`; Mahler does not choose branch names for you.
-- At session start, read the active `.harness/decisions/` ledger (not `archive/`) to recover durable decisions from earlier sessions.
+- At session start, read the brief's `Relevant Knowledge` and `.harness/decisions/INDEX.md`, and open the notes that bear on your work. After planning, run `mahler knowledge search --changed` (see `.harness/policies/knowledge.md`).
+- Record what you learn about the code, tools, or project with `mahler learn`; update an existing note rather than adding a near-duplicate.
 - Before delegating, use the `delegate` skill to decide whether a sub-agent is worth its context cost and which model tier to launch it on; briefs follow `.harness/policies/sub-agent-delegation.md`, and default sub-agent authority is read-only unless the brief explicitly grants edit scope.
 - Before launching agents in parallel or running full test suites and builds, run `mahler capacity` and stay within the `concurrency` caps in `.harness/config.json`.
 - Record deliberate workflow deviations in `HANDOFF.md`; only when the reason generalizes beyond this issue, also append a note with `mahler decide` to `.harness/decisions/`.

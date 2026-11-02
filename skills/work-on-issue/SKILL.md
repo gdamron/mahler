@@ -51,10 +51,11 @@ description: Create an issue brief and worktrees from Linear issue metadata or a
 4. Write the metadata to `.harness/tmp/linear/<ISSUE>.json` in the product workspace,
    creating the directory if needed.
 5. Run `mahler issue <ISSUE> --agent <agent> --linear-file .harness/tmp/linear/<ISSUE>.json`.
-6. Read the generated issue brief under `.harness/issues/<ISSUE>/`, and read the
-   active `.harness/decisions/` ledger (not `archive/`) to recover durable
-   decisions and intent from earlier sessions (record a new deviation with
-   `mahler decide` only when its reason generalizes beyond this issue).
+6. Read the generated issue brief under `.harness/issues/<ISSUE>/`, including
+   its `Relevant Knowledge` section, and `.harness/decisions/INDEX.md`. Open
+   the notes that bear on the work (see the knowledge policy). Record a new
+   deviation with `mahler decide` only when its reason generalizes beyond this
+   issue.
 7. Decide which configured repos need worktrees for the task, and whether to
    split the work into slices (see the conduct skill); each slice gets its own
    branch and worktree.

@@ -33,6 +33,9 @@ delegated by another conductor.
 - `git push` for the assigned branch only; never force-push a shared branch or
   push to a base branch
 - `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
+- `mahler knowledge search <terms>` or `--changed`; `mahler learn` and
+  `mahler knowledge verify` when you own the issue (in slice mode, propose
+  notes in your report instead)
 
 ## Expected Inputs
 
@@ -46,6 +49,8 @@ delegated by another conductor.
 1. Read the issue brief and, when delegated, the slice brief. Confirm the worktree and branch
    match the brief; stop if they do not.
 2. Inspect the relevant code and tests before editing (implementation policy).
+   Before working in an unfamiliar area, search the knowledge store for it
+   (see the knowledge policy).
 3. Work in save points: implement a small increment, run focused tests, commit
    it with the commit skill, and continue. If a change breaks tests, revert to
    the last commit and investigate rather than piling on fixes.
@@ -60,7 +65,8 @@ delegated by another conductor.
    (`git push -u origin <branch>`).
 7. Report the implementation policy's change summary (changes made, things
    intentionally not touched, potential concerns), the commit list, checks run,
-   and the pushed branch.
+   and the pushed branch, plus any fact worth a knowledge note (see the
+   knowledge policy).
 
 In slice mode, report status and results to the conductor that owns
 `HANDOFF.md`; you still record your own workflow deviations there. When you own

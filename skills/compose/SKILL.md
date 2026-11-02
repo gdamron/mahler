@@ -48,7 +48,7 @@ itself: one issue never needs a composer layer.
 - A Linear project name or ID, an explicit list of issue identifiers, or a
   human goal to decompose into issues
 - The project's acceptance criteria from the human, when they wrote them
-- The active `.harness/decisions/` ledger (not `archive/`)
+- `.harness/decisions/INDEX.md` and the knowledge store's `INDEX.md`
 
 ## Process
 

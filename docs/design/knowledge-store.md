@@ -103,7 +103,7 @@ adds a `description` line so it can be indexed too.
   archive/<slug>.md
   pending/<slug>.md          PR mode only: published but not merged; gitignored
 
-.harness/decisions/           the ledger; a clone of decisions.repo when set
+.harness/decisions/          the ledger; a clone of decisions.repo when set
   README.md
   INDEX.md                   generated
   <date>-<slug>.md

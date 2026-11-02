@@ -34,3 +34,11 @@ what you learned about the code or tools belongs in the knowledge store
 
 Knowledge lives separately, in the knowledge store (`.harness/knowledge/` by
 default).
+
+## Backup
+
+With `decisions.repo` in `.harness/config.json`, this folder is a clone of
+that repo. `mahler decide` commits and pushes each note, and briefs and
+`mahler knowledge sync` pull and push. A backup that couldn't reach the remote
+only warns, and the next sync pushes. `INDEX.md` is generated and stays out
+of the repo.

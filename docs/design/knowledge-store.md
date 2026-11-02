@@ -103,7 +103,7 @@ adds a `description` line so it can be indexed too.
   archive/<slug>.md
   pending/<slug>.md          PR mode only: published but not merged; gitignored
 
-<decisions path>/            default: .harness/decisions
+.harness/decisions/           the ledger; a clone of decisions.repo when set
   README.md
   INDEX.md                   generated
   <date>-<slug>.md
@@ -185,7 +185,7 @@ sync.
 
 ## Configuration
 
-Both stores use the same shape and backend code:
+Both stores use the same backend code, and a similar shape:
 
 ```json
 "knowledge": {
@@ -195,7 +195,8 @@ Both stores use the same shape and backend code:
   "publish": "direct"
 },
 "decisions": {
-  "path": ".harness/decisions"
+  "repo": "git@github.com:example/workspace-decisions.git",
+  "branch": "main"
 }
 ```
 
@@ -273,7 +274,13 @@ Both stores use the same shape and backend code:
   - when `gh` can't say what happened to the batch, nothing is published
     until it can.
 - `decisions.repo`: a private backup of the ledger, which can live on a
-  different remote from the knowledge repo. The ledger always publishes directly.
+  different remote from the knowledge repo. The ledger always publishes
+  directly, with the same clone, lock, and push code as the knowledge store.
+  Its folder stays `.harness/decisions`, since policies and templates name
+  it. `decide` and `knowledge import --archive` push, and briefs and
+  `knowledge sync` pull too. A failed backup only warns, because the note is
+  saved either way. Each store syncs on its own, so a knowledge conflict
+  doesn't stop the ledger's backup.
 - Writes take a lock under `.harness/tmp/locks/` so parallel agents on one
   machine don't collide on the git index.
 

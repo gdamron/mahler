@@ -195,6 +195,14 @@ that turns out to be a fact about the code moves to the knowledge store with
 `mahler knowledge import`. `mahler doctor` warns when the active ledger
 passes 20 notes.
 
+To back the ledger up, set `decisions.repo` (and optionally
+`decisions.branch`) in `.harness/config.json` and rerun `mahler install`,
+which clones the repo into `.harness/decisions/` and carries over the notes
+already there. The repo can differ from the knowledge repo. `mahler decide`
+and `mahler knowledge import --archive` then commit and push. Briefs pull,
+and `mahler knowledge sync` syncs both stores. The ledger always pushes
+directly, never through PRs.
+
 Install compiles canonical Mahler source into native agent artifacts:
 
 - Codex project skills in `.agents/skills/`

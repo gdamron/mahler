@@ -24,7 +24,7 @@ import {
   writeIndexes,
 } from "../knowledge.js";
 import { issueRisk } from "../risk.js";
-import { syncKnowledge } from "../knowledge-repo.js";
+import { syncKnowledge, syncLedger } from "../knowledge-repo.js";
 import type { LinearIssue, RiskConfig } from "../types.js";
 import {
   ensureDir,
@@ -106,6 +106,14 @@ function writeBrief(
   } catch (error) {
     writeIndexes(workspace, config);
     console.warn(`Knowledge sync skipped: ${(error as Error).message}`);
+  }
+  // Pull the ledger too: sessions read its index at start.
+  try {
+    const result = syncLedger(workspace, config, { lockWaitMs: 15_000 });
+    if (result && !result.published) console.warn(result.summary);
+  } catch (error) {
+    writeIndexes(workspace, config);
+    console.warn(`Ledger sync skipped: ${(error as Error).message}`);
   }
   const notes = readNotes(knowledgeDir(workspace, config));
   const knowledge = relevantKnowledgeMarkdown(

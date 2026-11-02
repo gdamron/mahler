@@ -13,15 +13,17 @@ import {
 } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { dirname, relative, resolve, sep } from "node:path";
-import { knowledgeDir, writeIndexes } from "./knowledge.js";
+import { decisionsDir, knowledgeDir, writeIndexes } from "./knowledge.js";
 import { ensureExcluded, leavePrMode, prModeSync } from "./knowledge-pr.js";
 import { firstLine, git, GIT_ENV, gitOrThrow, IGNORED, NETWORK_TIMEOUT_MS } from "./knowledge-git.js";
 import type { HarnessConfig } from "./types.js";
 
 /**
- * Repo mode for the knowledge store: the store's folder is a clone of
- * `knowledge.repo`, and Mahler commits and pushes notes to `knowledge.branch`.
- * Without `repo`, the store is a plain local folder and none of this runs.
+ * Repo mode: a store's folder is a clone of its repo, and Mahler commits and
+ * pushes notes to its branch. The knowledge store uses `knowledge.repo`, and
+ * can publish through PRs instead. The decisions ledger can be backed up to
+ * `decisions.repo`, always publishing directly. Without a repo, a store is a
+ * plain local folder and none of this runs.
  */
 
 /** A lock held longer than this belongs to a crashed process. */
@@ -29,6 +31,45 @@ const STALE_LOCK_MS = 10 * 60 * 1000;
 
 export function knowledgeBranch(config: HarnessConfig): string {
   return config.knowledge.branch ?? "main";
+}
+
+/** A store that can live in a git repo: the knowledge store or the decisions ledger. */
+export interface RepoStore {
+  /** The lock's name. */
+  name: "knowledge" | "decisions";
+  /** How messages name the store. */
+  label: string;
+  dir: string;
+  repo?: string;
+  branch: string;
+  /** Publish through PRs (knowledge only). */
+  pr: boolean;
+  /** Files a clone mustn't silently replace: notes, as opposed to the README. */
+  isNote: (file: string) => boolean;
+}
+
+export function knowledgeStore(workspace: string, config: HarnessConfig): RepoStore {
+  return {
+    name: "knowledge",
+    label: "knowledge store",
+    dir: knowledgeDir(workspace, config),
+    repo: config.knowledge.repo,
+    branch: knowledgeBranch(config),
+    pr: prPublish(config),
+    isNote: (file) => /^(notes|archive)[\\/].*\.md$/.test(file),
+  };
+}
+
+export function ledgerStore(workspace: string, config: HarnessConfig): RepoStore {
+  return {
+    name: "decisions",
+    label: "decisions ledger",
+    dir: decisionsDir(workspace),
+    repo: config.decisions?.repo,
+    branch: config.decisions?.branch ?? "main",
+    pr: false,
+    isNote: (file) => /^(archive[\\/])?[^\\/]+\.md$/.test(file) && file !== "README.md" && file !== "INDEX.md",
+  };
 }
 
 /**
@@ -53,18 +94,17 @@ function sameRepo(workspace: string, origin: string, repo: string): boolean {
 }
 
 /**
- * Install: when `knowledge.repo` is set and the store's folder isn't a git
- * clone yet, clone the repo and check out `knowledge.branch` (creating it when
- * the remote is empty). Notes already in a local store are copied into the
+ * Install: when the store has a repo and its folder isn't a git clone yet,
+ * clone the repo and check out the store's branch (creating it when the
+ * remote is empty). Notes already in a local store are copied into the
  * clone, to be published by the next sync, and the old folder is kept beside
  * it as `<path>.before-clone`. A file that differs between the two stops the
  * install with nothing changed. Returns what it did, or undefined when there
  * was nothing to do.
  */
-export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): string | undefined {
-  const { repo } = config.knowledge;
+export function cloneStore(workspace: string, store: RepoStore): string | undefined {
+  const { repo, dir, isNote } = store;
   if (!repo) return undefined;
-  const dir = knowledgeDir(workspace, config);
   if (existsSync(resolve(dir, ".git"))) return undefined;
   const temp = `${dir}.cloning`;
   rmSync(temp, { recursive: true, force: true });
@@ -76,10 +116,10 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
   });
   if (clone.status !== 0) {
     rmSync(temp, { recursive: true, force: true });
-    throw new Error(`Couldn't clone the knowledge repo ${repo}: ${(clone.stderr ?? "").trim()}`);
+    throw new Error(`Couldn't clone the ${store.name} repo ${repo}: ${(clone.stderr ?? "").trim()}`);
   }
   try {
-    checkOutBranch(temp, knowledgeBranch(config));
+    checkOutBranch(temp, store.branch);
   } catch (error) {
     rmSync(temp, { recursive: true, force: true });
     throw error;
@@ -119,9 +159,9 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
     }
   }
   renameSync(temp, dir);
-  if (prPublish(config)) ensureExcluded(dir);
+  if (store.pr) ensureExcluded(dir);
   else ensureGitignore(dir);
-  const lines = [`Cloned the knowledge store from ${repo} into ${dir}`];
+  const lines = [`Cloned the ${store.label} from ${repo} into ${dir}`];
   if (carried > 0) {
     lines.push(
       `Copied ${carried} local ${carried === 1 ? "note" : "notes"} into the clone; \`mahler knowledge sync\` publishes them.`,
@@ -129,11 +169,6 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
   }
   if (kept) lines.push(`The old folder is at ${kept}; delete it once you've checked.`);
   return lines.join("\n");
-}
-
-/** Notes the repo tracks (pending notes are machine-local). */
-function isNote(file: string): boolean {
-  return /^(notes|archive)[\\/].*\.md$/.test(file);
 }
 
 function unusedPath(base: string): string {
@@ -178,9 +213,8 @@ export interface StoreState {
 }
 
 /** The store's clone, as far as local git knows (no fetch). */
-export function storeState(workspace: string, config: HarnessConfig): StoreState {
-  const { repo } = config.knowledge;
-  const dir = knowledgeDir(workspace, config);
+export function storeState(workspace: string, store: RepoStore): StoreState {
+  const { repo, dir } = store;
   if (!repo) return {};
   if (!existsSync(dir)) return { problem: `${dir} is missing; run \`mahler install\` to clone ${repo}` };
   if (!existsSync(resolve(dir, ".git"))) {
@@ -199,7 +233,7 @@ export function storeState(workspace: string, config: HarnessConfig): StoreState
     }
   }
   const branch = git(dir, ["symbolic-ref", "--short", "HEAD"]).stdout;
-  const expected = knowledgeBranch(config);
+  const expected = store.branch;
   if (branch !== expected) return { problem: `${dir} is on "${branch || "a detached HEAD"}", not "${expected}"`, branch };
   const counts = git(dir, ["rev-list", "--left-right", "--count", `HEAD...refs/remotes/origin/${expected}`]);
   const [ahead, behind] = counts.ok ? counts.stdout.split(/\s+/).map(Number) : [commitCount(dir), 0];
@@ -248,29 +282,53 @@ export function syncKnowledge(workspace: string, config: HarnessConfig, options:
     return { summary: "The knowledge store is a local folder (no knowledge.repo); indexes rebuilt.", published: true };
   }
   checkPublishMode(config);
-  const state = storeState(workspace, config);
-  if (state.problem) throw new Error(state.problem);
-  const dir = knowledgeDir(workspace, config);
-  const branch = knowledgeBranch(config);
-  const repo = config.knowledge.repo;
-  const { done, published } = withLock(
-    workspace,
-    "knowledge",
-    () => {
-      if (prPublish(config)) return prModeSync(dir, branch, repo, message, quick);
-      ensureGitignore(dir);
-      return directSync(dir, branch, repo, message);
-    },
-    lockWaitMs,
-  );
-  writeIndexes(workspace, config);
-  return { summary: `Knowledge sync: ${done.length > 0 ? done.join("; ") : "already up to date"}.`, published };
+  return syncStore(workspace, config, knowledgeStore(workspace, config), { ...options, message, lockWaitMs, quick }, "Knowledge sync");
 }
 
-/** Direct publish: commit, rebase onto the remote branch, push (one retry). */
-function directSync(dir: string, branch: string, repo: string, message: string): { done: string[]; published: boolean } {
+/**
+ * Back the decisions ledger up to `decisions.repo` (direct publish), or
+ * return undefined when it has no repo.
+ */
+export function syncLedger(workspace: string, config: HarnessConfig, options: SyncOptions = {}): SyncResult | undefined {
+  if (!config.decisions?.repo) return undefined;
+  const { message = "decisions: update the ledger", lockWaitMs = 60_000 } = options;
+  return syncStore(workspace, config, ledgerStore(workspace, config), { message, lockWaitMs }, "Ledger sync");
+}
+
+function syncStore(
+  workspace: string,
+  config: HarnessConfig,
+  store: RepoStore,
+  options: Required<Pick<SyncOptions, "message" | "lockWaitMs">> & SyncOptions,
+  title: string,
+): SyncResult {
+  const state = storeState(workspace, store);
+  if (state.problem) throw new Error(state.problem);
+  const { dir, branch, repo } = store;
+  if (!repo) throw new Error(`The ${store.label} has no repo to sync with`);
+  const { done, published } = withLock(
+    workspace,
+    store.name,
+    () => {
+      if (store.pr) return prModeSync(dir, branch, repo, options.message, options.quick ?? false);
+      ensureGitignore(dir);
+      return directSync(store, repo, options.message);
+    },
+    options.lockWaitMs,
+  );
+  writeIndexes(workspace, config);
+  return { summary: `${title}: ${done.length > 0 ? done.join("; ") : "already up to date"}.`, published };
+}
+
+/**
+ * Direct publish: commit, rebase onto the remote branch, push (one retry).
+ * For the knowledge store, first settle anything left from PR publish.
+ */
+function directSync(store: RepoStore, repo: string, message: string): { done: string[]; published: boolean } {
+  const { dir, branch } = store;
   // Left over from PR publish: settle its PRs, and publish what's still pending.
-  const left = leavePrMode(dir, branch);
+  const left: { done: string[]; blocked?: string } =
+    store.name === "knowledge" ? leavePrMode(dir, branch) : { done: [] };
   const done = left.done;
   const unpublished = (why: string) => ({ done: [...done, why], published: false });
   if (left.blocked) return unpublished(left.blocked);
@@ -299,7 +357,7 @@ function directSync(dir: string, branch: string, repo: string, message: string):
           const conflicts = git(dir, ["diff", "--name-only", "--diff-filter=U"]).stdout.split("\n").filter(Boolean);
           git(dir, ["rebase", "--abort"]);
           throw new Error(
-            `Knowledge sync stopped: your changes conflict with the remote in ${conflicts.join(", ") || "the store"}. Your commit is kept locally in ${dir}; merge the notes by hand there (git pull --rebase), then run \`mahler knowledge sync\`.`,
+            `${store.name === "knowledge" ? "Knowledge" : "Ledger"} sync stopped: your changes conflict with the remote in ${conflicts.join(", ") || "the store"}. Your commit is kept locally in ${dir}; merge the notes by hand there (git pull --rebase), then run \`mahler knowledge sync\`.`,
           );
         }
         done.push(`pulled ${behind} ${behind === 1 ? "commit" : "commits"}`);

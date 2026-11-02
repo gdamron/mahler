@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { type Flags, required, stringFlag, workspaceFlag } from "../args.js";
-import { ledgerIndex } from "../knowledge.js";
+import { loadConfig } from "../config.js";
+import { decisionsDir, ledgerIndex } from "../knowledge.js";
+import { syncLedger } from "../knowledge-repo.js";
+import type { HarnessConfig } from "../types.js";
 import { renderTemplate } from "../templates.js";
 import { ensureDir, slugify, writeFileEnsured } from "../util.js";
 
@@ -20,7 +23,7 @@ export function decide(flags: Flags): void {
   const agent = stringFlag(flags, "agent") ?? "unknown";
   const date = new Date().toISOString().slice(0, 10);
   const slug = slugify(stringFlag(flags, "slug") ?? rule) || "deviation";
-  const dir = resolve(workspace, ".harness", "decisions");
+  const dir = decisionsDir(workspace);
   ensureDir(dir);
   const path = uniqueDecisionPath(dir, date, slug);
   writeFileEnsured(
@@ -39,6 +42,22 @@ export function decide(flags: Flags): void {
   console.log(
     `Reference it from the issue's HANDOFF.md under "Workflow Deviations". This ledger is append-only — never edit or delete entries.`,
   );
+  publishLedger(workspace, loadConfig(workspace), `decisions: add ${basename(path, ".md")}`, path);
+}
+
+/**
+ * With `decisions.repo`, back up what was just written. The note is saved
+ * either way, so a failure only warns: the next sync pushes it.
+ */
+export function publishLedger(workspace: string, config: HarnessConfig, message: string, file: string): void {
+  try {
+    const result = syncLedger(workspace, config, { message });
+    if (!result) return;
+    if (result.published) console.log(result.summary);
+    else console.warn(result.summary);
+  } catch (error) {
+    console.warn(`${file} is saved locally, but backing it up failed: ${(error as Error).message}`);
+  }
 }
 
 /** First non-colliding `<date>-<slug>.md` path in `dir`, suffixing -2, -3, … so appends never overwrite. */

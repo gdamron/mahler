@@ -125,7 +125,7 @@ const commands: Record<string, Command> = {
   decide: {
     usage:
       'mahler decide --rule <rule> --description "<one line>" --reason "<why>" [--issue <ISSUE>] [--agent codex|claude] [--slug <slug>] [--workspace <path>]',
-    summary: "Record a deviation from a rule.",
+    summary: "Record a deviation from a rule, and back it up when the ledger has a repo.",
     positionals: 0,
     flags: {
       ...workspace,
@@ -161,7 +161,7 @@ const commands: Record<string, Command> = {
     usage:
       "mahler knowledge index | search [terms...] [--paths file,file | --changed] [--repo r] [--limit n] | verify <slug> | sync | import <ledger-note> [--title t] [--description d] [--tags a,b] [--repos r] [--paths glob,glob] [--slug s] [--source ISSUE] [--archive] [--workspace <path>]",
     summary:
-      "Rebuild the knowledge and ledger indexes, search notes by terms or changed files, mark a note verified today, sync the store with its repo, or import a decisions ledger note as knowledge.",
+      "Rebuild the knowledge and ledger indexes, search notes by terms or changed files, mark a note verified today, sync the store and the ledger with their repos, or import a decisions ledger note as knowledge.",
     positionals: 50,
     flags: {
       ...workspace,

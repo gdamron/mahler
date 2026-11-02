@@ -102,3 +102,16 @@ test("install is idempotent and preserves user content in AGENTS.md", () => {
   const startMatches = body.match(/<!-- HARNESS:START -->/g) ?? [];
   assert.equal(startMatches.length, 1, "harness block should not be duplicated");
 });
+
+test("doctor warns when the acceptance suite names an unknown repo or has no run command", () => {
+  const workspace = installWorkspace();
+  const configFile = resolve(workspace, ".harness", "config.json");
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  config.acceptance = { repo: "suite", path: "acceptance" };
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  assert.match(runDoctor(workspace).stdout, /warn acceptance\.repo "suite" is not a configured repo/);
+
+  config.repos = [{ name: "suite", path: "suite", baseBranch: "main" }];
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  assert.match(runDoctor(workspace).stdout, /warn acceptance\.repo is "suite" but acceptance\.run is not set/);
+});

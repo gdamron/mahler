@@ -87,21 +87,21 @@ other roles pick one.
 npm install -g https://github.com/gdamron/mahler/releases/download/v2026.10.2/mahler-2026.10.2.tgz   # pinned; see INSTALL.md
 mahler --version
 mahler install /path/to/product-workspace --linear-assignee gonzo --linear-label agent
-mahler issue FUG-123 --workspace /path/to/product-workspace --agent codex
+mahler issue DEV-123 --workspace /path/to/product-workspace --agent codex
 mahler task curved-declick --workspace /path/to/product-workspace --agent claude --task-file task.json
 mahler project "Project X" --workspace /path/to/product-workspace --agent claude --linear-file project.json
 mahler status --workspace /path/to/product-workspace
 mahler profile codex --workspace /path/to/product-workspace
 mahler can codex commit --workspace /path/to/product-workspace
-mahler handoff FUG-123 --workspace /path/to/product-workspace --agent codex
+mahler handoff DEV-123 --workspace /path/to/product-workspace --agent codex
 mahler decide --rule scope --reason "expanded to fix adjacent bug" --issue FUG-123 --agent codex --workspace /path/to/product-workspace
-mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue FUG-123 | --path <worktree>]
-mahler acceptance freeze --workspace /path/to/product-workspace --issue FUG-123 --repo <name> --commit <sha|base..sha> [--reason "<dispute decision>"]
+mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue DEV-123 | --path <worktree>]
+mahler acceptance freeze --workspace /path/to/product-workspace --issue DEV-123 --repo <name> --commit <sha|base..sha> [--reason "<dispute decision>"]
 mahler acceptance freeze --workspace /path/to/product-workspace --project <slug> --repo <name> --commit <sha>
-mahler acceptance manifest --workspace /path/to/product-workspace --issue FUG-123 | --project <slug>
-mahler acceptance run --workspace /path/to/product-workspace --project <slug> [--issue FUG-123]
+mahler acceptance manifest --workspace /path/to/product-workspace --issue DEV-123 | --project <slug>
+mahler acceptance run --workspace /path/to/product-workspace --project <slug> [--issue DEV-123]
 mahler capacity --workspace /path/to/product-workspace
-mahler cleanup FUG-123 --workspace /path/to/product-workspace [--dry-run]
+mahler cleanup DEV-123 --workspace /path/to/product-workspace [--dry-run]
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project

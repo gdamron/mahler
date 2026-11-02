@@ -18,7 +18,7 @@ import {
 
 test("workflow names issue prompts and project prompts", () => {
   const workflow = workflowMarkdown();
-  assert.match(workflow, /work on FUG-123/);
+  assert.match(workflow, /work on DEV-123/);
   assert.match(workflow, /work on project X in Linear/);
 });
 

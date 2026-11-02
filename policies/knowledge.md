@@ -64,8 +64,10 @@ it) with a PR of its own, which editing the pending note updates; edits to
 existing notes, verified dates included, go up together in one open PR at
 the next sync. Briefs only pull, so run `mahler knowledge sync` after
 editing notes by hand. Never merge a knowledge PR
-yourself, whatever the merge policy allows for code. A PR the human closes
-drops its change from this machine too.
+yourself, whatever the merge policy allows for code, and don't push to its
+branch: Mahler stops updating a PR once anyone else commits to it. A PR the
+human closes drops its change from this machine too, unless the change was
+edited since.
 
 Conductors and composers run `mahler learn`. Slice conductors, testers, and
 reviewers put proposed notes (title, description, scope) in their report, and

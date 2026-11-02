@@ -220,26 +220,43 @@ Both stores use the same shape and backend code:
   the PR merges, and open a PR for it on `knowledge/<slug>-<random>` with the
   note's description, tags, and sources. (The random suffix, not the agent's
   name, keeps two machines' branches apart; `learn` doesn't know the agent.)
-  The pending copy records the PR in `pr:` and `pr-branch:`, which the
-  published note leaves out; editing the pending note updates its PR. Edits
-  to notes already on `branch` (`verify`, hand edits, an audit) stay in the
-  working tree and go up as one open batch PR, which each sync force-pushes
-  to match the current edits, so a file never sits in two competing PRs.
-  `pending/edits.json` records the batch by git blob id. The human reviews
-  and merges knowledge PRs; no agent merges them, whatever the merge policy
-  allows for code, because the store is shared between agents and the
-  human. `sync` drops a pending note when the remote holds it exactly as
-  proposed, or when `gh` says its PR merged (once the pull has brought the
-  note) or closed unmerged; a different note with the same slug from
-  another machine doesn't count. For the batch, it puts the files back to
-  the clone's version (unless edited again since), remembers a closed
-  batch's changes so they aren't proposed again, and then pulls. Before
-  opening a PR, sync looks for one already open from the same branch, so a
-  `gh pr create` whose reply was lost isn't repeated. PR mode keeps
-  machine-local files out through `.git/info/exclude`, not `.gitignore`,
-  which would itself need a PR. Briefs only pull and settle what git can
-  see; they open no PRs. Switching back to `direct` moves pending notes into
-  `notes/` for the next push.
+  `pending/prs.json` records each PR: its branch, URL, and the commit and
+  content Mahler last pushed. Sync never writes to a note file for its own
+  bookkeeping. Editing the pending note updates its PR. Edits to notes
+  already on `branch` (`verify`, hand edits, an audit) stay in the working
+  tree and go up as one open batch PR. Each sync keeps it in step with the
+  current edits, so a file never sits in two competing PRs. An undone edit
+  is taken back out of the PR, and the PR is closed once every edit is
+  undone. Mahler pushes to a PR's branch only while `gh` says the PR is open
+  and the branch's tip is Mahler's own last push. It adds commits and never
+  force-pushes, so a reviewer's commits are never overwritten. Newer local
+  edits wait until that PR merges or closes. The human reviews and merges
+  knowledge PRs. No agent merges them, whatever the merge policy allows for
+  code, because the store is shared between agents and the human.
+  `sync` settles a PR when the remote holds its content exactly as last
+  pushed, or when `gh` says it merged or closed. A different note with the
+  same slug from another machine doesn't count as a merge.
+  - **Merged:** Mahler compares local files with the PR's head commit as it
+    merged. Matching files go back to the clone's version and arrive with the
+    pull. A file edited here since keeps the edit, three-way merged into the
+    merged version and proposed afresh. When that merge conflicts, the file
+    is left for a hand merge, which doctor reports. A merged pending note
+    waits for the pull that brings it.
+  - **Closed:** files proposed unchanged are dropped. Ones changed since are
+    proposed again.
+  - **Blocked pull:** no edits are proposed, since the working tree's base
+    is stale.
+
+  Before opening a PR, sync looks for one already open from the same
+  branch, so a `gh pr create` whose reply was lost isn't repeated. PR mode
+  keeps machine-local files out through `.git/info/exclude`, not
+  `.gitignore`, which would itself need a PR. Briefs only pull, and settle
+  only what git can see. They ask the forge nothing and open no PRs.
+  Switching back to `direct` settles PRs first:
+  - pending notes whose PR is still open, or was never opened, move into
+    `notes/` for the next push, and sync names the PRs to close;
+  - notes whose PR closed are dropped;
+  - notes whose PR merged arrive with the pull.
 - `decisions.repo`: a private backup of the ledger, which can live on a
   different remote from the knowledge repo. The ledger always publishes directly.
 - Writes take a lock under `.harness/tmp/locks/` so parallel agents on one

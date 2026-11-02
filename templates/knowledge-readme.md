@@ -19,13 +19,15 @@ Obsidian's settings (`.obsidian/`, `.trash/`) and `.DS_Store`.
 With `knowledge.publish: "pr"`, changes go up as pull requests (through the
 GitHub CLI, `gh`) for a human to merge, and this folder only ever pulls:
 
-- A new note waits in `pending/<slug>.md`, with its PR's URL in `pr:`. It
-  leaves `pending/` once the PR merges, or once it closes unmerged.
-  Editing the pending note updates its PR at the next sync.
+- A new note waits in `pending/<slug>.md` and gets a PR of its own. It
+  leaves `pending/` once the PR merges or closes unmerged. Editing the
+  pending note updates its PR at the next sync.
 - Edits to notes already merged (including `mahler knowledge verify` and
-  hand edits) stay as uncommitted changes here; each sync keeps one open PR
-  in step with them, recorded in `pending/edits.json`. A closed PR puts
-  those files back as they are on the branch.
+  hand edits) stay as uncommitted changes here. Each sync keeps one open
+  PR in step with them, and closes it if you undo them all.
+- `pending/prs.json` records each PR. Mahler never force-pushes, and
+  leaves a PR alone once someone else commits to it. An edit made after a
+  PR's last push is kept when the PR merges or closes, and proposed again.
 - Briefs only pull. Run `mahler knowledge sync` after editing by hand.
 
 ## Commands

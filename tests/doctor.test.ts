@@ -115,3 +115,15 @@ test("doctor warns when the acceptance suite names an unknown repo or has no run
   writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   assert.match(runDoctor(workspace).stdout, /warn acceptance\.repo is "suite" but acceptance\.run is not set/);
 });
+
+test("doctor reports gh support for attachments and stacks", async () => {
+  const { ghFindings } = await import("../src/commands/doctor.js");
+  assert.deepEqual(ghFindings(undefined, undefined).map((f) => f.level), ["info"]);
+  const current = ghFindings("gh version 2.100.0 (2026-09-03)\n", "gh stack version 0.1.0\n");
+  assert.deepEqual(current.map((f) => f.level), ["ok", "ok"]);
+  const old = ghFindings("gh version 2.98.1 (2026-07-01)\n", "");
+  assert.equal(old[0].level, "warn");
+  assert.match(old[0].message, /predates --attach/);
+  assert.equal(old[1].level, "info");
+  assert.equal(ghFindings("gh version 3.0.0\n", undefined)[0].level, "ok");
+});

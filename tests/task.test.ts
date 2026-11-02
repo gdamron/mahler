@@ -59,6 +59,7 @@ test("task reads a task file, and keeps an existing local- prefix", () => {
   }));
   const created = run(["task", "local-repin-core", "--workspace", workspace, "--agent", "codex", "--task-file", file]);
   assert.equal(created.status, 0, created.stderr);
+  assert.doesNotMatch(created.stdout, /warn:/);
   const brief = resolve(workspace, ".harness", "issues", "local-repin-core");
   const task = readFileSync(resolve(brief, "TASK.md"), "utf8");
   assert.match(task, /- \[ \] The product builds against the new core pin\./);
@@ -80,6 +81,8 @@ test("an issue without a risk label asks for one in its brief", () => {
   const workspace = workspaceWithRepo();
   const created = run(["issue", "MAH-9", "--workspace", workspace, "--agent", "codex", "--title", "t"]);
   assert.equal(created.status, 0, created.stderr);
+  assert.match(created.stdout, /warn: no acceptance criteria/);
+  assert.match(created.stdout, /warn: no risk level/);
   const session = readFileSync(resolve(workspace, ".harness", "issues", "MAH-9", "AGENT_SESSION.md"), "utf8");
   assert.match(session, /- Risk: not set\. Classify it with `\.harness\/policies\/risk\.md`/);
 });

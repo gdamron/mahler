@@ -66,9 +66,9 @@ description: Create an issue brief and worktrees from Linear issue metadata or a
 
 When the work was agreed in conversation and has no Linear issue:
 
-1. Write the task as JSON in the shape printed by `mahler linear-template
-   task`: title, description, risk, acceptance criteria as observable
-   behavior, non-goals, protected areas, and risk notes.
+1. Write the task with the write-issue skill, as JSON in the shape printed
+   by `mahler linear-template task`: title, description, risk, acceptance
+   criteria, non-goals, protected areas, and risk notes.
 2. Show the criteria and risk level to the human and wait for their go-ahead.
 3. Write it to `.harness/tmp/tasks/<slug>.json` and run `mahler task <slug>
    --agent <agent> --task-file .harness/tmp/tasks/<slug>.json`. The issue

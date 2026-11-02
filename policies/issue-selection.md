@@ -14,9 +14,8 @@ When asked to work on a specific issue:
 
 When the human describes work in conversation instead of naming an issue:
 
-1. Agree on the task first: a title, acceptance criteria as observable
-   behavior, non-goals, and a risk level with its reason (see the risk
-   policy).
+1. Agree on the task first, written with the write-issue skill: a title,
+   acceptance criteria, non-goals, and a risk level with its reason.
 2. Write it with `mahler task <slug> --task-file <task.json>` (template:
    `mahler linear-template task`). The identifier is `local-<slug>`, and the
    brief has the same layout as an issue's.

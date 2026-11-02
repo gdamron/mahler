@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
 import { modelConfigProblems, tierVariants } from "../models.js";
@@ -116,6 +117,7 @@ export function doctor(workspaceInput: string): void {
   );
   if (spotlight) results.push(spotlight);
   results.push(...acceptanceFindings(config));
+  results.push(...ghFindings(ghOutput(["--version"]), ghOutput(["stack", "--version"])));
 
   if (!existsSync(resolve(harness, "MODELS.md"))) {
     results.push({
@@ -393,4 +395,39 @@ function acceptanceFindings(config: HarnessConfig): Finding[] {
     return [{ level: "warn", message: `acceptance.repo is "${repo}" but acceptance.run is not set — \`mahler acceptance run\` needs it` }];
   }
   return [{ level: "ok", message: `acceptance suite: ${repo} (${config.acceptance.path})` }];
+}
+
+function ghOutput(args: string[]): string | undefined {
+  const result = spawnSync("gh", args, { encoding: "utf8", timeout: 10_000 });
+  return result.status === 0 ? result.stdout : undefined;
+}
+
+/**
+ * GitHub CLI support for the pr policy: `--attach` (gh 2.99+) for proof of
+ * work, and the gh-stack extension for stacks that merge in one step.
+ * `gh stack --version` works logged out, unlike `gh extension list`.
+ */
+export function ghFindings(version: string | undefined, stackVersion: string | undefined): Finding[] {
+  if (version === undefined) {
+    return [{ level: "info", message: "gh (GitHub CLI) not found or not responding — on GitHub, PRs need gh 2.99 or later to attach proof" }];
+  }
+  const match = /gh version (\d+)\.(\d+)\.(\d+)/.exec(version);
+  const findings: Finding[] = [];
+  if (!match) {
+    findings.push({ level: "warn", message: `cannot read the gh version from "${version.trim().split("\n")[0]}"` });
+  } else {
+    const [major, minor] = [Number(match[1]), Number(match[2])];
+    const current = `${match[1]}.${match[2]}.${match[3]}`;
+    findings.push(
+      major > 2 || (major === 2 && minor >= 99)
+        ? { level: "ok", message: `gh ${current} supports --attach for proof of work` }
+        : { level: "warn", message: `gh ${current} predates --attach (2.99); upgrade gh so agents can attach proof to PRs` },
+    );
+  }
+  findings.push(
+    stackVersion?.startsWith("gh stack version")
+      ? { level: "ok", message: "gh stack extension installed: stacked PRs merge in one step" }
+      : { level: "info", message: "gh stack extension not installed — stacked PRs merge one at a time (gh extension install github/gh-stack)" },
+  );
+  return findings;
 }

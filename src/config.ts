@@ -20,7 +20,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
       requiredLabels: [],
     },
     guardrails: [
-      "PRs larger than about 1000 lines should be split into smaller, stacked PRs.",
+      "A PR holds one deliverable that can merge and be reverted on its own; dependent parts land as a stack (see `.harness/policies/pr.md`).",
       "PRs with a human-review label, or that change a path in `merge.humanReviewPaths`, must be approved and merged by a human (see `.harness/policies/merge.md`).",
       "Required CI checks must pass before merge (enforced by CI).",
       "Changes reach main only through a merged PR (enforced by the forge).",
@@ -58,6 +58,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "delegate",
           "select-project-issue",
           "work-on-issue",
+          "write-issue",
           "interview",
           "implement",
           "commit",
@@ -96,6 +97,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "delegate",
           "select-project-issue",
           "work-on-issue",
+          "write-issue",
           "interview",
           "implement",
           "commit",
@@ -305,6 +307,7 @@ export function serializeConfig(config: HarnessConfig): string {
  */
 const retiredDefaults = {
   guardrails: [
+    "PRs larger than about 1000 lines should be split into smaller, stacked PRs.",
     "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
     "High-risk PRs (identified by agent judgment or by issue or project labels) must be approved and merged by a human reviewer (see `.harness/policies/merge.md`).",
   ],

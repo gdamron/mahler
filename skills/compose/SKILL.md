@@ -36,7 +36,8 @@ itself: one issue never needs a composer layer.
 - `mahler task <slug> --agent <agent> --task-file <task.json>`
 - `mahler acceptance freeze|manifest|run --workspace <workspace> --project <slug> ...`
 - `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
-- Linear MCP project and issue lookup
+- Linear MCP project and issue lookup, and creating the issues in a plan the
+  human approved (see the write-issue skill)
 - `mahler capacity --workspace <workspace>`
 - runtime-native agent launch for conductors (sub-agents, agent teams, or
   headless sessions such as `claude -p` / `codex exec`)
@@ -62,13 +63,16 @@ itself: one issue never needs a composer layer.
    below (`<slug>` is the project slug, or a short name for an ad hoc list).
    Order issues by blockers, then priority, then oldest update/create
    timestamp, and group them into waves: an issue joins a wave only when its
-   blockers are done or can be stacked on an open PR. Issues likely to touch the
+   blockers are done or can be stacked on an open PR (its PR targets the
+   blocker's branch, but the two issues are never linked into one GitHub
+   stack). Issues likely to touch the
    same files go in different waves. An issue that holds several deliverables,
    each able to merge on its own, is often better split into several issues
    now than discovered as one long stack later.
-3. **Specify.** Every issue you write gets a risk label with its reason and
-   acceptance criteria a tester can check without the code (see the risk
-   policy's Writing Issues). When an issue is underspecified, or issues share
+3. **Specify.** Write every new issue with the write-issue skill: a risk
+   label with its reason, and acceptance criteria a tester can check without
+   the code. Get the human's go-ahead on new issues before creating them in
+   Linear. When an issue is underspecified, or issues share
    an interface, add a section under `Specifications` in `COMPOSITION.md`
    (clarified acceptance criteria, contracts between issues, non-goals) and
    point the conductor brief at it. Use the interview skill with the human
@@ -117,11 +121,13 @@ itself: one issue never needs a composer layer.
      outgrown its estimate: decide yourself what matters (see the review
      policy) rather than passing every finding
      back as more work. Batch the set-aside findings for the human to triage
-     before any of them becomes a new issue.
+     before any of them becomes a new issue, then write the approved ones with
+     the write-issue skill.
 7. **Merge and advance waves.** When a conductor reports PRs ready to
    merge, use the merge skill: labels and paths first, then the risk level's
    verification, then readiness. Merge what the merge policy allows
-   (predecessors first for stacked PRs); hand everything else to the human
+   (a stack in one step with `gh stack merge`, or predecessors first
+   without it); hand everything else to the human
    with its verification record. After each wave merges, run the project
    suite on the base branches (`mahler acceptance run --project <slug>`) and
    update the traceability table; a failing criterion becomes new work. Start

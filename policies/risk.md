@@ -83,13 +83,6 @@ one matches:
 
 ## Writing Issues
 
-Agents write most issues, so an issue must be enough for a tester who never
-sees the code:
-
-- A risk label and its one-line reason.
-- Acceptance criteria stated as observable behavior: inputs, outputs, error
-  cases, and limits, not implementation steps. When the project has criteria
-  IDs (P1, P2, ...), name the ones the issue serves.
-- Non-goals and protected areas.
-- For high risk, how the change ships and how it is undone (see the
-  verification policy).
+The write-issue skill says how to write an issue a tester can check without
+the code. For risk, it needs the label and a one-line reason naming the
+deciding dimension, and, at high risk, how the change ships and is undone.

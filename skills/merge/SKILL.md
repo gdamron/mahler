@@ -26,6 +26,8 @@ description: Decide whether a verified PR may be merged by an agent, then merge 
 
 - forge PR inspection: `gh pr view`, `gh pr checks`, `gh pr diff`
 - forge merge without bypass flags: `gh pr merge <pr> --<method> --delete-branch`
+- stack merge: `gh stack merge <pr> --<method> --yes`, then
+  `git push origin --delete <branch>` for its head branches
 - Linear MCP `get_issue` and `get_project` for labels
 - `mahler check --workspace <workspace> --issue <ISSUE>` and
   `mahler acceptance run --workspace <workspace> --project <slug> --issue <ISSUE>`
@@ -51,11 +53,18 @@ description: Decide whether a verified PR may be merged by an agent, then merge 
    the reviewer's tier.
 3. Verify every readiness item yourself; do not rely only on the conductor's
    record.
-4. When an agent merge is allowed, merge using the repo's merge method.
+4. When an agent merge is allowed, merge with the repo's merge method:
+   - a single PR with `gh pr merge`;
+   - a linked stack whose PRs all pass steps 1–3 and show CI checks, in one
+     step with `gh stack merge` up to the top PR you may merge (see the merge
+     policy's Stacks);
+   - any other stacked PRs one at a time, bottom first, retargeting each
+     next PR to the base branch.
    Otherwise, hand the PR to the human with the verification record and
    continue with other work.
-5. Clean up and retarget stacked PRs per the merge policy. When the issue's
-   last PR merges, run `mahler cleanup <ISSUE>`.
+5. Clean up branches per the merge policy. When the issue's last PR has
+   merged (with a merge queue, once the queue shows it merged), run
+   `mahler cleanup <ISSUE>`.
 6. Record the decision in `COMPOSITION.md` and the issue's `HANDOFF.md`.
 
 ## Required Outputs

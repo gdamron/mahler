@@ -55,8 +55,10 @@ unrecorded deviation is a workflow failure; a recorded one is a review input.
 ### Tier 2 — Confirm (get explicit human go-ahead first)
 
 Examples: merging a PR (see the merge policy for who may approve it), approving
-a PR, resolving PR comment threads, changing issue-tracker state, writing to a
-production database, or modifying remote/shared infrastructure.
+a PR, resolving PR comment threads, changing issue-tracker state (status,
+assignee, closing or deleting issues), writing to a production database, or
+modifying remote/shared infrastructure. Commenting on an issue, and creating
+the issues in a plan the human approved, are not state changes.
 
 These actions are outward-facing or hard to reverse. A human developer would
 feel friction before doing them out of role; you do not, so manufacture the

@@ -14,7 +14,7 @@ import {
 import { randomBytes } from "node:crypto";
 import { dirname, relative, resolve, sep } from "node:path";
 import { knowledgeDir, writeIndexes } from "./knowledge.js";
-import { adoptPendingNotes, ensureExcluded, prModeSync } from "./knowledge-pr.js";
+import { ensureExcluded, leavePrMode, prModeSync } from "./knowledge-pr.js";
 import { firstLine, git, GIT_ENV, gitOrThrow, IGNORED, NETWORK_TIMEOUT_MS } from "./knowledge-git.js";
 import type { HarnessConfig } from "./types.js";
 
@@ -269,8 +269,8 @@ export function syncKnowledge(workspace: string, config: HarnessConfig, options:
 
 /** Direct publish: commit, rebase onto the remote branch, push (one retry). */
 function directSync(dir: string, branch: string, repo: string, message: string): { done: string[]; published: boolean } {
-  // Left over from PR publish: publish pending notes like any other change.
-  const done: string[] = adoptPendingNotes(dir);
+  // Left over from PR publish: settle its PRs, and publish what's still pending.
+  const done: string[] = leavePrMode(dir, branch);
   const unpublished = (why: string) => ({ done: [...done, why], published: false });
   // Ignoring a file the repo already tracks does nothing, so untrack it too.
   gitOrThrow(dir, ["rm", "-r", "--cached", "--quiet", "--ignore-unmatch", "--", ...IGNORED.map(ignoredPathspec)]);

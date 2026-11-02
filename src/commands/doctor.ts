@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
 import { decisionsDir, knowledgeDir, knowledgeIndex, readLedger, readNotes } from "../knowledge.js";
 import { prPublish, storeState } from "../knowledge-repo.js";
-import { frontmatterField, pendingNotes, readEdits } from "../knowledge-pr.js";
+import { frontmatterField, pendingNotes, proposalStatus } from "../knowledge-pr.js";
 import { modelConfigProblems, tierVariants } from "../models.js";
 import { spotlightFinding } from "../spotlight.js";
 import {
@@ -411,22 +411,29 @@ const PENDING_REVIEW_DAYS = 7;
 /** PR publish: what waits for review, and what hasn't been proposed yet. */
 function pendingFindings(dir: string): Finding[] {
   const findings: Finding[] = [];
-  const notes = pendingNotes(dir).map((file) => readFileSync(file, "utf8"));
-  const { batch } = readEdits(dir);
-  const unopened = notes.filter((text) => !frontmatterField(text, "pr")).length + (batch && !batch.url ? 1 : 0);
-  const cutoff = new Date(Date.now() - PENDING_REVIEW_DAYS * 86_400_000).toISOString().slice(0, 10);
-  const stale = notes.filter((text) => (frontmatterField(text, "created") ?? cutoff) < cutoff).length;
-  if (notes.length > 0 || batch) {
-    const edits = batch ? Object.keys(batch.files).length : 0;
+  const status = proposalStatus(dir);
+  if (status.notes > 0 || status.batch) {
+    const edits = status.batch?.files ?? 0;
     const parts = [
-      ...(notes.length > 0 ? [`${notes.length} pending ${notes.length === 1 ? "note" : "notes"}`] : []),
-      ...(batch ? [`a batch of ${edits} ${edits === 1 ? "edit" : "edits"}`] : []),
+      ...(status.notes > 0 ? [`${status.notes} pending ${status.notes === 1 ? "note" : "notes"}`] : []),
+      ...(status.batch ? [`a batch of ${edits} ${edits === 1 ? "edit" : "edits"}`] : []),
     ];
     findings.push({ level: "info", message: `knowledge PRs awaiting review: ${parts.join(" and ")}` });
   }
-  if (unopened > 0) {
-    findings.push({ level: "warn", message: `${unopened} knowledge ${unopened === 1 ? "change has" : "changes have"} no PR yet; run \`mahler knowledge sync\`` });
+  if (status.unproposed > 0) {
+    findings.push({
+      level: "warn",
+      message: `${status.unproposed} knowledge ${status.unproposed === 1 ? "change isn't" : "changes aren't"} proposed in a PR yet; run \`mahler knowledge sync\``,
+    });
   }
+  for (const slug of status.conflicted) {
+    findings.push({
+      level: "warn",
+      message: `pending/${slug}.md changed after its PR merged; fold your changes into notes/${slug}.md by hand and delete it`,
+    });
+  }
+  const cutoff = new Date(Date.now() - PENDING_REVIEW_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const stale = pendingNotes(dir).filter((file) => (frontmatterField(readFileSync(file, "utf8"), "created") ?? cutoff) < cutoff).length;
   if (stale > 0) {
     findings.push({
       level: "warn",

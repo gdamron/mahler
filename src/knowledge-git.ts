@@ -49,6 +49,12 @@ function run(command: string, dir: string, args: string[], timeout?: number, inp
   };
 }
 
+/** Stdout exactly as git wrote it (file contents), or undefined on failure. */
+export function gitText(dir: string, args: string[]): string | undefined {
+  const result = spawnSync("git", args, { cwd: dir, encoding: "utf8", env: GIT_ENV });
+  return result.status === 0 ? result.stdout : undefined;
+}
+
 export function gitOrThrow(dir: string, args: string[]): string {
   const result = git(dir, args);
   if (!result.ok) throw new Error(`git ${args.join(" ")} failed in ${dir}: ${result.stderr || result.stdout}`);

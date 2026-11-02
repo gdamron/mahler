@@ -326,7 +326,7 @@ function verify(workspace: string, config: HarnessConfig, slug: string): void {
   console.log(`Verified ${slug} on ${date}: ${file}`);
   if (prPublish(config)) {
     // One PR per verify would bury the reviewer; the next sync batches them.
-    console.log("The next `mahler knowledge sync` (or brief, or learn) proposes it in a PR with any other edits.");
+    console.log("Run `mahler knowledge sync` to propose it in a PR, with any other edits.");
     return;
   }
   publish(workspace, config, `knowledge: verify ${slug}`, file);

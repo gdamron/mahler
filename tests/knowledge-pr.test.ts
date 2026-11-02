@@ -13,16 +13,22 @@ interface FakePr {
   title: string;
   body: string;
   state: string;
+  headRefOid?: string;
 }
 
 /**
  * A stand-in for the GitHub CLI: `pr create` records the PR in a JSON file
- * and prints its URL, `pr view <url> --json state` prints its state, and
- * `pr list --head <branch>` lists PRs from a branch. FAKE_GH_FAIL makes
- * `pr create` fail, as it would offline; FAKE_GH_LOSE makes it create the PR
- * and then fail, as when the reply is lost.
+ * and prints its URL, `pr view <url>` prints its state and head commit (set
+ * when a test merges or closes it), `pr list --head <branch>` lists PRs from
+ * a branch, and `pr close` closes one. FAKE_GH_FAIL makes `pr create` fail,
+ * as it would offline; FAKE_GH_LOSE makes it create the PR and then fail, as
+ * when the reply is lost.
  */
-function forge(): { env: Record<string, string>; prs: () => FakePr[]; setState: (url: string, state: string) => void } {
+function forge(): {
+  env: Record<string, string>;
+  prs: () => FakePr[];
+  setState: (url: string, state: string, headRefOid?: string) => void;
+} {
   const bin = mkdtempSync(resolve(tmpdir(), "mahler-gh-"));
   const stateFile = resolve(bin, "prs.json");
   writeFileSync(
@@ -41,7 +47,7 @@ if (args[0] === "pr" && args[1] === "create") {
   if (process.env.FAKE_GH_LOSE) { console.error("timed out reading the response"); process.exit(1); }
   console.log(url);
 } else if (args[0] === "pr" && args[1] === "list") {
-  for (const pr of prs.filter((candidate) => candidate.head === flag("--head")).reverse()) console.log(pr.url + " " + pr.state);
+  for (const pr of prs.filter((candidate) => candidate.head === flag("--head")).reverse()) console.log(pr.url + " " + pr.state + " " + (pr.headRefOid || ""));
 } else if (args[0] === "pr" && args[1] === "edit") {
   const pr = prs.find((candidate) => candidate.url === args[2]);
   Object.assign(pr, { title: flag("--title"), body: flag("--body") });
@@ -49,7 +55,11 @@ if (args[0] === "pr" && args[1] === "create") {
 } else if (args[0] === "pr" && args[1] === "view") {
   const pr = prs.find((candidate) => candidate.url === args[2]);
   if (!pr) { console.error("no such PR"); process.exit(1); }
-  console.log(pr.state);
+  console.log(pr.state + " " + (pr.headRefOid || ""));
+} else if (args[0] === "pr" && args[1] === "close") {
+  const pr = prs.find((candidate) => candidate.url === args[2]);
+  pr.state = "CLOSED";
+  fs.writeFileSync(file, JSON.stringify(prs));
 } else {
   console.error("fake gh: unsupported " + args.join(" "));
   process.exit(1);
@@ -61,23 +71,33 @@ if (args[0] === "pr" && args[1] === "create") {
   return {
     env: { PATH: `${bin}:${process.env.PATH}`, FAKE_GH_STATE: stateFile },
     prs,
-    setState: (url, state) =>
-      writeFileSync(stateFile, JSON.stringify(prs().map((pr) => (pr.url === url ? { ...pr, state } : pr)))),
+    setState: (url, state, headRefOid) =>
+      writeFileSync(stateFile, JSON.stringify(prs().map((pr) => (pr.url === url ? { ...pr, state, headRefOid } : pr)))),
   };
 }
 
-/** Squash-merge a PR's branch into main, as a reviewer would, optionally editing a file first. */
-function squashMerge(shared: string, pr: FakePr, edit?: { path: string; text: string }): void {
+/**
+ * Squash-merge a PR's branch (or an earlier commit on it) into main, as a
+ * reviewer would, optionally editing a file first.
+ */
+function squashMerge(shared: string, pr: FakePr, edit?: { path: string; text: string }, at = "FETCH_HEAD"): void {
   const clone = resolve(mkdtempSync(resolve(tmpdir(), "mahler-review-")), "repo");
   spawnSync("git", ["clone", "-q", shared, clone], { env });
   git(clone, ["fetch", "-q", "origin", pr.head]);
-  git(clone, ["merge", "-q", "--squash", "FETCH_HEAD"]);
+  git(clone, ["merge", "-q", "--squash", at]);
   if (edit) {
     writeFileSync(resolve(clone, edit.path), edit.text);
     git(clone, ["add", edit.path]);
   }
   git(clone, ["commit", "-q", "-m", pr.title]);
   git(clone, ["push", "-q", "origin", "HEAD:main"]);
+}
+
+/** Merge a PR as the forge would, recording the head commit it merged. */
+function merge(shared: string, gh: ReturnType<typeof forge>, pr: FakePr, options: { edit?: { path: string; text: string }; at?: string } = {}): void {
+  const head = options.at ?? git(shared, ["rev-parse", `refs/heads/${pr.head}`]);
+  squashMerge(shared, pr, options.edit, head);
+  gh.setState(pr.url, "MERGED", head);
 }
 
 /** A workspace in PR publish mode, on a remote whose main already has a seed note. */
@@ -90,6 +110,7 @@ function prWorkspace(): { shared: string; ws: string; gh: ReturnType<typeof forg
   return { shared, ws, gh };
 }
 
+const ledger = (ws: string) => JSON.parse(readFileSync(resolve(store(ws), "pending", "prs.json"), "utf8"));
 const pending = (ws: string, slug: string) => resolve(store(ws), "pending", `${slug}.md`);
 const sync = (ws: string, gh: ReturnType<typeof forge>) => run(["knowledge", "sync", "--workspace", ws], gh.env);
 const onMain = (shared: string) => git(shared, ["ls-tree", "-r", "--name-only", "main"]).split("\n");
@@ -102,7 +123,7 @@ test("a pending note is searchable before its PR merges and leaves pending/ afte
   assert.match(learned.stdout, /opened https:\/\/forge\.example\/pr\/1 for retries-need-jitter/);
   assert.ok(existsSync(pending(ws, "retries-need-jitter")));
   assert.ok(!existsSync(noteFile(ws, "retries-need-jitter")));
-  assert.match(readFileSync(pending(ws, "retries-need-jitter"), "utf8"), /^pr: https:\/\/forge\.example\/pr\/1$/m);
+  assert.equal(ledger(ws).notes["retries-need-jitter"].url, "https://forge.example/pr/1");
 
   const found = run(["knowledge", "search", "jitter", "--workspace", ws]);
   assert.match(found.stdout, /Retries need jitter.*\(pending review\)/);
@@ -114,11 +135,14 @@ test("a pending note is searchable before its PR merges and leaves pending/ afte
   assert.equal(pr.title, "Knowledge: Retries need jitter");
   assert.match(pr.body, /Retries need jitter\./);
   assert.ok(!onMain(shared).includes("notes/retries-need-jitter.md"), "nothing lands on main before review");
-  const proposed = git(shared, ["show", `${pr.head}:notes/retries-need-jitter.md`]);
-  assert.doesNotMatch(proposed, /^pr(-branch)?:/m, "PR bookkeeping stays on this machine");
+  assert.equal(
+    git(shared, ["show", `${pr.head}:notes/retries-need-jitter.md`]),
+    readFileSync(pending(ws, "retries-need-jitter"), "utf8").trim(),
+    "the PR proposes the note as written",
+  );
   assert.equal(git(store(ws), ["status", "--porcelain"]), "", "the clone itself is untouched");
 
-  squashMerge(shared, pr);
+  merge(shared, gh, pr);
   const synced = sync(ws, gh);
   assert.equal(synced.status, 0, synced.stderr);
   assert.match(synced.stdout, /pulled 1 commit; 1 pending note merged/);
@@ -147,7 +171,7 @@ test("edits to existing notes batch into one PR, settled when it merges or close
   const { shared, ws, gh } = prWorkspace();
   const verified = run(["knowledge", "verify", "seed-note", "--workspace", ws], gh.env);
   assert.equal(verified.status, 0, verified.stderr);
-  assert.match(verified.stdout, /The next `mahler knowledge sync`/);
+  assert.match(verified.stdout, /Run `mahler knowledge sync` to propose it in a PR/);
   assert.equal(gh.prs().length, 0, "verify alone opens no PR");
   writeFileSync(noteFile(ws, "seed-note"), `${readFileSync(noteFile(ws, "seed-note"), "utf8")}\nA correction.\n`);
 
@@ -159,8 +183,7 @@ test("edits to existing notes batch into one PR, settled when it merges or close
 
   // The reviewer merges with a wording change of their own.
   const reviewed = readFileSync(noteFile(ws, "seed-note"), "utf8").replace("A correction.", "A reviewed correction.");
-  squashMerge(shared, gh.prs()[0], { path: "notes/seed-note.md", text: reviewed });
-  gh.setState(gh.prs()[0].url, "MERGED");
+  merge(shared, gh, gh.prs()[0], { edit: { path: "notes/seed-note.md", text: reviewed } });
   const merged = sync(ws, gh);
   assert.equal(merged.status, 0, merged.stderr);
   assert.match(merged.stdout, /https:\/\/forge\.example\/pr\/1 merged; pulled 1 commit/);
@@ -181,11 +204,10 @@ test("a PR that couldn't open is retried on the next sync, on the same branch", 
   const offline = learn(ws, "Opened later", { ...gh.env, FAKE_GH_FAIL: "1" });
   assert.equal(offline.status, 0, offline.stderr);
   assert.match(offline.stderr, /couldn't open a PR for opened-later \(error connecting to api\.github\.com\)/);
-  const text = readFileSync(pending(ws, "opened-later"), "utf8");
-  const branch = /^pr-branch: (.*)$/m.exec(text)?.[1];
+  const { branch, url } = ledger(ws).notes["opened-later"];
   assert.ok(branch);
-  assert.doesNotMatch(text, /^pr:/m);
-  assert.match(run(["doctor", ws], gh.env).stdout, /1 knowledge change has no PR yet/);
+  assert.equal(url, undefined);
+  assert.match(run(["doctor", ws], gh.env).stdout, /1 knowledge change isn't proposed in a PR yet/);
 
   const synced = sync(ws, gh);
   assert.equal(synced.status, 0, synced.stderr);
@@ -255,8 +277,7 @@ test("a blocked pull keeps a merged pending note until the note arrives", () => 
   writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nMy edit.\n");
   assert.match(sync(ws, gh).stdout, /proposed 1 edit in https:\/\/forge\.example\/pr\/2/);
   pushToMain(shared, "notes/seed-note.md", "---\ntitle: Seed note\n---\nTheir edit.\n");
-  squashMerge(shared, gh.prs()[0]);
-  gh.setState(gh.prs()[0].url, "MERGED");
+  merge(shared, gh, gh.prs()[0]);
 
   const blocked = sync(ws, gh);
   assert.equal(blocked.status, 0, blocked.stderr);
@@ -266,7 +287,7 @@ test("a blocked pull keeps a merged pending note until the note arrives", () => 
 
   git(store(ws), ["checkout", "--", "notes/seed-note.md"]);
   const unblocked = sync(ws, gh);
-  assert.match(unblocked.stdout, /pulled 2 commits; 1 pending note merged/);
+  assert.match(unblocked.stdout, /pulled 2 commits; 1 pending note merged; closed https:\/\/forge\.example\/pr\/2: its edits were undone/);
   assert.ok(existsSync(noteFile(ws, "arrives-later")));
 });
 
@@ -282,7 +303,7 @@ test("edits update one open batch PR instead of stacking new ones", () => {
   assert.match(git(shared, ["show", `${gh.prs()[0].head}:notes/seed-note.md`]), /Second edit\./);
 });
 
-test("PR publish keeps machine-local files out of PRs, and doesn't repeat a closed change", () => {
+test("PR publish keeps machine-local files out of PRs, and a closed batch drops its edits", () => {
   const shared = remote();
   const seed = resolve(mkdtempSync(resolve(tmpdir(), "mahler-seed-")), "repo");
   spawnSync("git", ["clone", "-q", shared, seed], { env });
@@ -302,21 +323,23 @@ test("PR publish keeps machine-local files out of PRs, and doesn't repeat a clos
   gh.setState(gh.prs()[0].url, "CLOSED");
   assert.match(sync(ws, gh).stdout, /dropped the edits/);
   assert.ok(!existsSync(noteFile(ws, "by-hand")));
-  writeFileSync(noteFile(ws, "by-hand"), "---\ntitle: By hand\n---\n");
-  assert.match(sync(ws, gh).stdout, /already up to date/, "the same closed change isn't proposed again");
-  assert.equal(gh.prs().length, 1);
+  assert.equal(git(store(ws), ["status", "--porcelain"]), "");
 });
 
-test("switching back to direct publish pushes pending notes", () => {
+test("switching back to direct publish pushes notes still in review, not rejected ones", () => {
   const { shared, ws, gh } = prWorkspace();
   assert.equal(learn(ws, "Was pending", gh.env).status, 0);
+  assert.equal(learn(ws, "Was rejected", gh.env).status, 0);
+  gh.setState(gh.prs()[1].url, "CLOSED");
   assert.equal(setRepo(ws, { publish: "direct" }, gh.env).status, 0);
   const synced = sync(ws, gh);
   assert.equal(synced.status, 0, synced.stderr);
-  assert.match(synced.stdout, /moved 1 pending note into notes\/ \(close its PR on the forge\)/);
+  assert.match(synced.stdout, /moved 1 pending note into notes\/; close https:\/\/forge\.example\/pr\/1 on the forge/);
   assert.ok(!existsSync(pending(ws, "was-pending")));
-  const published = git(shared, ["show", "main:notes/was-pending.md"]);
-  assert.doesNotMatch(published, /^pr(-branch)?:/m);
+  assert.ok(!existsSync(pending(ws, "was-rejected")));
+  assert.ok(onMain(shared).includes("notes/was-pending.md"));
+  assert.ok(!onMain(shared).includes("notes/was-rejected.md"), "a closed PR's note isn't published");
+  assert.ok(!existsSync(resolve(store(ws), "pending", "prs.json")));
 });
 
 test("a PR created without Mahler hearing back is found, not opened twice", () => {
@@ -324,7 +347,7 @@ test("a PR created without Mahler hearing back is found, not opened twice", () =
   const lost = learn(ws, "Lost reply", { ...gh.env, FAKE_GH_LOSE: "1" });
   assert.equal(lost.status, 0, lost.stderr);
   assert.match(lost.stderr, /couldn't open a PR for lost-reply/);
-  assert.match(sync(ws, gh).stdout, /opened https:\/\/forge\.example\/pr\/1 for lost-reply/);
+  assert.match(sync(ws, gh).stdout, /found https:\/\/forge\.example\/pr\/1 for lost-reply/);
   assert.equal(gh.prs().length, 1);
 });
 
@@ -334,4 +357,130 @@ test("a brief pulls without opening PRs", () => {
   const brief = run(["task", "brief-check", "--workspace", ws, "--agent", "claude", "--title", "Check the brief"], gh.env);
   assert.equal(brief.status, 0, brief.stderr);
   assert.equal(gh.prs().length, 0);
+});
+
+const tipOf = (shared: string, pr: FakePr) => git(shared, ["rev-parse", `refs/heads/${pr.head}`]);
+
+/** Push a commit to a PR's branch, as a reviewer suggesting a change would. */
+function pushToBranch(shared: string, pr: FakePr, path: string, text: string): void {
+  const clone = resolve(mkdtempSync(resolve(tmpdir(), "mahler-reviewer-")), "repo");
+  spawnSync("git", ["clone", "-q", "-b", pr.head, shared, clone], { env });
+  writeFileSync(resolve(clone, path), text);
+  git(clone, ["commit", "-q", "-am", "reviewer suggestion"]);
+  git(clone, ["push", "-q", "origin", `HEAD:${pr.head}`]);
+}
+
+test("undoing every edit closes the batch PR instead of leaving it to merge", () => {
+  const { ws, gh } = prWorkspace();
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nAn edit.\n");
+  assert.match(sync(ws, gh).stdout, /proposed 1 edit in https:\/\/forge\.example\/pr\/1/);
+  git(store(ws), ["checkout", "--", "notes/seed-note.md"]);
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /closed https:\/\/forge\.example\/pr\/1: its edits were undone/);
+  assert.equal(gh.prs()[0].state, "CLOSED");
+  assert.match(sync(ws, gh).stdout, /already up to date/);
+});
+
+test("undoing one edit takes it back out of the batch PR", () => {
+  const { shared, ws, gh } = prWorkspace();
+  const original = readFileSync(noteFile(ws, "seed-note"), "utf8");
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nAn edit.\n");
+  writeFileSync(noteFile(ws, "new-by-hand"), "---\ntitle: New by hand\n---\n");
+  assert.match(sync(ws, gh).stdout, /proposed 2 edits/);
+  git(store(ws), ["checkout", "--", "notes/seed-note.md"]);
+  assert.match(sync(ws, gh).stdout, /updated https:\/\/forge\.example\/pr\/1 with 1 edit/);
+  const [pr] = gh.prs();
+  assert.equal(git(shared, ["show", `${pr.head}:notes/seed-note.md`]), original.trim());
+  assert.equal(pr.title, "Knowledge: update notes/new-by-hand.md");
+});
+
+test("a reviewer's commits on a PR branch are never overwritten", () => {
+  const { shared, ws, gh } = prWorkspace();
+  assert.equal(learn(ws, "Reviewed note", gh.env).status, 0);
+  const [pr] = gh.prs();
+  pushToBranch(shared, pr, "notes/reviewed-note.md", "---\ntitle: Reviewed note\n---\nReviewer wording.\n");
+  const suggested = tipOf(shared, pr);
+
+  assert.match(sync(ws, gh).stdout, /already up to date/, "an unchanged note pushes nothing");
+  assert.equal(tipOf(shared, pr), suggested);
+
+  const file = pending(ws, "reviewed-note");
+  writeFileSync(file, `${readFileSync(file, "utf8")}\nMy addition.\n`);
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stderr, /pr\/1 has commits from someone else, so Mahler leaves it alone/);
+  assert.equal(tipOf(shared, pr), suggested, "the reviewer's commit stays the branch tip");
+});
+
+test("an edit to a pending note after its PR merged is kept, folded into the merged note", () => {
+  const { shared, ws, gh } = prWorkspace();
+  assert.equal(learn(ws, "Late edit", gh.env).status, 0);
+  const [pr] = gh.prs();
+  const proposed = readFileSync(pending(ws, "late-edit"), "utf8");
+  // The reviewer fixes the title as they merge; meanwhile the note gains a line here.
+  merge(shared, gh, pr, { edit: { path: "notes/late-edit.md", text: proposed.replace('title: "Late edit"', 'title: "Late edit, reviewed"') } });
+  writeFileSync(pending(ws, "late-edit"), `${proposed}\nAdded after merge.\n`);
+
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /kept your later edits to late-edit; 1 pending note merged; proposed 1 edit in https:\/\/forge\.example\/pr\/2/);
+  assert.ok(!existsSync(pending(ws, "late-edit")));
+  const note = readFileSync(noteFile(ws, "late-edit"), "utf8");
+  assert.match(note, /title: "Late edit, reviewed"/);
+  assert.match(note, /Added after merge\./);
+  assert.match(git(shared, ["show", `${gh.prs()[1].head}:notes/late-edit.md`]), /Added after merge\./);
+});
+
+test("an edit pushed after the batch PR merged is kept and proposed again", () => {
+  const { shared, ws, gh } = prWorkspace();
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nFirst.\n");
+  assert.match(sync(ws, gh).stdout, /proposed 1 edit/);
+  const [pr] = gh.prs();
+  const first = tipOf(shared, pr);
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nSecond.\n");
+  assert.match(sync(ws, gh).stdout, /updated https:\/\/forge\.example\/pr\/1/);
+  // The reviewer merged the first version, before the second reached the PR.
+  merge(shared, gh, pr, { at: first });
+
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /pr\/1 merged, keeping your later edits to 1 file; pulled 1 commit; proposed 1 edit in https:\/\/forge\.example\/pr\/2/);
+  assert.match(readFileSync(noteFile(ws, "seed-note"), "utf8"), /Second\./);
+  assert.match(git(shared, ["show", "main:notes/seed-note.md"]), /First\./);
+  assert.match(git(shared, ["show", `${gh.prs()[1].head}:notes/seed-note.md`]), /Second\./);
+});
+
+test("a blocked pull proposes no edits built on the old commit", () => {
+  const { shared, ws, gh } = prWorkspace();
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nMine.\n");
+  assert.match(sync(ws, gh).stdout, /proposed 1 edit/);
+  const [pr] = gh.prs();
+  const proposedTip = tipOf(shared, pr);
+  pushToMain(shared, "notes/seed-note.md", "---\ntitle: Seed note\n---\nTheirs.\n");
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nMine, again.\n");
+
+  const blocked = sync(ws, gh);
+  assert.equal(blocked.status, 0, blocked.stderr);
+  assert.match(blocked.stderr, /couldn't pull: .*your edits are proposed once the pull succeeds/);
+  assert.equal(tipOf(shared, pr), proposedTip, "the PR keeps what it had");
+});
+
+test("doctor reports edits not yet proposed, and a pending note changed after merging", () => {
+  const { shared, ws, gh } = prWorkspace();
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nUnproposed.\n");
+  assert.match(run(["doctor", ws], gh.env).stdout, /1 knowledge change isn't proposed in a PR yet/);
+  assert.equal(sync(ws, gh).status, 0);
+  assert.doesNotMatch(run(["doctor", ws], gh.env).stdout, /proposed in a PR yet/);
+
+  assert.equal(learn(ws, "Clashing note", gh.env).status, 0);
+  const pr = gh.prs()[1];
+  const proposed = readFileSync(pending(ws, "clashing-note"), "utf8");
+  merge(shared, gh, pr, { edit: { path: "notes/clashing-note.md", text: proposed.replace(/^description: .*$/m, "description: Theirs.") } });
+  writeFileSync(pending(ws, "clashing-note"), proposed.replace(/^description: .*$/m, "description: Mine."));
+  const synced = sync(ws, gh);
+  assert.match(synced.stderr, /pending\/clashing-note\.md changed after .*pr\/2 merged, in ways that conflict/);
+  assert.ok(existsSync(pending(ws, "clashing-note")), "kept for a hand merge");
+  assert.match(run(["doctor", ws], gh.env).stdout, /pending\/clashing-note\.md changed after its PR merged/);
+  assert.equal(gh.prs().length, 2, "not proposed again");
 });

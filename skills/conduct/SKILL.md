@@ -22,8 +22,8 @@ human who tasked it directly.
 ## Required Policies
 
 Issue mode: judgment, issue-selection, workspace-safety, branching,
-implementation, commit, sub-agent-delegation, review, definition-of-done, pr,
-merge, handoff.
+implementation, commit, sub-agent-delegation, review, risk, verification,
+definition-of-done, pr, merge, handoff.
 
 Slice mode reads only: judgment, workspace-safety, implementation, branching,
 commit, handoff. Skip the rest; your parent owns them.
@@ -32,16 +32,19 @@ commit, handoff. Skip the rest; your parent owns them.
 
 - `mahler issue <ISSUE> --agent <agent> --linear-file <issue.json>`
 - `mahler check --workspace <workspace> --issue <ISSUE>` (or `--path <worktree>`)
+- `mahler task <slug> --agent <agent> --task-file <task.json>` for a local task
+- `mahler acceptance freeze --workspace <workspace> --issue <ISSUE> --repo <repo> --commit <sha>`
+- `mahler acceptance run --workspace <workspace> --project <slug> --issue <ISSUE>`
 - `mahler capacity --workspace <workspace>`
 - `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
 - git worktree, branch, status, diff, log, add, commit, and push commands for
   the issue's own branches
-- runtime-native sub-agent launch for slice conductors and reviewers
+- runtime-native sub-agent launch for slice conductors, testers, and reviewers
 - configured GitHub or forge command for PR creation (via the pr skill)
 
 ## Expected Inputs
 
-- One issue identifier, from a composer brief or the human
+- One issue identifier (or local task), from a composer brief or the human
 - For a project prompt from the human: use select-project-issue to choose one
   issue first
 - Any `Specifications` section the composer wrote for this issue
@@ -50,7 +53,8 @@ commit, handoff. Skip the rest; your parent owns them.
 ## Process (issue mode)
 
 1. **Set up** the issue with the work-on-issue skill: brief, ledger, repos, and
-   branch names.
+   branch names. Confirm the risk level (see the risk policy) and note in
+   `HANDOFF.md` the verification it calls for.
 2. **Decide the shape.** Work directly — one slice, done by you — unless one of
    these holds:
    - the issue spans repos or splits into independent parts worth running in
@@ -69,14 +73,22 @@ commit, handoff. Skip the rest; your parent owns them.
    Record the shape and the reason in `HANDOFF.md`, with a rough estimate
    (PRs, changed lines). The estimate is not a limit. It is what lets you, and
    your parent, notice when the work has grown into something else.
-3. **Implement.** Do your own slice with the implement skill. For each
+3. **Tests first (high risk).** Before anyone implements, launch a tester
+   (pick its tier with the delegate skill: a different model from the
+   implementer) to write acceptance tests from the spec in its own worktree
+   at `<issue root>/tests/<repo>`, cut from the base branch. Freeze its
+   commit with `mahler acceptance freeze --issue <ISSUE> --repo <repo>
+   --commit <sha>`, merge its branch into the issue branch, and remove its
+   worktree. The implementer makes those tests pass without changing
+   them.
+4. **Implement.** Do your own slice with the implement skill. For each
    delegated slice, use the delegate skill to pick the tier and write the
    brief: base profile `conductor`, `slice mode`, authority `edit`, allowed
    paths limited to the slice worktree, permission to commit and push the slice
    branch only, and no permission to open PRs, merge, force-push, change
    issue-tracker state, or delegate further. Stay within
    `concurrency.maxSliceAgents` and check `mahler capacity --workspace <workspace>` before launching.
-4. **Monitor.** Answer slice questions within the issue scope. If a slice
+5. **Monitor.** Answer slice questions within the issue scope. If a slice
    stalls or drifts out of scope, stop it and re-brief, or take it over.
    Escalate scope changes and Tier 2 actions to your parent; do not approve
    them yourself. When the work clearly outgrows its estimate (more PRs than
@@ -84,10 +96,14 @@ commit, handoff. Skip the rest; your parent owns them.
    continuing. Bring a proposed cut: ship what is done, ship the clear bug and
    set the rest aside for triage, or redesign. Splitting into more stacked PRs
    keeps each one reviewable, but it doesn't make the whole change smaller.
-5. **Review.** Launch a reviewer that did not write the code, with a read-only
-   brief covering the diff against its base branch; pick its tier with the
-   delegate skill. For more than one slice, review each slice's diff.
-6. **Iterate.** Weigh the findings as the review policy describes (for
+6. **Review and test.** Launch a reviewer that did not write the code, with a
+   read-only brief covering the diff against its base branch; its tier
+   follows the risk level (see the delegate skill). For more than one slice,
+   review each slice's diff. At medium risk, launch a tester alongside the
+   reviewer. It works from the spec, not the diff; freeze its commit and merge
+   its branch as in step 3. At low risk, have the reviewer confirm the tests
+   can fail (see the verification policy).
+7. **Iterate.** Weigh the findings as the review policy describes (for
    example fix, acknowledge, set aside for triage, or rebut). Fix the ones you accept (or
    send them back to the slice conductor), then ask the same reviewer to
    re-review only the fix commits rather than launching a fresh one. Stop when
@@ -96,17 +112,26 @@ commit, handoff. Skip the rest; your parent owns them.
    recommendation: accept the risk, rebut, set aside, run one more round on a
    named question, or redesign. When the parent allows more rounds, give each
    one a purpose rather than continuing until the reviewer is quiet.
-7. **Verify.** Run `mahler check --issue <ISSUE>`, which checks every worktree
-   under the issue's `repos/` dir, slices included, and walk the Definition of
-   Done checklist.
-8. **Open PRs** with the pr skill: one PR per slice branch. A stacked PR
+   When a tester's test fails, decide whether the code, the test, or the spec
+   is at fault (see the verification policy). Fix the code yourself. For a
+   wrong test or an unclear criterion, raise a dispute with your parent and
+   wait for the decision. Never edit frozen tests yourself; after a decision,
+   the tester changes them and you freeze again with `--reason`.
+8. **Verify.** Run `mahler check --issue <ISSUE>`, which checks every worktree
+   under the issue's `repos/` dir, slices included, and fails if a frozen
+   acceptance test changed. When the issue's project has an acceptance suite,
+   run `mahler acceptance run --project <slug> --issue <ISSUE>`. Walk the
+   Definition of Done checklist.
+9. **Open PRs** with the pr skill: one PR per slice branch. A stacked PR
    targets its predecessor's branch and says so in its description.
-9. **Assess merge readiness.** For each PR, write the merge assessment from the
-   merge policy (labels matched, risk level and reasons, readiness). Do not
-   merge: the composer decides, or the human when you were tasked directly.
-10. **Report.** Update `HANDOFF.md` (you own it for this issue; phase
-    `ready-to-merge`) and reply to your parent with PR URLs, merge
-    assessments, checks, review status, risks, and deviations.
+10. **Record verification.** For each PR, write the verification record from
+    the verification policy into `HANDOFF.md` and the PR description, with
+    the merge routing (labels and any human-review paths `mahler check`
+    reported). Do not merge: the composer decides, or the human when you were
+    tasked directly.
+11. **Report.** Update `HANDOFF.md` (you own it for this issue; phase
+    `ready-to-merge`) and reply to your parent with PR URLs, verification
+    records, checks, review status, risks, and deviations.
 
 ## Slice Mode
 
@@ -120,14 +145,16 @@ issue:
    and pushed branch to your parent. Your parent owns `HANDOFF.md`; record only
    your own workflow deviations there.
 
-Do not set up the issue, open PRs, write merge assessments, or delegate.
+Do not set up the issue, open PRs, write verification records, or delegate.
+Never edit frozen acceptance tests; report a test you think is wrong.
 
 ## Required Outputs
 
 - Issue brief and worktrees; the chosen shape and its reason in `HANDOFF.md`
 - A brief, with tier and reason, for every sub-agent launched
 - One open PR per slice, reviewed, with `mahler check` passing
-- A merge assessment per PR
+- Acceptance tests frozen when the risk level calls for them
+- A verification record per PR
 - Updated `HANDOFF.md` and a synthesis reply to the parent
 
 ## Stop Conditions
@@ -138,6 +165,7 @@ Do not set up the issue, open PRs, write merge assessments, or delegate.
 - the next step crosses a Tier 3 boundary
 - the work requires scope beyond the issue or slice
 - a slice still has open review findings after about three rounds
+- a dispute over a frozen test is waiting for a decision
 - the work has clearly outgrown its estimate (check in, as in Monitor)
 - your parent asks you to pause: finish and push the current commit, update
   `HANDOFF.md`, and report, without starting another review round

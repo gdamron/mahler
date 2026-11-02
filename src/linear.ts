@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { isRiskLevel } from "./risk.js";
 import type { HarnessConfig, IssueSelection, LinearIssue, LinearProject } from "./types.js";
 
 export function linearIssueTemplate(): LinearIssue {
@@ -25,6 +26,23 @@ export function linearIssueTemplate(): LinearIssue {
     updatedAt: "2026-05-22T00:00:00.000Z",
     createdAt: "2026-05-22T00:00:00.000Z",
     url: "https://linear.app/workspace/issue/ISSUE-123"
+  };
+}
+
+/** A local task's brief: no Linear fields, and the risk level is set directly. */
+export function localTaskTemplate(): Partial<LinearIssue> {
+  return {
+    title: "Task title",
+    description: "What the conversation decided, in a few sentences",
+    risk: "medium",
+    labels: [],
+    acceptanceCriteria: [
+      "Observable behavior that proves the task is done.",
+      "Existing workflows continue to pass."
+    ],
+    nonGoals: ["Work the conversation ruled out"],
+    protectedAreas: ["Files or systems not to change"],
+    riskNotes: ["Why the risk level is what it is"]
   };
 }
 
@@ -89,8 +107,19 @@ export function normalizeIssue(input: Partial<LinearIssue> & { [key: string]: un
     riskNotes: stringList(input.riskNotes),
     updatedAt: input.updatedAt ? String(input.updatedAt) : undefined,
     createdAt: input.createdAt ? String(input.createdAt) : undefined,
-    url: input.url ? String(input.url) : undefined
+    url: input.url ? String(input.url) : undefined,
+    source: input.source === "local" || input.source === "linear" ? input.source : undefined,
+    risk: riskField(input.risk)
   };
+}
+
+function riskField(value: unknown): LinearIssue["risk"] {
+  if (value === undefined || value === null || value === "") return undefined;
+  const level = String(value).trim().toLowerCase();
+  if (!isRiskLevel(level)) {
+    throw new Error(`Unknown risk level "${String(value)}". Expected low, medium, or high.`);
+  }
+  return level;
 }
 
 export function selectProjectIssue(project: LinearProject, config: HarnessConfig, activeIssues: Set<string>): IssueSelection {

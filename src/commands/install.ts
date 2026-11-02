@@ -55,6 +55,8 @@ export function install(workspaceInput: string, flags: Flags): void {
     guardrails: previous?.guardrails,
     definitionOfDone: previous?.definitionOfDone,
     merge: previous?.merge,
+    risk: previous?.risk,
+    acceptance: previous?.acceptance,
     models: previous?.models,
     concurrency: previous?.concurrency,
     agents: previous?.agents,

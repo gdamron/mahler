@@ -11,9 +11,13 @@ essential for effective collaboration between agent and human developers.
 
 Before preparing a PR:
 
-- Confirm the branch corresponds to the Linear issue.
+- Confirm the branch corresponds to the issue or local task.
 - Confirm `HANDOFF.md` is current.
 - Summarize user-visible behavior, implementation notes, and tests.
+- Include the verification record (see the verification policy). For a local
+  task, also include its acceptance criteria and the reason for its risk
+  level: `.harness/` may not be versioned, so the PR is the lasting record.
+  Under Issue Tracking, write `none (local task local-<slug>)`.
 - Do not merge PRs yourself; merging follows the merge policy.
 
 ### PR size
@@ -70,5 +74,5 @@ you to read comments and address them in the code.
 ### Merging
 
 Opening a PR does not grant merge authority. Only a composer merges, and only
-under the merge policy (labels, readiness, and risk). Everyone else reports the
-PR as ready with a merge assessment and waits.
+under the merge policy (labels, paths, and readiness). Everyone else reports
+the PR as ready with its verification record and waits.

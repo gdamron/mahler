@@ -25,8 +25,22 @@ other roles pick one.
   **conductor** per issue. A conductor does the work itself by default and
   delegates slices to other conductors in **slice mode** only when the issue
   spans repos, splits into parallel parts, or is too large for one PR. A
-  **reviewer** (read-only) reviews every diff. Agents pause at Tier 2
-  boundaries for their parent's go-ahead.
+  **reviewer** (read-only) reviews every diff, and a **tester** writes
+  acceptance tests from the spec without reading the code. Agents pause at
+  Tier 2 boundaries for their parent's go-ahead.
+- The human doesn't review code by default. They write project-level
+  acceptance criteria, and agents earn their trust with verification scaled
+  to risk. Every issue or local task carries a risk level (`risk:low`,
+  `risk:medium`, `risk:high`) set when it is written and only ever raised.
+  Low risk gets the implementer's tests and a light review. Medium risk adds a
+  tester after implementation whose tests must pass. High risk has the tester
+  write tests before implementation, on a different model, plus a deep review
+  and a rollout plan. Tester tests are frozen: `mahler check` fails if anyone
+  else changes them, and disputes go to the composer.
+- A project's acceptance suite lives in a repo of its own or in a directory
+  of a shared repo (`acceptance` in `.harness/config.json`). `mahler
+  acceptance run` tests each issue's worktrees, and base branches elsewhere,
+  against it.
 - Delegation costs tokens, so it must earn its place. The `delegate` skill
   decides whether to launch a sub-agent and on which **model tier**: named
   per-install tiers (`models` overrides in `.harness/config.json`, listed in
@@ -36,17 +50,18 @@ other roles pick one.
   `fallback` tier, such as a Claude review when Codex is out of usage, so agents
   switch instead of waiting. `concurrency` caps parallel agents and heavy
   commands, and `mahler capacity` reports machine load against them.
-- Merging is a Tier 2 action only the composer takes, and only once readiness
-  checks pass. Labels in `merge.humanReviewLabels` (default `high-risk`) always
-  send a PR to the human; labels in `merge.agentMergeLabels` (default
-  `agent-merge`) pre-approve a composer merge; otherwise the composer merges
-  only what it judges low risk. A PR it judges high risk always goes to the
-  human.
+- Merging is a Tier 2 action only the composer takes, and only once the
+  risk level's verification and the readiness checks pass. Labels in
+  `merge.humanReviewLabels` (default `human-review`) always send a PR to the
+  human. A PR that changes a path in `merge.humanReviewPaths` goes to the
+  human unless a label in `merge.agentMergeLabels` (default `agent-merge`)
+  pre-approves it. Otherwise the composer merges, at any risk level.
 - Sub-agent delegation uses native/runtime agent capabilities plus the installed
   `sub-agent-delegation` policy and brief template. Sub-agents are read-only by
   default unless their brief explicitly grants scoped edit authority.
-- Tasks (such as Linear issues) are the atomic unit for code changes, commits,
-  and PRs.
+- Tasks are the atomic unit for code changes, commits, and PRs: a Linear
+  issue, or a local task (`mahler task`) agreed in conversation when Linear
+  would be more ceremony than the work needs.
 - Agents create dedicated git worktrees only for the repos needed by a task,
   preferably under `workspaces/issues/<ISSUE>/repos/`.
 - Policies live in canonical Mahler modules and are rendered into
@@ -57,7 +72,7 @@ other roles pick one.
   definitions, installed READMEs) is rendered from `templates/*.md`; the
   TypeScript only fills `{{placeholders}}`.
 - Linear MCP is the preferred source of issue and project context. If an agent
-  lacks Linear MCP access, it must ask for missing metadata instead of
+  can't fetch a named Linear issue, it must ask for missing metadata instead of
   inventing it.
 
 ## Commands
@@ -67,6 +82,7 @@ npm install -g https://github.com/gdamron/mahler/releases/download/v2026.10.2/ma
 mahler --version
 mahler install /path/to/product-workspace --linear-assignee gonzo --linear-label agent
 mahler issue FUG-123 --workspace /path/to/product-workspace --agent codex
+mahler task curved-declick --workspace /path/to/product-workspace --agent claude --task-file task.json
 mahler project "Project X" --workspace /path/to/product-workspace --agent claude --linear-file project.json
 mahler status --workspace /path/to/product-workspace
 mahler profile codex --workspace /path/to/product-workspace
@@ -74,11 +90,16 @@ mahler can codex commit --workspace /path/to/product-workspace
 mahler handoff FUG-123 --workspace /path/to/product-workspace --agent codex
 mahler decide --rule scope --reason "expanded to fix adjacent bug" --issue FUG-123 --agent codex --workspace /path/to/product-workspace
 mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue FUG-123 | --path <worktree>]
+mahler acceptance freeze --workspace /path/to/product-workspace --issue FUG-123 --repo <name> --commit <sha|base..sha> [--reason "<dispute decision>"]
+mahler acceptance freeze --workspace /path/to/product-workspace --project <slug> --repo <name> --commit <sha>
+mahler acceptance manifest --workspace /path/to/product-workspace --issue FUG-123 | --project <slug>
+mahler acceptance run --workspace /path/to/product-workspace --project <slug> [--issue FUG-123]
 mahler capacity --workspace /path/to/product-workspace
 mahler cleanup FUG-123 --workspace /path/to/product-workspace [--dry-run]
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project
+mahler linear-template task
 mahler <command> --help
 ```
 
@@ -92,7 +113,8 @@ explicit install options; Mahler does not ship a default assignee. When a repo
 has a `package.json`, install pre-populates per-repo `checks` (test/lint/build
 commands) from its scripts; edit `.harness/config.json` to adjust them.
 Reinstalling keeps human-set config: the Mahler command, worktree root, Linear
-filters, repo checks, merge labels, each runtime's agent profile, and changes
+filters, repo checks, merge labels and paths, risk labels, the acceptance
+suite, each runtime's agent profile, and changes
 to Mahler's default model tiers, concurrency caps, guardrails, and Definition
 of Done, which are stored as overrides so new defaults still arrive (see
 [INSTALL.md](INSTALL.md#what-reinstall-keeps)).
@@ -101,8 +123,21 @@ of Done, which are stored as overrides so new defaults still arrive (see
 commands and reports ok/fail per command. With `--issue` it checks every
 worktree under the issue's `repos/` dir, including slice worktrees such as
 `repos/<repo>-<slice>`, and fails if there are none; with `--path` it checks a
-single worktree; otherwise it checks each source repo. It is feedback, not a gate — the
-forge/CI remains the Tier 3 authority.
+single worktree; otherwise it checks each source repo. It also fails when a
+worktree changes frozen acceptance tests, and notes changes to
+`merge.humanReviewPaths`. It is local feedback — the forge/CI remains the
+Tier 3 authority.
+
+`mahler task` writes a local task brief under `.harness/issues/local-<slug>/`,
+in the same layout as an issue brief, from a task file (`mahler
+linear-template task`) or `--title`, `--description`, and `--risk`.
+
+`mahler acceptance freeze` records the commit that holds a tester's
+acceptance tests, for an issue or a project; changing a frozen set needs
+`--reason` with the dispute decision, and the old set stays in the history.
+`mahler acceptance run` writes a revision manifest (each repo's issue
+worktree, or its base branch) and runs `acceptance.run` with `<manifest>` and
+`<project>` filled in.
 
 `mahler capacity` prints CPU cores, load average, and the `concurrency` caps
 from `.harness/config.json`, with an ok/busy verdict. Agents run it before
@@ -164,7 +199,7 @@ one workspace without forking Mahler, drop files under
 
 See `.harness/custom/README.md` (written on install) and `INSTALL.md` for details.
 
-Use `mahler linear-template issue|project` to print the JSON shape expected by
+Use `mahler linear-template issue|project|task` to print the JSON shape expected by
 `--linear-file`. Agents should write temporary Linear MCP metadata under
 `.harness/tmp/linear/` in the product workspace before invoking Mahler.
 

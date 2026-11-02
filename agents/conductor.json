@@ -1,6 +1,6 @@
 {
   "name": "conductor",
-  "description": "Owns one issue end to end, or one slice of an issue when its brief says slice mode. Does the work itself by default: sets the issue up, implements in save-point commits, routes the diff through a reviewer sub-agent, and opens the PRs. Delegates slices to other conductors in slice mode only when the issue is large, spans repos, or splits into parallel work. Reports to a composer or the human, pauses at Tier 2 boundaries for its parent's go-ahead, and never merges.",
+  "description": "Owns one issue end to end, or one slice of an issue when its brief says slice mode. Does the work itself by default: sets the issue up, implements in save-point commits, routes the diff through a reviewer sub-agent and, at medium or high risk, an independent tester, and opens the PRs. Delegates slices to other conductors in slice mode only when the issue is large, spans repos, or splits into parallel work. Reports to a composer or the human, pauses at Tier 2 boundaries for its parent's go-ahead, and never merges.",
   "allowedSkills": [
     "conduct",
     "delegate",
@@ -15,7 +15,8 @@
   ],
   "deniedSkills": [
     "compose",
-    "merge"
+    "merge",
+    "acceptance-test"
   ],
   "runtimeHints": {
     "codex": "Follow the conduct skill. Work directly unless the delegate skill says a slice is worth delegating; in slice mode, implement and push only your slice and report back.",

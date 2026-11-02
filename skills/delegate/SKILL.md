@@ -28,7 +28,8 @@ Delegate when at least one holds:
 - **Context protection:** wide searches, long logs, or big diffs you need the
   conclusion of, not the contents.
 - **Cheaper tier:** a lower tier can do the work as well as you.
-- **Independence:** review must come from an agent that did not write the code.
+- **Independence:** review must come from an agent that did not write the
+  code, and acceptance tests from one that has not read it (the tester).
 
 Do it yourself when the work is small, when the brief would be longer than the
 work, when you would have to re-explain context you already hold, or when the
@@ -42,6 +43,7 @@ check, or a one-file fix almost never earns a sub-agent.
 | One issue, from a composer | `conductor`, issue mode |
 | One slice, from a conductor | `conductor`, slice mode |
 | Review of a finished diff | `reviewer` |
+| Acceptance tests from the spec (medium or high risk, or a project suite) | `tester` |
 | Read-only lookup or codebase search | the runtime's built-in explore agent, or an ad hoc read-only brief |
 
 ## 3. Pick the tier
@@ -79,8 +81,11 @@ Rules of thumb:
 - Escalate one tier after a failed attempt, after a second review round with
   substantive (non-style) findings, or when the sub-agent reports the task is
   ambiguous. Say why in the brief.
-- Review a high-risk diff (merge policy) at `deep` or with a cross-model tier.
-  Otherwise the reviewer's tier need not match the author's.
+- Pick the reviewer's tier from the risk level (verification policy): `light`
+  for low, `standard` for medium, and `deep` or a cross-model tier for high.
+- The tester defaults to `standard`. At high risk, run it on a different
+  model from the implementer: a cross-model tier when the install has one,
+  otherwise a different tier.
 - A tier outside the profile's `allowed` list is a Tier 1 deviation: record
   the reason in `HANDOFF.md`. In Claude it has no generated definition; the
   closest you can get is a model-alias override, which keeps the default

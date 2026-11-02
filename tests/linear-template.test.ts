@@ -28,5 +28,5 @@ test("linear-template project prints parseable project JSON", () => {
 test("linear-template rejects unknown template kind", () => {
   const result = spawnSync(cli[0], [cli[1], "linear-template", "workspace"], { encoding: "utf8" });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Expected "issue" or "project"/);
+  assert.match(result.stderr, /Expected "issue", "project", or "task"/);
 });

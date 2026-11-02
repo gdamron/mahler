@@ -14,7 +14,8 @@ import { cleanup } from "./commands/cleanup.js";
 import { decide } from "./commands/decide.js";
 import { doctor } from "./commands/doctor.js";
 import { install } from "./commands/install.js";
-import { createIssue, createProject, handoff } from "./commands/issue.js";
+import { acceptance } from "./commands/acceptance.js";
+import { createIssue, createProject, createTask, handoff } from "./commands/issue.js";
 import { printLinearTemplate } from "./commands/linear-template.js";
 import { canUseSkill, printProfile } from "./commands/profile.js";
 import { status } from "./commands/status.js";
@@ -59,6 +60,22 @@ const commands: Record<string, Command> = {
     },
     run: (args) =>
       createIssue(required(args.rest[0], "issue identifier is required"), args.flags),
+  },
+  task: {
+    usage:
+      "mahler task <slug> --workspace <path> --agent codex|claude (--task-file task.json | --title <title> [--description <text>]) [--risk low|medium|high]",
+    summary: "Create a local task's brief (no Linear issue) as local-<slug>.",
+    positionals: 1,
+    flags: {
+      ...workspace,
+      agent: "string",
+      "task-file": "string",
+      title: "string",
+      description: "string",
+      risk: "string",
+    },
+    run: (args) =>
+      createTask(required(args.rest[0], "task slug is required"), args.flags),
   },
   project: {
     usage:
@@ -127,6 +144,28 @@ const commands: Record<string, Command> = {
     flags: { ...workspace, repo: "string", issue: "string", path: "string" },
     run: (args) => check(args.flags),
   },
+  acceptance: {
+    usage:
+      "mahler acceptance freeze|manifest|run --workspace <path> (--issue <ISSUE> | --project <slug>) [--repo <name> --commit <sha|base..sha> [--worktree <dir>] [--reason <why>]] [--out <file>]",
+    summary:
+      "Freeze a tester's acceptance tests, write the revision manifest, or run the project acceptance suite.",
+    positionals: 1,
+    flags: {
+      ...workspace,
+      issue: "string",
+      project: "string",
+      repo: "string",
+      commit: "string",
+      worktree: "string",
+      reason: "string",
+      out: "string",
+    },
+    run: (args) =>
+      acceptance(
+        required(args.rest[0], "action is required: freeze, manifest, or run"),
+        args.flags,
+      ),
+  },
   capacity: {
     usage: "mahler capacity --workspace <path>",
     summary: "Show agent and heavy-command capacity.",
@@ -151,13 +190,13 @@ const commands: Record<string, Command> = {
     run: (args) => doctor(required(args.rest[0], "workspace path is required")),
   },
   "linear-template": {
-    usage: "mahler linear-template issue|project",
-    summary: "Print the Linear JSON template for an issue or project.",
+    usage: "mahler linear-template issue|project|task",
+    summary: "Print the JSON template for a Linear issue or project, or a local task.",
     positionals: 1,
     flags: {},
     run: (args) =>
       printLinearTemplate(
-        required(args.rest[0], "template kind is required: issue or project"),
+        required(args.rest[0], "template kind is required: issue, project, or task"),
       ),
   },
 };

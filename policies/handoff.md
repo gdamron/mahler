@@ -22,8 +22,11 @@ Update `HANDOFF.md` with:
   `blocked`; this is guidance only, not a state machine,
 - slices: each slice's branch, owner, tier, review round, and PR (when the
   issue has more than one),
-- reviews: self-review, sub-agent review, and human review status,
-- merge: the merge assessment and decision (see the merge policy),
+- reviews: self-review and sub-agent review status, and human review when
+  the merge policy routes the PR to the human,
+- verification: the risk level and the verification record (see the
+  verification policy),
+- merge: the routing and decision (see the merge policy),
 - quality: relevant tests/checks, full test suite status, known risks, and any
   skipped checks with reasons,
 - changed files,
@@ -36,8 +39,10 @@ Default expectations:
 
 - self-review before pull request,
 - sub-agent review before pull request (see the review policy),
-- merge per the merge policy: a composer may merge the PRs it allows; everything
-  else waits for human sign-off,
+- verification for the risk level before merge (see the verification
+  policy),
+- merge per the merge policy: a composer merges unless the PR's labels or
+  paths route it to the human,
 - skipped checks must be documented with reasons.
 
 If work is incomplete, say exactly where to resume.

@@ -21,7 +21,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
     },
     guardrails: [
       "PRs larger than about 1000 lines should be split into smaller, stacked PRs.",
-      "High-risk PRs (identified by agent judgment or by issue or project labels) must be approved and merged by a human reviewer (see `.harness/policies/merge.md`).",
+      "PRs with a human-review label, or that change a path in `merge.humanReviewPaths`, must be approved and merged by a human (see `.harness/policies/merge.md`).",
       "Required CI checks must pass before merge (enforced by CI).",
       "Changes reach main only through a merged PR (enforced by the forge).",
       "Only a human reviewer may merge a PR whose required CI checks are failing.",
@@ -31,14 +31,20 @@ export function defaultConfig(_workspace: string): HarnessConfig {
       "Self-review is complete.",
       "Sub-agent review is complete.",
       "Sub-agent review findings are weighed (see the review policy).",
+      "Verification for the change's risk level is complete, and frozen acceptance tests are unchanged (see the verification policy).",
       "A PR is open for every touched repo, with a description of the change and its context.",
       "`HANDOFF.md` is current with changed files, checks run, blockers, and next steps.",
-      "The change stays within the Linear issue scope.",
+      "The change stays within the issue or task scope.",
     ],
     merge: {
-      humanReviewLabels: ["high-risk"],
+      humanReviewLabels: ["human-review"],
       agentMergeLabels: ["agent-merge"],
+      humanReviewPaths: [],
     },
+    risk: {
+      labels: { low: "risk:low", medium: "risk:medium", high: "risk:high" },
+    },
+    acceptance: { path: "acceptance" },
     models: defaultModels(),
     concurrency: defaultConcurrency(),
     agents: {
@@ -56,6 +62,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "implement",
           "commit",
           "review",
+          "acceptance-test",
           "pr",
           "merge",
           "handoff",
@@ -73,7 +80,9 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "merge",
           "pr",
           "review",
+          "risk",
           "sub-agent-delegation",
+          "verification",
           "workspace-safety",
         ],
       },
@@ -91,6 +100,7 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "implement",
           "commit",
           "review",
+          "acceptance-test",
           "pr",
           "merge",
           "handoff",
@@ -108,7 +118,9 @@ export function defaultConfig(_workspace: string): HarnessConfig {
           "merge",
           "pr",
           "review",
+          "risk",
           "sub-agent-delegation",
+          "verification",
           "workspace-safety",
         ],
       },
@@ -151,6 +163,10 @@ export function defaultModels(): ModelsConfig {
         default: "light",
         allowed: ["trivial", "light", "standard", "deep"],
       },
+      tester: {
+        default: "standard",
+        allowed: ["light", "standard", "deep"],
+      },
     },
   };
 }
@@ -175,6 +191,8 @@ export function withInstallOptions(
     guardrails?: string[];
     definitionOfDone?: string[];
     merge?: HarnessConfig["merge"];
+    risk?: HarnessConfig["risk"];
+    acceptance?: HarnessConfig["acceptance"];
     models?: HarnessConfig["models"];
     concurrency?: HarnessConfig["concurrency"];
     agents?: HarnessConfig["agents"];
@@ -188,6 +206,8 @@ export function withInstallOptions(
     guardrails: options.guardrails ?? config.guardrails,
     definitionOfDone: options.definitionOfDone ?? config.definitionOfDone,
     merge: options.merge ?? config.merge,
+    risk: options.risk ?? config.risk,
+    acceptance: options.acceptance ?? config.acceptance,
     models: options.models ?? config.models,
     concurrency: options.concurrency ?? config.concurrency,
     agents: withPreservedAgents(config.agents, options.agents),
@@ -233,7 +253,17 @@ export function loadConfig(workspace: string): HarnessConfig {
         parsed.merge?.humanReviewLabels ?? defaults.merge.humanReviewLabels,
       agentMergeLabels:
         parsed.merge?.agentMergeLabels ?? defaults.merge.agentMergeLabels,
+      humanReviewPaths:
+        parsed.merge?.humanReviewPaths ?? defaults.merge.humanReviewPaths,
     },
+    risk: {
+      labels: {
+        ...defaults.risk.labels,
+        ...legacyHighRiskLabel(parsed),
+        ...parsed.risk?.labels,
+      },
+    },
+    acceptance: { ...defaults.acceptance, ...parsed.acceptance },
     models: resolveModels(defaults.models, parsed.models as ModelsOverrides | undefined),
     concurrency: { ...defaults.concurrency, ...parsed.concurrency },
   };
@@ -276,10 +306,12 @@ export function serializeConfig(config: HarnessConfig): string {
 const retiredDefaults = {
   guardrails: [
     "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
+    "High-risk PRs (identified by agent judgment or by issue or project labels) must be approved and merged by a human reviewer (see `.harness/policies/merge.md`).",
   ],
   definitionOfDone: [
     "A PR is opened for human review before merge.",
     "Sub-agent review comments are addressed.",
+    "The change stays within the Linear issue scope.",
   ],
 };
 
@@ -344,4 +376,15 @@ export function issuePaths(
     meta: resolve(workspace, ".harness", "issues", identifier),
     worktreeRoot: resolve(workspace, config.workspaceDir, "issues", identifier),
   };
+}
+
+/**
+ * Configs from before risk levels routed a `high-risk` label to the human.
+ * Until the install sets `risk.labels`, treat that label as the high risk
+ * label, so issues carrying it get high-risk verification rather than none.
+ */
+function legacyHighRiskLabel(parsed: { risk?: unknown; merge?: { humanReviewLabels?: string[] } }): { high?: string } {
+  if (parsed.risk) return {};
+  const label = parsed.merge?.humanReviewLabels?.find((candidate) => candidate.toLowerCase() === "high-risk");
+  return label ? { high: label } : {};
 }

@@ -49,12 +49,16 @@ delegated by another conductor.
 3. Work in save points: implement a small increment, run focused tests, commit
    it with the commit skill, and continue. If a change breaks tests, revert to
    the last commit and investigate rather than piling on fixes.
-4. When addressing review findings, fix each accepted one in its own commit
+4. Never edit frozen acceptance tests (the brief or `HANDOFF.md` names them,
+   and `mahler check` fails if they change). If one looks wrong, report it as
+   a possible dispute with the test, the criterion, and your reasoning, and
+   keep working on everything else.
+5. When addressing review findings, fix each accepted one in its own commit
    where practical. If you disagree with a finding, say why in your report
    instead of silently skipping it.
-5. Run `mahler check --path <worktree>` for your worktree, then push the branch
+6. Run `mahler check --path <worktree>` for your worktree, then push the branch
    (`git push -u origin <branch>`).
-6. Report the implementation policy's change summary (changes made, things
+7. Report the implementation policy's change summary (changes made, things
    intentionally not touched, potential concerns), the commit list, checks run,
    and the pushed branch.
 

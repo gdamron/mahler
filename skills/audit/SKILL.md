@@ -39,8 +39,9 @@ Removing a rule is usually a better result than adding one.
     turn a ledger note into knowledge and archive it
   - move other ledger notes to `.harness/decisions/archive/`
   - edit, merge, or retire knowledge notes, and `mahler knowledge verify
-    <slug>` for ones you confirmed; then `mahler knowledge sync` to publish
-    the hand edits when the store is a shared repo
+    <slug>` for ones you confirmed; then `mahler knowledge sync` once, to
+    publish the hand edits when the store is a shared repo (with PR
+    publish, that opens one PR for the audit's edits)
   - edit `.harness/custom/` and the workspace instruction files, then
     `mahler install` to regenerate the native artifacts
 

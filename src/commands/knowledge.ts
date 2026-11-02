@@ -29,7 +29,7 @@ import { repoForDir } from "../repos.js";
 import type { HarnessConfig } from "../types.js";
 import { slugify } from "../util.js";
 import { changedFiles } from "./check.js";
-import { syncKnowledge } from "../knowledge-repo.js";
+import { prPublish, syncKnowledge } from "../knowledge-repo.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -53,19 +53,20 @@ export function learn(flags: Flags): void {
     body: noteBody(flags),
     date: today(),
   });
-  console.log(`Recorded knowledge: ${file}`);
+  console.log(`Recorded knowledge${prPublish(config) ? " (pending review)" : ""}: ${file}`);
   publish(workspace, config, `knowledge: add ${basename(file, ".md")}`, file);
 }
 
 /**
- * In repo mode, commit and push what was just written. A failure throws with
- * the note's path, since the note itself is saved either way.
+ * In repo mode, publish what was just written: commit and push, or with
+ * `publish: "pr"`, open a PR. A failure throws with the note's path, since the
+ * note itself is saved either way.
  */
 function publish(workspace: string, config: HarnessConfig, message: string, file: string): void {
   if (!config.knowledge.repo) return;
   let result;
   try {
-    result = syncKnowledge(workspace, config, message);
+    result = syncKnowledge(workspace, config, { message });
   } catch (error) {
     throw new Error(`${file} is saved locally, but publishing it failed: ${(error as Error).message}`);
   }
@@ -178,8 +179,10 @@ function recordNote(workspace: string, config: HarnessConfig, note: NewNote): st
     if (existsSync(existing)) slugTaken(dir, slug, existing, folder === "archive");
   }
   const others = readNotes(dir);
-  const file = resolve(dir, "notes", `${slug}.md`);
-  mkdirSync(resolve(dir, "notes"), { recursive: true });
+  // With PR publish, a new note waits in pending/ until its PR merges.
+  const folder = prPublish(config) ? "pending" : "notes";
+  const file = resolve(dir, folder, `${slug}.md`);
+  mkdirSync(resolve(dir, folder), { recursive: true });
   try {
     // "wx" fails if another session wrote the same slug since the check above.
     writeFileSync(file, formatNote(note), { flag: "wx" });
@@ -321,6 +324,11 @@ function verify(workspace: string, config: HarnessConfig, slug: string): void {
   writeFileSync(file, setFrontmatterField(readFileSync(file, "utf8"), "verified", date));
   writeIndexes(workspace, config);
   console.log(`Verified ${slug} on ${date}: ${file}`);
+  if (prPublish(config)) {
+    // One PR per verify would bury the reviewer; the next sync batches them.
+    console.log("Run `mahler knowledge sync` to propose it in a PR, with any other edits.");
+    return;
+  }
   publish(workspace, config, `knowledge: verify ${slug}`, file);
 }
 

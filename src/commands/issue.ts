@@ -100,7 +100,8 @@ function writeBrief(
   // on the network and on other syncs only briefly: a failed sync warns and
   // uses the local notes.
   try {
-    const result = syncKnowledge(workspace, config, undefined, 15_000);
+    // Pull only: a brief opens no knowledge PRs and doesn't wait on the forge.
+    const result = syncKnowledge(workspace, config, { lockWaitMs: 15_000, quick: true });
     if (!result.published) console.warn(result.summary);
   } catch (error) {
     writeIndexes(workspace, config);

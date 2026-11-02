@@ -32,7 +32,7 @@ delegated by another conductor.
 - `git status`, `git diff`, `git add`, `git commit` (via the commit skill)
 - `git push` for the assigned branch only; never force-push a shared branch or
   push to a base branch
-- `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
+- `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`
 - `mahler knowledge search <terms>` or `--changed`; `mahler learn` and
   `mahler knowledge verify` when you own the issue (in slice mode, propose
   notes in your report instead)

@@ -124,12 +124,13 @@ const commands: Record<string, Command> = {
   },
   decide: {
     usage:
-      'mahler decide --rule <rule> --reason "<why>" [--issue <ISSUE>] [--agent codex|claude] [--slug <slug>] [--workspace <path>]',
+      'mahler decide --rule <rule> --description "<one line>" --reason "<why>" [--issue <ISSUE>] [--agent codex|claude] [--slug <slug>] [--workspace <path>]',
     summary: "Record a deviation from a rule.",
     positionals: 0,
     flags: {
       ...workspace,
       rule: "string",
+      description: "string",
       reason: "string",
       issue: "string",
       agent: "string",
@@ -158,14 +159,27 @@ const commands: Record<string, Command> = {
   },
   knowledge: {
     usage:
-      "mahler knowledge index | search [terms...] [--paths file,file | --changed] [--repo r] [--limit n] | verify <slug> [--workspace <path>]",
+      "mahler knowledge index | search [terms...] [--paths file,file | --changed] [--repo r] [--limit n] | verify <slug> | import <ledger-note> [--title t] [--description d] [--tags a,b] [--repos r] [--paths glob,glob] [--slug s] [--archive] [--workspace <path>]",
     summary:
-      "Rebuild the knowledge and ledger indexes, search notes by terms or changed files, or mark a note verified today.",
+      "Rebuild the knowledge and ledger indexes, search notes by terms or changed files, mark a note verified today, or import a decisions ledger note as knowledge.",
     positionals: 50,
-    flags: { ...workspace, paths: "string", changed: "boolean", repo: "string", limit: "string" },
+    flags: {
+      ...workspace,
+      paths: "string",
+      changed: "boolean",
+      repo: "string",
+      limit: "string",
+      title: "string",
+      description: "string",
+      tags: "string",
+      repos: "string",
+      slug: "string",
+      source: "string",
+      archive: "boolean",
+    },
     run: (args) =>
       knowledge(
-        required(args.rest[0], "action is required: index, search, or verify"),
+        required(args.rest[0], "action is required: index, search, verify, or import"),
         args.rest.slice(1),
         args.flags,
       ),

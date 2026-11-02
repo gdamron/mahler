@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { ledgerFinding } from "../src/commands/doctor.js";
 import { indexLine, parseNote, relevantNotes, searchNotes, setFrontmatterField, splitGlobs } from "../src/knowledge.js";
 
 const cliPath = resolve("dist/src/cli.js");
@@ -269,4 +270,65 @@ test("install and decide keep the ledger index current", () => {
   assert.match(index, /1 active note/);
   assert.match(index, /- \[skip-tester\]\(\d{4}-\d{2}-\d{2}-skip-tester\.md\): Docs-only change, so no tester\. \(DEV-9, \d{4}-\d{2}-\d{2}\)/);
   assert.doesNotMatch(index, /README/);
+});
+
+test("decide records a description, and the ledger index shows it", () => {
+  const workspace = workspaceWith(["app"]);
+  const decided = run([
+    "decide", "--workspace", workspace, "--rule", "commit-size", "--issue", "DEV-4",
+    "--description", "Generated files can land in one large commit.",
+    "--reason", "The lockfile and snapshots changed together. Splitting them broke the build.",
+  ]);
+  assert.equal(decided.status, 0, decided.stderr);
+  const [name] = readdirSync(resolve(workspace, ".harness/decisions")).filter((file) => file.endsWith("-commit-size.md"));
+  const note = readFileSync(resolve(workspace, ".harness/decisions", name), "utf8");
+  assert.match(note, /\nrule: commit-size\ndescription: "Generated files can land in one large commit\."\n---/);
+  const index = readFileSync(resolve(workspace, ".harness/decisions/INDEX.md"), "utf8");
+  assert.match(index, /- \[commit-size\]\([^)]*\): Generated files can land in one large commit\. \(DEV-4, /);
+});
+
+test("knowledge import turns a ledger note into a knowledge note and can archive it", () => {
+  const workspace = workspaceWith(["app"]);
+  const ledger = resolve(workspace, ".harness/decisions");
+  writeFileSync(
+    resolve(ledger, "2026-03-04-cache-get-null.md"),
+    "<!-- Decisions ledger. -->\n---\ndate: 2026-03-04\nissue: DEV-7\nagent: claude\nrule: cache-get-null\n---\n\nThe cache client's get() returns null on a timeout. Callers recomputed on every slow read.\n",
+  );
+  const draft = run(["knowledge", "import", "2026-03-04-cache-get-null.md", "--tags", "cache", "--workspace", workspace]);
+  assert.equal(draft.status, 0, draft.stderr);
+  assert.match(draft.stdout, /Imported 2026-03-04-cache-get-null\.md as knowledge: .*notes\/cache-get-null\.md/);
+  assert.match(draft.stdout, /Now rewrite the note/);
+  const note = readFileSync(resolve(workspace, ".harness/knowledge/notes/cache-get-null.md"), "utf8");
+  assert.match(note, /^---\ntitle: "cache-get-null"\ndescription: "The cache client's get\(\) returns null on a timeout\."\ntags: \[cache\]/);
+  assert.match(note, /sources: \[DEV-7\]\ncreated: 2026-03-04\nupdated: \d{4}-\d{2}-\d{2}\nverified: 2026-03-04\n/);
+  assert.match(note, /Callers recomputed on every slow read\.\n\nImported from the decisions ledger \(`2026-03-04-cache-get-null\.md`\)\.\n$/);
+  assert.ok(existsSync(resolve(ledger, "2026-03-04-cache-get-null.md")), "without --archive the ledger note stays");
+  const again = run(["knowledge", "import", "2026-03-04-cache-get-null", "--workspace", workspace]);
+  assert.notEqual(again.status, 0);
+  assert.match(again.stderr, /already uses the slug "cache-get-null"/);
+
+  const done = run([
+    "knowledge", "import", resolve(ledger, "2026-03-04-cache-get-null.md"), "--slug", "cache-get-null-on-timeout",
+    "--title", "Cache get() returns null on a timeout", "--description", "Use getOrThrow() where a timeout must surface.",
+    "--archive", "--workspace", workspace,
+  ]);
+  assert.equal(done.status, 0, done.stderr);
+  assert.doesNotMatch(done.stdout, /Now rewrite/);
+  assert.ok(!existsSync(resolve(ledger, "2026-03-04-cache-get-null.md")));
+  const archived = readFileSync(resolve(ledger, "archive/2026-03-04-cache-get-null.md"), "utf8");
+  assert.match(archived, /^<!-- Decisions ledger\. -->\n---\n[\s\S]*\nimported-to: cache-get-null-on-timeout\n---\n/);
+  assert.match(readFileSync(resolve(ledger, "INDEX.md"), "utf8"), /0 active notes/);
+  assert.match(readFileSync(resolve(workspace, ".harness/knowledge/INDEX.md"), "utf8"), /Cache get\(\) returns null on a timeout/);
+
+  const missing = run(["knowledge", "import", "nope", "--workspace", workspace]);
+  assert.notEqual(missing.status, 0);
+  assert.match(missing.stderr, /No ledger note "nope"/);
+});
+
+test("doctor suggests an audit once the ledger passes 20 notes", () => {
+  assert.equal(ledgerFinding(20).level, "ok");
+  assert.match(ledgerFinding(20).message, /20 active notes/);
+  const long = ledgerFinding(21);
+  assert.equal(long.level, "warn");
+  assert.match(long.message, /21 active notes .* run the audit skill .*`mahler knowledge import`/);
 });

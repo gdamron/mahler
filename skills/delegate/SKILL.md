@@ -17,7 +17,7 @@ that cost only where it buys something. Run this skill before each launch.
 ## Allowed Commands
 
 - `mahler capacity --workspace <workspace>`
-- `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
+- `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`
 - runtime-native sub-agent launch, skill invocation, and agent messaging
 
 ## 1. Delegate or do it yourself?

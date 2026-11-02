@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
+import { decisionsDir, readLedger } from "../knowledge.js";
 import { modelConfigProblems, tierVariants } from "../models.js";
 import { spotlightFinding } from "../spotlight.js";
 import {
@@ -79,7 +80,7 @@ export function doctor(workspaceInput: string): void {
   }
 
   if (existsSync(resolve(harness, "decisions"))) {
-    results.push({ level: "ok", message: ".harness/decisions/ present" });
+    results.push(ledgerFinding(readLedger(decisionsDir(workspace)).length));
   } else {
     results.push({
       level: "info",
@@ -358,6 +359,19 @@ function report(results: Finding[]): void {
 }
 
 /** Compare the Mahler version that generated the workspace with the running CLI. */
+/** Sessions read the ledger's index at start, so a long ledger costs every session. */
+export const LEDGER_AUDIT_THRESHOLD = 20;
+
+export function ledgerFinding(active: number): Finding {
+  if (active > LEDGER_AUDIT_THRESHOLD) {
+    return {
+      level: "warn",
+      message: `.harness/decisions/ has ${active} active notes — sessions read its index at start; run the audit skill to sort them (most facts about the code belong in the knowledge store: \`mahler knowledge import\`)`,
+    };
+  }
+  return { level: "ok", message: `.harness/decisions/ present (${active} active ${active === 1 ? "note" : "notes"})` };
+}
+
 export function installVersionFinding(harness: string, running = mahlerVersion()): Finding {
   const path = resolve(harness, "install.json");
   let installed: string | undefined;

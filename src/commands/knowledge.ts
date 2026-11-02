@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import {
   type Flags,
   listFlag,
@@ -11,11 +11,14 @@ import {
 } from "../args.js";
 import { loadConfig } from "../config.js";
 import {
+  decisionsDir,
   formatNote,
   indexLine,
   knowledgeDir,
   type KnowledgeNote,
+  type NewNote,
   notesForFiles,
+  readLedgerNote,
   readNotes,
   searchNotes,
   setFrontmatterField,
@@ -40,8 +43,65 @@ export function learn(flags: Flags): void {
       "--description is required: one or two sentences an agent can act on from the index alone",
     ),
   );
-  const slug = slugify(stringFlag(flags, "slug") ?? title);
-  if (!slug) throw new UsageError("the title (or --slug) has no usable characters for a slug");
+  const file = recordNote(workspace, config, {
+    ...scope(config, flags),
+    slug: slugify(stringFlag(flags, "slug") ?? title),
+    title,
+    description,
+    sources: listFlag(flags, "source"),
+    body: noteBody(flags),
+    date: today(),
+  });
+  console.log(`Recorded knowledge: ${file}`);
+}
+
+/**
+ * `mahler knowledge import <ledger-note>`: turn a decisions ledger note into
+ * a knowledge note. The rule becomes the slug, the issue the source, and the
+ * body is copied. Title and description default to the rule and the ledger
+ * summary; the agent rewrites them as a claim, unless it passed them.
+ */
+function importLedgerNote(workspace: string, config: HarnessConfig, target: string, flags: Flags): void {
+  const ledger = decisionsDir(workspace);
+  const source = [resolve(target), resolve(ledger, target), resolve(ledger, `${target}.md`)].find(
+    (candidate) => existsSync(candidate) && !candidate.endsWith("INDEX.md") && !candidate.endsWith("README.md"),
+  );
+  if (!source) throw new Error(`No ledger note "${target}" (give its path, or its file name in ${ledger})`);
+  const entry = readLedgerNote(source);
+  const title = stringFlag(flags, "title");
+  const description = stringFlag(flags, "description");
+  const issue = entry.issue && entry.issue !== "unassigned" ? [entry.issue] : [];
+  const file = recordNote(workspace, config, {
+    ...scope(config, flags),
+    slug: slugify(stringFlag(flags, "slug") ?? entry.rule),
+    title: oneLine(title ?? entry.rule),
+    description: oneLine(description ?? entry.summary),
+    sources: [...new Set([...issue, ...listFlag(flags, "source")])],
+    body: `${entry.body}\n\nImported from the decisions ledger (\`${basename(source)}\`).`,
+    date: today(),
+    created: entry.date || undefined,
+    verified: entry.date || undefined,
+  });
+  console.log(`Imported ${basename(source)} as knowledge: ${file}`);
+  if (flags.archive === true) {
+    const archived = resolve(ledger, "archive", basename(source));
+    if (existsSync(archived)) throw new Error(`Not archived: ${archived} already exists`);
+    mkdirSync(dirname(archived), { recursive: true });
+    const slug = basename(file, ".md");
+    writeFileSync(archived, setFrontmatterField(readFileSync(source, "utf8"), "imported-to", slug));
+    rmSync(source);
+    writeIndexes(workspace, config);
+    console.log(`Archived the ledger note: ${archived}`);
+  }
+  if (!title || !description) {
+    console.log(
+      "Now rewrite the note for readers outside the issue: a title that states the fact as a claim, and a description that carries it (see .harness/policies/knowledge.md).",
+    );
+  }
+}
+
+/** Tags, repos, and paths from flags, with repos checked against the config. */
+function scope(config: HarnessConfig, flags: Flags): Pick<NewNote, "tags" | "repos" | "paths"> {
   const repos = listFlag(flags, "repos");
   const known = config.repos.map((repo) => repo.name);
   const unknown = repos.filter((repo) => !known.includes(repo));
@@ -50,7 +110,20 @@ export function learn(flags: Flags): void {
       `Unknown repo ${unknown.map((repo) => `"${repo}"`).join(", ")}. Configured repos: ${known.join(", ") || "(none)"}`,
     );
   }
-  const body = noteBody(flags);
+  return {
+    tags: listFlag(flags, "tags").map(slugify).filter(Boolean),
+    repos,
+    paths: splitGlobs(stringFlag(flags, "paths") ?? ""),
+  };
+}
+
+/**
+ * Write a new note, refusing a slug already in use, rebuild the indexes, and
+ * point at similar notes. Returns the note's file.
+ */
+function recordNote(workspace: string, config: HarnessConfig, note: NewNote): string {
+  const { slug } = note;
+  if (!slug) throw new UsageError("the title (or --slug) has no usable characters for a slug");
   const dir = knowledgeDir(workspace, config);
   for (const folder of ["notes", "pending", "archive"]) {
     const existing = resolve(dir, folder, `${slug}.md`);
@@ -58,32 +131,21 @@ export function learn(flags: Flags): void {
   }
   const others = readNotes(dir);
   const file = resolve(dir, "notes", `${slug}.md`);
-  const content = formatNote({
-    slug,
-    title,
-    description,
-    tags: listFlag(flags, "tags").map(slugify).filter(Boolean),
-    repos,
-    paths: splitGlobs(stringFlag(flags, "paths") ?? ""),
-    sources: listFlag(flags, "source"),
-    body,
-    date: today(),
-  });
   mkdirSync(resolve(dir, "notes"), { recursive: true });
   try {
     // "wx" fails if another session wrote the same slug since the check above.
-    writeFileSync(file, content, { flag: "wx" });
+    writeFileSync(file, formatNote(note), { flag: "wx" });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") slugTaken(dir, slug, file, false);
     throw error;
   }
   writeIndexes(workspace, config);
-  console.log(`Recorded knowledge: ${file}`);
-  const similar = searchNotes(others, [title, description], undefined, 6).slice(0, 3);
+  const similar = searchNotes(others, [note.title, note.description], undefined, 6).slice(0, 3);
   if (similar.length > 0) {
     console.log("Similar notes (merge into one of these if they cover the same fact):");
-    for (const note of similar) console.log(indexLine(note, undefined, true));
+    for (const other of similar) console.log(indexLine(other, undefined, true));
   }
+  return file;
 }
 
 function slugTaken(dir: string, slug: string, existing: string, retired: boolean): never {
@@ -101,7 +163,7 @@ function slugTaken(dir: string, slug: string, existing: string, retired: boolean
   );
 }
 
-/** `mahler knowledge index|search|verify`. */
+/** `mahler knowledge index|search|verify|import`. */
 export function knowledge(action: string, args: string[], flags: Flags): void {
   const workspace = workspaceFlag(flags);
   const config = loadConfig(workspace);
@@ -119,8 +181,11 @@ export function knowledge(action: string, args: string[], flags: Flags): void {
     case "verify":
       verify(workspace, config, required(args[0], "the note's slug is required"));
       return;
+    case "import":
+      importLedgerNote(workspace, config, required(args[0], "the ledger note's path or file name is required"), flags);
+      return;
     default:
-      throw new UsageError(`unknown action "${action}": use index, search, or verify`);
+      throw new UsageError(`unknown action "${action}": use index, search, verify, or import`);
   }
 }
 

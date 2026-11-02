@@ -94,7 +94,7 @@ mahler status --workspace /path/to/product-workspace
 mahler profile codex --workspace /path/to/product-workspace
 mahler can codex commit --workspace /path/to/product-workspace
 mahler handoff FUG-123 --workspace /path/to/product-workspace --agent codex
-mahler decide --rule scope --description "Fixed an adjacent bug in scope" --reason "expanded to fix adjacent bug" --issue FUG-123 --agent codex --workspace /path/to/product-workspace
+mahler decide --rule scope --description "Fixed an adjacent bug in scope" --reason "expanded to fix adjacent bug" --issue DEV-123 --agent codex --workspace /path/to/product-workspace
 mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue FUG-123 | --path <worktree>]
 mahler acceptance freeze --workspace /path/to/product-workspace --issue FUG-123 --repo <name> --commit <sha|base..sha> [--reason "<dispute decision>"]
 mahler acceptance freeze --workspace /path/to/product-workspace --project <slug> --repo <name> --commit <sha>

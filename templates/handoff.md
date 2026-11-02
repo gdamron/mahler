@@ -11,8 +11,15 @@
 
 - Self-review: not started
 - Agent review: not requested
-- Human review: pending
+- Human review: not required unless the merge policy routes the PR to the human
 - Merge decision: pending (see `.harness/policies/merge.md`)
+
+## Verification
+
+- Risk: (level, reasons, and who set it; see `.harness/policies/risk.md`)
+- Acceptance tests: (tester, tier, commit, files, and `mahler acceptance freeze` status)
+- Tester results: (first run: passed, implementation bugs, test bugs, spec questions)
+- Disputes: (none)
 
 ## Quality
 

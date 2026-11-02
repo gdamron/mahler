@@ -1,5 +1,6 @@
 import { renderTemplate } from "./templates.js";
 import { tierChoice, tierVariants, type TierVariant } from "./models.js";
+import { issueRisk } from "./risk.js";
 import type {
   AgentName,
   HarnessConfig,
@@ -8,6 +9,7 @@ import type {
   LinearProject,
   MergeConfig,
   ModelsConfig,
+  RiskConfig,
   TierChoice,
   Runtime,
 } from "./types.js";
@@ -46,6 +48,8 @@ export function rootAgentBlock(config: HarnessConfig): string {
     guardrails: bulletList(config.guardrails ?? [], "- (none declared)"),
     humanReviewLabels: labelList(config.merge?.humanReviewLabels ?? []),
     agentMergeLabels: labelList(config.merge?.agentMergeLabels ?? []),
+    humanReviewPaths: labelList(config.merge?.humanReviewPaths ?? []),
+    riskLabels: labelList(Object.values(config.risk?.labels ?? {})),
   });
 }
 
@@ -61,7 +65,7 @@ export function taskMarkdown(
     urlLine: issue.url ? `Linear URL: ${issue.url}\n` : "",
     description:
       issue.description?.trim() ||
-      "_No description supplied. If Linear MCP is unavailable, ask the human for missing context before inventing requirements._",
+      "_No description supplied. Ask whoever assigned this work for missing context before inventing requirements._",
     context: issueContextMarkdown(issue),
     definitionOfDone: definitionOfDoneChecklist(issue, definitionOfDone),
   });
@@ -76,6 +80,7 @@ export function sessionMarkdown(
   guardrails: string[] = [],
   definitionOfDone: string[] = [],
   merge?: MergeConfig,
+  risk?: RiskConfig,
 ): string {
   const profileLines = profile
     ? `- Profile: ${profile.name}
@@ -100,8 +105,25 @@ export function sessionMarkdown(
       "- (none declared in .harness/config.json)",
     ),
     definitionOfDone: definitionOfDoneChecklist(issue, definitionOfDone),
+    risk: riskLines(issue, risk),
     merge: mergeRouting(issue, merge),
   });
+}
+
+/** The issue's risk level and where it came from, or a prompt to set one. */
+export function riskLines(issue: LinearIssue, risk?: RiskConfig): string {
+  const labels = risk
+    ? Object.entries(risk.labels).map(([level, label]) => `${level} \`${label}\``).join(", ")
+    : "(not configured)";
+  const found = risk ? issueRisk(issue, risk) : undefined;
+  const level = found
+    ? `- Risk: ${found.level} (from ${found.from}). Verification: the "${capitalize(found.level)} risk" section of \`.harness/policies/verification.md\`.`
+    : "- Risk: not set. Classify it with `.harness/policies/risk.md` before implementing, and record it in `HANDOFF.md`.";
+  return [
+    level,
+    `- Risk labels: ${labels}.`,
+    "- Risk only goes up: raise it whenever the work turns out riskier; lowering it is a recorded deviation, and only before implementation starts.",
+  ].join("\n");
 }
 
 /**
@@ -111,7 +133,7 @@ export function sessionMarkdown(
  */
 export function mergeRouting(
   issue: LinearIssue,
-  merge: MergeConfig = { humanReviewLabels: [], agentMergeLabels: [] },
+  merge: MergeConfig = { humanReviewLabels: [], agentMergeLabels: [], humanReviewPaths: [] },
 ): string {
   const issueLabels = issue.labels ?? [];
   const labels = uniqueNonEmpty([...issueLabels, ...(issue.projectLabels ?? [])]);
@@ -125,10 +147,12 @@ export function mergeRouting(
     human.length > 0
       ? `Human review required: label ${labelList(human)} matches \`merge.humanReviewLabels\`.`
       : agent.length > 0
-        ? `Agent merge pre-approved: label ${labelList(agent)} matches \`merge.agentMergeLabels\`; a composer may merge once readiness checks pass, unless it judges the PR high risk.`
-        : "No merge label: a composer decides by the risk rubric; without a composer, the human decides.";
-  const projectLine =
-    issue.projectLabels === undefined
+        ? `Agent merge pre-approved: label ${labelList(agent)} matches \`merge.agentMergeLabels\`; a composer may merge once verification and readiness pass, even when the PR changes a human-review path.`
+        : "No merge label: a composer merges once the verification for the PR's risk level and every readiness check pass, unless the PR changes a human-review path; then, or without a composer, the human decides.";
+  const local = issue.source === "local";
+  const projectLine = local
+    ? "(local task; none)"
+    : issue.projectLabels === undefined
       ? "(unknown; the composer checks the project's labels at merge time)"
       : issue.projectLabels.length > 0
         ? labelList(issue.projectLabels)
@@ -136,8 +160,11 @@ export function mergeRouting(
   return [
     `- Issue labels: ${issueLabels.length > 0 ? labelList(issueLabels) : "(none)"}`,
     `- Project labels: ${projectLine}`,
+    `- Human-review paths: ${labelList(merge.humanReviewPaths ?? [])}`,
     `- ${rule}`,
-    "- Labels can change after this brief was written; confirm them at merge time (see `.harness/policies/merge.md`).",
+    local
+      ? "- Local task: its labels and risk live in this brief and `HANDOFF.md`, not Linear (see `.harness/policies/merge.md`)."
+      : "- Labels can change after this brief was written; confirm them at merge time (see `.harness/policies/merge.md`).",
   ].join("\n");
 }
 
@@ -310,6 +337,10 @@ function profileDescription(profile: InstalledProfile): string {
 
 function skillList(skills: string[]): string {
   return skills.join(", ") || "(none)";
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function labelList(labels: string[]): string {

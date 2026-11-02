@@ -29,7 +29,8 @@ test("defaultConfig includes a team Definition of Done baseline", () => {
 
 test("defaultConfig routes merges by label", () => {
   const config = defaultConfig("/tmp/workspace");
-  assert.deepEqual(config.merge.humanReviewLabels, ["high-risk"]);
+  assert.deepEqual(config.merge.humanReviewLabels, ["human-review"]);
+  assert.deepEqual(config.merge.humanReviewPaths, []);
   assert.deepEqual(config.merge.agentMergeLabels, ["agent-merge"]);
 });
 
@@ -46,6 +47,24 @@ test("loadConfig backfills merge labels for older config files", () => {
   const loaded = loadConfig(workspace);
   assert.deepEqual(loaded.merge.humanReviewLabels, ["risky"]);
   assert.deepEqual(loaded.merge.agentMergeLabels, ["agent-merge"]);
+});
+
+test("loadConfig backfills risk labels, the acceptance suite, and human-review paths", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-config-"));
+  mkdirSync(resolve(workspace, ".harness"));
+  const oldConfig = {
+    ...defaultConfig(workspace),
+    merge: { humanReviewLabels: ["high-risk"], agentMergeLabels: ["agent-merge"] },
+    risk: { labels: { high: "danger" } },
+  } as Record<string, unknown>;
+  delete oldConfig.acceptance;
+  writeFileSync(resolve(workspace, ".harness", "config.json"), `${JSON.stringify(oldConfig)}\n`);
+
+  const config = loadConfig(workspace);
+  assert.deepEqual(config.merge.humanReviewLabels, ["high-risk"]);
+  assert.deepEqual(config.merge.humanReviewPaths, []);
+  assert.deepEqual(config.risk.labels, { low: "risk:low", medium: "risk:medium", high: "danger" });
+  assert.deepEqual(config.acceptance, { path: "acceptance" });
 });
 
 test("loadConfig backfills Definition of Done for older config files", () => {

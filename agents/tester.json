@@ -1,0 +1,25 @@
+{
+  "name": "tester",
+  "description": "Writes acceptance tests from a spec without seeing the implementation: for one issue (from its acceptance criteria) or for a project (from the human's project criteria). Tests public boundaries, commits only to its own branch, and reports the commit and files so its parent can freeze them. Never implements, reviews, opens PRs, or merges.",
+  "allowedSkills": [
+    "acceptance-test",
+    "commit",
+    "handoff"
+  ],
+  "deniedSkills": [
+    "compose",
+    "conduct",
+    "delegate",
+    "select-project-issue",
+    "work-on-issue",
+    "implement",
+    "review",
+    "pr",
+    "merge",
+    "audit"
+  ],
+  "runtimeHints": {
+    "codex": "Follow the acceptance-test skill. Work only from the spec and public interfaces in your brief; do not read the implementation branch.",
+    "claude": "Follow the acceptance-test skill. Work only from the spec and public interfaces in your brief; do not read the implementation branch."
+  }
+}

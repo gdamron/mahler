@@ -81,18 +81,34 @@ test("reinstall preserves human-set per-repo checks that detection cannot infer"
   );
 });
 
+test("reinstall preserves human-set risk labels and acceptance suite", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "mahler-risk-"));
+  assert.equal(install(workspace).status, 0);
+
+  const configFile = resolve(workspace, ".harness", "config.json");
+  const config = JSON.parse(readFileSync(configFile, "utf8"));
+  config.risk = { labels: { low: "r1", medium: "r2", high: "r3" } };
+  config.acceptance = { repo: "suite", path: "tests", run: "make accept MANIFEST=<manifest>" };
+  writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+
+  assert.equal(install(workspace).status, 0);
+  const after = JSON.parse(readFileSync(configFile, "utf8"));
+  assert.deepEqual(after.risk, config.risk);
+  assert.deepEqual(after.acceptance, config.acceptance);
+});
+
 test("reinstall preserves human-set merge labels", () => {
   const workspace = mkdtempSync(resolve(tmpdir(), "mahler-merge-"));
   assert.equal(install(workspace).status, 0);
 
   const configFile = resolve(workspace, ".harness", "config.json");
   const config = JSON.parse(readFileSync(configFile, "utf8"));
-  config.merge = { humanReviewLabels: ["security"], agentMergeLabels: [] };
+  config.merge = { humanReviewLabels: ["security"], agentMergeLabels: [], humanReviewPaths: ["migrations/**"] };
   writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
 
   assert.equal(install(workspace).status, 0);
   const after = JSON.parse(readFileSync(configFile, "utf8"));
-  assert.deepEqual(after.merge, { humanReviewLabels: ["security"], agentMergeLabels: [] });
+  assert.deepEqual(after.merge, { humanReviewLabels: ["security"], agentMergeLabels: [], humanReviewPaths: ["migrations/**"] });
 });
 
 test("install pins default tiers, and reinstall preserves human-set models and concurrency", () => {

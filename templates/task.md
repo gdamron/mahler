@@ -1,6 +1,6 @@
 # {{identifier}}: {{title}}
 
-Linear source: {{source}}
+Source: {{source}}
 {{urlLine}}
 ## Description
 
@@ -18,4 +18,4 @@ Linear source: {{source}}
 - Inspect the repo before changing code.
 - Decide which configured repos need worktrees for this task.
 - Choose branch names using `.harness/policies/branching.md`.
-- Keep work scoped to this Linear issue.
+- Keep work scoped to this issue or task.

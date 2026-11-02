@@ -12,6 +12,10 @@
 
 {{guardrails}}
 
+## Risk and Verification
+
+{{risk}}
+
 ## Merge
 
 {{merge}}

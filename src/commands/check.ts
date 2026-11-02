@@ -1,9 +1,10 @@
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { basename, resolve } from "node:path";
+import { basename, matchesGlob, resolve } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
 import { gitCommonDir } from "../repos.js";
+import { baseRef, frozenAcceptanceFindings } from "./acceptance.js";
 import type { Finding, HarnessConfig, RepoConfig } from "../types.js";
 import { abs, listDirectories } from "../util.js";
 
@@ -65,6 +66,17 @@ export function check(flags: Flags): void {
         ): entry is { name: (typeof checkOrder)[number]; command: string } =>
           Boolean(entry.command),
       );
+    for (const finding of frozenAcceptanceFindings(workspace, config, repo, cwd, label, issue)) {
+      if (finding.level === "error") failures += 1;
+      results.push(finding);
+    }
+    const humanPaths = humanReviewChanges(workspace, config, repo, cwd);
+    if (humanPaths.length > 0) {
+      results.push({
+        level: "info",
+        message: `${label}: changes paths in merge.humanReviewPaths, so a human merges this PR unless an agent-merge label pre-approves it: ${humanPaths.join(", ")}`,
+      });
+    }
     if (entries.length === 0) {
       results.push({
         level: "warn",
@@ -102,7 +114,9 @@ export function check(flags: Flags): void {
         ? "ok  "
         : result.level === "warn"
           ? "warn"
-          : "fail";
+          : result.level === "info"
+            ? "info"
+            : "fail";
     console.log(`${prefix} ${result.message}`);
   }
   if (failures > 0) {
@@ -172,6 +186,38 @@ function checkTargets(
     );
   }
   return targets;
+}
+
+/**
+ * Files changed since the branch left its base, including uncommitted ones,
+ * that match `merge.humanReviewPaths`. Checking a repo's own checkout on its
+ * base branch finds none.
+ */
+function humanReviewChanges(
+  workspace: string,
+  config: HarnessConfig,
+  repo: RepoConfig,
+  cwd: string,
+): string[] {
+  const patterns = config.merge.humanReviewPaths;
+  if (patterns.length === 0) return [];
+  const base = spawnSync(
+    "git", ["merge-base", "HEAD", baseRef(abs(workspace, repo.path), repo)],
+    { cwd, encoding: "utf8" },
+  );
+  if (base.status !== 0) return [];
+  const diff = spawnSync("git", ["diff", "--name-only", base.stdout.trim()], {
+    cwd,
+    encoding: "utf8",
+  });
+  const untracked = spawnSync("git", ["ls-files", "--others", "--exclude-standard"], {
+    cwd,
+    encoding: "utf8",
+  });
+  return `${diff.stdout}\n${untracked.stdout}`
+    .split("\n")
+    .filter(Boolean)
+    .filter((file) => patterns.some((pattern) => matchesGlob(file, pattern)));
 }
 
 /** Matches a worktree to its repo by shared git dir, falling back to the dir name. */

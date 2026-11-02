@@ -28,8 +28,12 @@ export interface HarnessConfig {
   guardrails: string[];
   /** Team baseline that every issue must satisfy before handoff/PR. */
   definitionOfDone: string[];
-  /** Issue/project labels that route merge decisions; see policies/merge.md. */
+  /** Labels and paths that route merge decisions; see policies/merge.md. */
   merge: MergeConfig;
+  /** Labels that carry each risk level; see policies/risk.md. */
+  risk: RiskConfig;
+  /** Where project-level acceptance tests live and how to run them; see policies/verification.md. */
+  acceptance: AcceptanceConfig;
   /** Named model tiers and each profile's default tier; see skills/delegate. */
   models: ModelsConfig;
   /** Caps on parallel agents and heavy commands; reported by `mahler capacity`. */
@@ -113,8 +117,36 @@ export interface ConcurrencyConfig {
 export interface MergeConfig {
   /** Labels that require a human to review and merge. Always wins. */
   humanReviewLabels: string[];
-  /** Labels that pre-approve a composer merge once readiness checks pass. */
+  /**
+   * Labels that pre-approve an agent merge of work a human-review path would
+   * otherwise send to the human. Never overrides a human-review label.
+   */
   agentMergeLabels: string[];
+  /** Repo-relative globs; a PR that changes a matching file goes to the human. */
+  humanReviewPaths: string[];
+}
+
+export type RiskLevel = "low" | "medium" | "high";
+
+export interface RiskConfig {
+  /** The issue label that marks each risk level, matched case-insensitively. */
+  labels: Record<RiskLevel, string>;
+}
+
+export interface AcceptanceConfig {
+  /**
+   * Configured repo that holds project-level acceptance tests: a dedicated
+   * acceptance repo or a shared one such as the product repo. Unset: the
+   * workspace has no project-level suite.
+   */
+  repo?: string;
+  /** Directory in that repo for the suite; a project's tests go in `<path>/projects/<slug>/`. */
+  path: string;
+  /**
+   * Command that runs the suite, from the acceptance repo's checkout.
+   * `<manifest>` is the revision manifest's path and `<project>` the project slug.
+   */
+  run?: string;
 }
 
 export interface AgentProfile {
@@ -154,6 +186,10 @@ export interface LinearIssue {
   updatedAt?: string;
   createdAt?: string;
   url?: string;
+  /** Where the issue came from: Linear, or a local task written from a conversation. */
+  source?: "linear" | "local";
+  /** Risk level set on a local task; Linear issues carry it as a label instead. */
+  risk?: RiskLevel;
 }
 
 export interface LinearProject {

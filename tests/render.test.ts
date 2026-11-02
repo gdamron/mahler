@@ -252,7 +252,9 @@ test("handoff markdown includes structured status review quality and deviations"
   assert.match(handoff, /## Reviews/);
   assert.match(handoff, /- Self-review: not started/);
   assert.match(handoff, /- Agent review: not requested/);
-  assert.match(handoff, /- Human review: pending/);
+  assert.match(handoff, /- Human review: not required unless the merge policy routes/);
+  assert.match(handoff, /## Verification/);
+  assert.match(handoff, /- Acceptance tests:/);
   assert.match(handoff, /## Quality/);
   assert.match(handoff, /- Relevant tests\/checks:/);
   assert.match(handoff, /- Full test suite:/);
@@ -321,7 +323,7 @@ test("launch commands are agent specific", () => {
 });
 
 test("merge routing reflects issue labels, human review first", () => {
-  const merge = { humanReviewLabels: ["high-risk"], agentMergeLabels: ["agent-merge"] };
+  const merge = { humanReviewLabels: ["high-risk"], agentMergeLabels: ["agent-merge"], humanReviewPaths: [] };
   const issue = (labels: string[]) => ({ identifier: "MAH-2", title: "t", labels, blocked: false });
 
   const human = mergeRouting(issue(["Agent-Merge", "HIGH-RISK"]), merge);
@@ -330,14 +332,14 @@ test("merge routing reflects issue labels, human review first", () => {
 
   assert.match(mergeRouting(issue(["agent-merge"]), merge), /Agent merge pre-approved/);
   assert.match(mergeRouting(issue([]), merge), /Issue labels: \(none\)/);
-  assert.match(mergeRouting(issue(["bug"]), merge), /risk rubric/);
+  assert.match(mergeRouting(issue(["bug"]), merge), /verification for the PR's risk level/);
   assert.match(mergeRouting(issue([]), merge), /merge\.md/);
 });
 
 test("session brief and root block declare merge routing", () => {
   const config = defaultConfig("/tmp/workspace");
   const session = sessionMarkdown(
-    { identifier: "MAH-3", title: "t", labels: ["high-risk"], blocked: false },
+    { identifier: "MAH-3", title: "t", labels: ["human-review", "risk:medium"], blocked: false },
     "codex",
     "/tmp/workspace/workspaces/issues/MAH-3",
     config.repos,
@@ -345,19 +347,22 @@ test("session brief and root block declare merge routing", () => {
     config.guardrails,
     config.definitionOfDone,
     config.merge,
+    config.risk,
   );
   assert.match(session, /## Merge/);
   assert.match(session, /Human review required/);
+  assert.match(session, /- Risk: medium \(from label `risk:medium`\)/);
 
   const block = rootAgentBlock(config);
   assert.match(block, /only a composer may take/);
-  assert.match(block, /`high-risk` always require human review/);
-  assert.match(block, /`agent-merge` pre-approve/);
-  assert.match(block, /judges high risk always goes to the human, whatever its labels/);
+  assert.match(block, /`human-review` always require human review/);
+  assert.match(block, /unless a label in `agent-merge` pre-approves it/);
+  assert.match(block, /verification for the PR's risk level/);
+  assert.match(block, /`risk:low`, `risk:medium`, `risk:high`/);
 });
 
 test("merge routing includes project labels", () => {
-  const merge = { humanReviewLabels: ["high-risk"], agentMergeLabels: ["agent-merge"] };
+  const merge = { humanReviewLabels: ["high-risk"], agentMergeLabels: ["agent-merge"], humanReviewPaths: [] };
   const base = { identifier: "MAH-6", title: "t", blocked: false };
 
   const unknown = mergeRouting({ ...base, labels: ["agent-merge"] }, merge);

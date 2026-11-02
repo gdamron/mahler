@@ -119,7 +119,7 @@ test("doctor warns when the acceptance suite names an unknown repo or has no run
 test("doctor reports gh support for attachments and stacks", async () => {
   const { ghFindings } = await import("../src/commands/doctor.js");
   assert.deepEqual(ghFindings(undefined, undefined).map((f) => f.level), ["info"]);
-  const current = ghFindings("gh version 2.100.0 (2026-09-03)\n", "gh stack\tgithub/gh-stack\tv0.1.0\n");
+  const current = ghFindings("gh version 2.100.0 (2026-09-03)\n", "gh stack version 0.1.0\n");
   assert.deepEqual(current.map((f) => f.level), ["ok", "ok"]);
   const old = ghFindings("gh version 2.98.1 (2026-07-01)\n", "");
   assert.equal(old[0].level, "warn");

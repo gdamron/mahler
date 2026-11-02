@@ -40,7 +40,8 @@ commit, handoff. Skip the rest; your parent owns them.
 - git worktree, branch, status, diff, log, add, commit, and push commands for
   the issue's own branches
 - runtime-native sub-agent launch for slice conductors, testers, and reviewers
-- `gh stack link` and `gh stack view` for stacked PRs (no `gh stack merge`)
+- `gh stack link` for stacked PRs; `gh stack merge` only when the human
+  explicitly asks you to merge that stack (see the merge policy)
 - configured GitHub or forge command for PR creation (via the pr skill)
 
 ## Expected Inputs
@@ -61,7 +62,8 @@ commit, handoff. Skip the rest; your parent owns them.
    - the issue spans repos or splits into independent parts worth running in
      parallel;
    - the change holds more than one deliverable, or exceeds the pr policy's
-     size guidance, and should land as a stack of PRs;
+     size guidance, and should land as a stack of PRs (a stack lives in one
+     repo; work across repos is separate PRs);
    - a part suits a much cheaper tier than you (see the delegate skill), or
      would flood your context with exploration you don't need to keep.
 

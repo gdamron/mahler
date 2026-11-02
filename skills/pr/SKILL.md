@@ -25,7 +25,7 @@ description: Prepare or open a pull request for committed issue-scoped work.
 - configured GitHub or forge command for PR creation when available; with
   GitHub, `gh pr create`, `gh pr edit`, and `gh pr comment`, using
   `--body-file` and `--attach` for images and video
-- `gh stack link <pr> <pr> ...` and `gh stack view --json` for a stack
+- `gh stack link <pr> <pr> ...` for a stack, and `gh pr checks <pr>`
 - Linear MCP to comment on the issue with the PR link and proof
 
 ## Expected Inputs
@@ -39,15 +39,20 @@ description: Prepare or open a pull request for committed issue-scoped work.
 
 ## Process
 
-1. Write the description to a file using the pr policy's structure: a short
-   summary, the verification record, proof, and notes only when needed.
-   Reference each image by its local path where it belongs.
-2. Open the PR with `--body-file` and one `--attach` per image or video.
+1. Write the description to `body.md` in the issue's proof directory using
+   the pr policy's structure: a short summary, the verification record,
+   proof, and notes only when needed. Reference each image as `./<file>`
+   where it belongs.
+2. From the repo worktree, open the PR with `--body-file` and one `--attach`
+   per image or video, using absolute paths (see the pr policy). If some
+   uploads fail, retry them with `gh pr edit`; don't open the PR again.
 3. For a stack, open each PR against its predecessor's branch, then link them
-   bottom to top with `gh stack link` (see the pr policy).
+   bottom to top with `gh stack link`. Check that CI ran on each PR (see the
+   pr policy).
 4. Comment on the Linear issue with the PR link and the same proof. Skip this
    for a local task.
-5. Record the PR URL, and its stack if any, in `HANDOFF.md`.
+5. Record the PR URL, and for a stack its PR numbers in order, in
+   `HANDOFF.md`.
 
 ## Required Outputs
 

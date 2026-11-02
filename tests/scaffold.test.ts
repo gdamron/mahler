@@ -282,7 +282,7 @@ test("reinstall keeps guardrail and Definition of Done changes as overrides on M
   const configFile = resolve(workspace, ".harness", "config.json");
   const config = JSON.parse(readFileSync(configFile, "utf8"));
   assert.deepEqual(config.guardrails, { add: [], remove: [] });
-  const sizeRule = "PRs larger than about 1000 lines should be split into smaller, stacked PRs.";
+  const sizeRule = "A PR holds one deliverable that can merge and be reverted on its own; dependent parts land as a stack (see `.harness/policies/pr.md`).";
   config.guardrails = { add: ["Deploys need on-call sign-off (enforced by the deploy tool)."], remove: [sizeRule] };
   config.definitionOfDone = { add: ["Release notes are drafted."] };
   writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
@@ -294,7 +294,7 @@ test("reinstall keeps guardrail and Definition of Done changes as overrides on M
   const block = readFileSync(resolve(workspace, "CLAUDE.md"), "utf8");
   assert.match(block, /- Deploys need on-call sign-off/);
   assert.match(block, /- Required CI checks must pass before merge/);
-  assert.doesNotMatch(block, /1000 lines/);
+  assert.doesNotMatch(block, /one deliverable that can merge/);
 });
 
 test("reinstall turns an older whole-list config into additions so new defaults still arrive", () => {
@@ -305,6 +305,7 @@ test("reinstall turns an older whole-list config into additions so new defaults 
   // As written by an older Mahler: the whole list, including a retired default.
   config.guardrails = [
     "Merging to a repo's base branch requires a human-approved PR (enforced by the forge).",
+    "PRs larger than about 1000 lines should be split into smaller, stacked PRs.",
     "Required CI checks must pass before merge (enforced by CI).",
     "Deploys need on-call sign-off (enforced by the deploy tool).",
   ];
@@ -318,6 +319,7 @@ test("reinstall turns an older whole-list config into additions so new defaults 
   const block = readFileSync(resolve(workspace, "CLAUDE.md"), "utf8");
   assert.match(block, /- Only a human reviewer may merge a PR whose required CI checks are failing\./);
   assert.doesNotMatch(block, /requires a human-approved PR/);
+  assert.doesNotMatch(block, /1000 lines/);
 });
 
 test("reinstall keeps each runtime's profile and refreshes its skill and policy lists", () => {

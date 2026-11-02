@@ -28,9 +28,10 @@ dispute later; a missing one turns into behavior nobody tested.
 
 - `mahler linear-template issue` and `mahler linear-template task`
 - `mahler task <slug> --agent <agent> --task-file <task.json>`
-- Linear MCP to create or update issues and their labels, when your role
-  allows it: a composer creates the issues in its plan; a conductor proposes
-  follow-up issues to its parent rather than creating them
+- Linear MCP to create issues and set their labels, when your role allows
+  it: a composer creates the issues in a plan the human approved; a
+  conductor proposes follow-up issues to its parent rather than creating
+  them
 
 ## Shape of an Issue
 

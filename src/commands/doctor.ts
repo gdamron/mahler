@@ -117,7 +117,7 @@ export function doctor(workspaceInput: string): void {
   );
   if (spotlight) results.push(spotlight);
   results.push(...acceptanceFindings(config));
-  results.push(...ghFindings(ghOutput(["--version"]), ghOutput(["extension", "list"])));
+  results.push(...ghFindings(ghOutput(["--version"]), ghOutput(["stack", "--version"])));
 
   if (!existsSync(resolve(harness, "MODELS.md"))) {
     results.push({
@@ -405,10 +405,11 @@ function ghOutput(args: string[]): string | undefined {
 /**
  * GitHub CLI support for the pr policy: `--attach` (gh 2.99+) for proof of
  * work, and the gh-stack extension for stacks that merge in one step.
+ * `gh stack --version` works logged out, unlike `gh extension list`.
  */
-export function ghFindings(version: string | undefined, extensions: string | undefined): Finding[] {
+export function ghFindings(version: string | undefined, stackVersion: string | undefined): Finding[] {
   if (version === undefined) {
-    return [{ level: "info", message: "gh (GitHub CLI) not found — on GitHub, PRs need gh 2.99 or later to attach proof" }];
+    return [{ level: "info", message: "gh (GitHub CLI) not found or not responding — on GitHub, PRs need gh 2.99 or later to attach proof" }];
   }
   const match = /gh version (\d+)\.(\d+)\.(\d+)/.exec(version);
   const findings: Finding[] = [];
@@ -424,7 +425,7 @@ export function ghFindings(version: string | undefined, extensions: string | und
     );
   }
   findings.push(
-    extensions?.includes("github/gh-stack")
+    stackVersion?.startsWith("gh stack version")
       ? { level: "ok", message: "gh stack extension installed: stacked PRs merge in one step" }
       : { level: "info", message: "gh stack extension not installed — stacked PRs merge one at a time (gh extension install github/gh-stack)" },
   );

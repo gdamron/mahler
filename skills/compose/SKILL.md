@@ -36,7 +36,8 @@ itself: one issue never needs a composer layer.
 - `mahler task <slug> --agent <agent> --task-file <task.json>`
 - `mahler acceptance freeze|manifest|run --workspace <workspace> --project <slug> ...`
 - `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
-- Linear MCP project and issue lookup
+- Linear MCP project and issue lookup, and creating the issues in a plan the
+  human approved (see the write-issue skill)
 - `mahler capacity --workspace <workspace>`
 - runtime-native agent launch for conductors (sub-agents, agent teams, or
   headless sessions such as `claude -p` / `codex exec`)
@@ -62,13 +63,16 @@ itself: one issue never needs a composer layer.
    below (`<slug>` is the project slug, or a short name for an ad hoc list).
    Order issues by blockers, then priority, then oldest update/create
    timestamp, and group them into waves: an issue joins a wave only when its
-   blockers are done or can be stacked on an open PR. Issues likely to touch the
+   blockers are done or can be stacked on an open PR (its PR targets the
+   blocker's branch, but the two issues are never linked into one GitHub
+   stack). Issues likely to touch the
    same files go in different waves. An issue that holds several deliverables,
    each able to merge on its own, is often better split into several issues
    now than discovered as one long stack later.
 3. **Specify.** Write every new issue with the write-issue skill: a risk
    label with its reason, and acceptance criteria a tester can check without
-   the code. When an issue is underspecified, or issues share
+   the code. Get the human's go-ahead on new issues before creating them in
+   Linear. When an issue is underspecified, or issues share
    an interface, add a section under `Specifications` in `COMPOSITION.md`
    (clarified acceptance criteria, contracts between issues, non-goals) and
    point the conductor brief at it. Use the interview skill with the human

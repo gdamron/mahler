@@ -100,25 +100,31 @@ internal refactor), the relevant test output is the proof.
   and after. Put it in a collapsed `<details>` block with the command that
   produced it, trimmed to what shows the behavior.
 - **Images and video:** a UI change needs a screenshot or a short recording.
-  Save them under `.harness/tmp/proof/<ISSUE>/`, never in the branch, and
-  attach them with `gh` (2.99 or later; `mahler doctor` checks):
+  Save them, and the PR body, in `<workspace>/.harness/tmp/proof/<ISSUE>/`,
+  never in the branch. Run `gh` (2.99 or later; `mahler doctor` checks) from
+  the repo worktree, with absolute paths to the proof directory:
 
   ```sh
-  gh pr create --title "<title>" --body-file body.md --attach './after.png#Login error after the fix'
-  gh pr edit <pr> --body-file body.md --attach ./after.png
-  gh pr comment <pr> --body-file proof.md --attach ./before.png --attach ./after.png
+  P=<workspace>/.harness/tmp/proof/<ISSUE>
+  gh pr create --title "<title>" --body-file "$P/body.md" --attach "$P/after.png#Login error after the fix"
+  gh pr edit <pr> --body-file "$P/body.md" --attach "$P/after.png"
+  gh pr comment <pr> --body-file "$P/proof.md" --attach "$P/before.png" --attach "$P/after.png"
   ```
 
-  To place an image, reference its local path in the body
+  To place an image, reference it in the body relative to the body file
   (`![Login error after the fix](./after.png)`); `gh` uploads the file and
   rewrites the link. Attachments the body doesn't reference go at the end.
   For a video, put `![](./demo.mp4)` alone in its paragraph. `--attach` takes
   images and video only, repeats for several files, and needs push access.
+- If some uploads fail, `gh pr create` still opens the PR, prints its URL,
+  and exits non-zero. Don't run it again: retry the failed files with
+  `gh pr edit <pr> --attach`.
 - Don't say a file couldn't be attached without trying `--attach`. If it
   fails, give the exact error and attach what you can.
 - **Linear:** once the PR is open, post the same proof as a comment on the
   Linear issue with the PR link, using Linear MCP (and its file upload tools
-  for images). A comment is not an issue-tracker state change.
+  for images). A comment is not a Tier 2 state change (see the judgment
+  policy).
 
 ### Stacks
 
@@ -133,10 +139,16 @@ installed).
    verification record, and proof, and says where it sits in the stack.
 2. Link them, bottom to top: `gh stack link <pr> <pr> ...`. Add `--base
    <branch>` when the base isn't the default branch. To add a PR on top of an
-   existing stack: `gh stack link <stack-number> <pr>`. `gh stack view --json`
-   shows the stack.
-3. Don't use `gh stack init`, `add`, or `modify`: they expect every branch in
-   one checkout, and `modify` is interactive.
+   existing stack: `gh stack link <stack-number> <pr>`. Record the stack's PR
+   numbers, in order, in `HANDOFF.md`; the merge uses them.
+3. Don't use `gh stack init`, `add`, `modify`, or `view`: they rely on local
+   tracking that `link` doesn't create, and `modify` is interactive.
+4. A stack holds one issue's PRs in one repo. Don't link PRs from different
+   issues, even when one builds on the other: linked PRs merge together.
+5. CI must run on every PR in the stack, not only the bottom one. If the
+   upper PRs show no checks (`gh pr checks <pr>` is empty, often because CI
+   runs only for PRs into the base branch), say so in each PR's description;
+   the merge policy then merges them one at a time.
 
 Without the extension, the stacked PRs still target their predecessors, and
 the merge policy merges them one at a time.

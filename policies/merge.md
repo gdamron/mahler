@@ -67,15 +67,30 @@ bottom up to the PR you name:
 gh stack merge <stack-number | pr-number> --<method> --yes
 ```
 
+- Name the PR by number (the top one you merge); stack and PR numbers never
+  overlap. The PR numbers are in the issue's `HANDOFF.md`, or follow each
+  PR's base (`gh pr view <pr> --json baseRefName`).
 - Apply the routing rules to each PR in the stack. If one goes to the human,
   merge only the PRs below it, and hand the rest of the stack to the human.
+- `gh stack merge` checks only that each PR is open and not a draft, and
+  branch protection applies to the base branch. Check readiness on every PR
+  yourself, and confirm CI actually ran on each (`gh pr checks <pr>` lists
+  checks). A PR with no checks is not green; merge one at a time instead, so
+  each PR's checks run once it targets the base branch.
 - Always pass the merge method and `--yes`; without them the command prompts
   or reuses the last method.
 - Stack merges never bypass branch protection. If the forge rejects one,
-  nothing merged; handle it as any rejected merge.
-- Without the `gh stack` extension, or for stacked PRs that were never linked,
-  merge one PR at a time, bottom first: each merges only after its
-  predecessor has merged and it has been retargeted to the base branch.
+  nothing merged; handle it as any rejected merge. With a merge queue, the
+  stack joins the queue: wait until every PR shows merged before cleanup.
+- A stack merge doesn't delete head branches. Delete them afterwards
+  (`git push origin --delete <branch>`) unless the repo deletes them on
+  merge.
+- Without the `gh stack` extension, for stacked PRs that were never linked,
+  or when an upper PR has no checks, merge one PR at a time, bottom first:
+  each merges only after its predecessor has merged and it has been
+  retargeted to the base branch.
+- A conductor the human explicitly asked to merge a stack may run
+  `gh stack merge` under these same rules.
 
 ## Verification Record
 

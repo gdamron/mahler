@@ -1,14 +1,28 @@
 # Issue Selection Policy
 
-Linear issues are the atomic unit of implementation, commits, and PRs.
+An issue is the atomic unit of implementation, commits, and PRs. Most come
+from Linear; a local task, agreed in conversation, is the same unit without
+Linear.
 
 When asked to work on a specific issue:
 
 1. Use Linear MCP to fetch the issue title, description, status, labels, assignee,
    blockers, and project.
 2. Run the Mahler issue workflow for that identifier.
-3. If Linear MCP is unavailable or the issue metadata is incomplete, stop and ask
-   the human for the missing context.
+3. If the named issue can't be fetched from Linear, or its metadata is
+   incomplete, stop and ask the human for the missing context.
+
+When the human describes work in conversation instead of naming an issue:
+
+1. Agree on the task first: a title, acceptance criteria as observable
+   behavior, non-goals, and a risk level with its reason (see the risk
+   policy).
+2. Write it with `mahler task <slug> --task-file <task.json>` (template:
+   `mahler linear-template task`). The identifier is `local-<slug>`, and the
+   brief has the same layout as an issue's.
+3. Wait for the human's go-ahead on the criteria and risk, then run the normal
+   issue workflow for `local-<slug>`. Don't stop because there is no Linear
+   issue.
 
 When asked to work on a Linear project:
 

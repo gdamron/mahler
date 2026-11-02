@@ -1,6 +1,6 @@
 ---
 name: work-on-issue
-description: Create an issue brief and worktrees from Linear issue metadata, then hand off to the conduct skill.
+description: Create an issue brief and worktrees from Linear issue metadata or a local task, then hand off to the conduct skill.
 ---
 
 # Work On Issue
@@ -10,6 +10,7 @@ description: Create an issue brief and worktrees from Linear issue metadata, the
 - "work on ISSUE-123"
 - "start ISSUE-123"
 - "implement ISSUE-123"
+- "let's do this" after agreeing on work in conversation (a local task)
 
 ## Required Policies
 
@@ -19,19 +20,22 @@ description: Create an issue brief and worktrees from Linear issue metadata, the
 - workspace-safety
 - branching
 - definition-of-done
+- risk
 - handoff
 
 ## Allowed Commands
 
 - `mahler linear-template issue`
 - `mahler issue <ISSUE> --agent <agent> --linear-file <issue.json>`
+- `mahler linear-template task` and
+  `mahler task <slug> --agent <agent> --task-file <task.json>`
 - `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
 - git worktree commands for only the repos needed by the task
 - repo-local build, test, and inspection commands inside selected repo worktrees
 
 ## Expected Inputs
 
-- Linear issue identifier
+- Linear issue identifier, or work agreed with the human in conversation
 - Linear issue metadata from MCP, or explicit human-provided fallback metadata
 
 ## Linear MCP Resolution
@@ -58,6 +62,25 @@ description: Create an issue brief and worktrees from Linear issue metadata, the
 9. Create only the needed repo worktrees, preferably under `workspaces/issues/<ISSUE>/repos/<repo>`
    (`repos/<repo>-<slice>` for additional slices in the same repo).
 
+## Local Task Resolution
+
+When the work was agreed in conversation and has no Linear issue:
+
+1. Write the task as JSON in the shape printed by `mahler linear-template
+   task`: title, description, risk, acceptance criteria as observable
+   behavior, non-goals, protected areas, and risk notes.
+2. Show the criteria and risk level to the human and wait for their go-ahead.
+3. Write it to `.harness/tmp/tasks/<slug>.json` and run `mahler task <slug>
+   --agent <agent> --task-file .harness/tmp/tasks/<slug>.json`. The issue
+   identifier is `local-<slug>` from here on.
+4. Continue from step 6 above.
+
+## Risk
+
+Read the risk line under `## Risk and Verification` in `AGENT_SESSION.md`. If
+it says the risk is not set, classify it with the risk policy before starting,
+record it in `HANDOFF.md`, and add the label in Linear when you can.
+
 ## Next
 
 Continue with the conduct skill: implement directly unless the issue warrants
@@ -71,7 +94,8 @@ delegated slices, then review, verify, and open the PRs.
 
 ## Stop Conditions
 
-- Linear metadata is unavailable or incomplete
+- a named Linear issue's metadata is unavailable or incomplete
 - Linear MCP lookup fails or returns a different issue identifier
+- a local task has no go-ahead from the human
 - no repo is configured
-- requested work is outside the Linear issue scope
+- requested work is outside the issue or task scope

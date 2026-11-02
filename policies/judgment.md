@@ -67,8 +67,9 @@ When you work under a parent agent, ask the parent instead of the human. A
 composer may approve Tier 2 actions for its conductors and records each
 approval in `COMPOSITION.md`; a conductor or other sub-agent passes the
 request up rather than approving it. For merges, the composer's authority is
-bounded by the merge policy: labels and risk decide whether it may merge or
-must hand the PR to the human.
+bounded by the merge policy: labels and paths decide whether it may merge or
+must hand the PR to the human, and the risk level decides what must be
+verified first (see the verification policy).
 
 ### Tier 3 — Hard guardrails (declared by Mahler, enforced elsewhere)
 

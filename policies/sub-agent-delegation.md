@@ -17,8 +17,12 @@ human
   └── composer          plans multiple issues; one conductor per issue; merges
         └── conductor   owns one issue; works directly by default
               ├── conductor (slice mode)  edits, commits, and pushes one slice
+              ├── tester                  writes acceptance tests from the spec
               └── reviewer                read-only review of a finished diff
 ```
+
+A composer also launches a tester in project mode for a project's acceptance
+suite (see the verification policy).
 
 - A human may task any level directly. A composer handed a single issue
   conducts it itself rather than adding a layer.
@@ -62,6 +66,10 @@ areas. Standard grants by role:
   worktree, commit, and push its slice branch. It does not open PRs, merge,
   force-push shared branches, change issue-tracker state, or delegate further.
 - **Reviewer:** read-only. It may run tests and checks to validate findings.
+- **Tester:** edit test files only, in its own tester worktree cut from the
+  base branch, and commit and push its tester branch. It does not read the
+  implementation diff, merge its branch, freeze tests, open PRs, or delegate.
+  Its parent merges the branch and records the freeze.
 - **Conductor, issue mode (from a composer):** run the conduct skill for its
   one issue, including launching slice conductors and reviewers and opening
   PRs.

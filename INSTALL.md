@@ -283,7 +283,8 @@ defaults are kept, retired defaults are dropped, and newer defaults are added.
 
 - `mahlerCommand`, `workspaceDir`, and the Linear filters (a
   `--linear-assignee` or `--linear-label` flag replaces its filter);
-- each repo's `checks`, `merge` labels, and the `models`, `concurrency`,
+- each repo's `checks`, the `merge` labels and paths, the `risk` labels, the
+  `acceptance` suite settings, and the `models`, `concurrency`,
   `guardrails`, and `definitionOfDone` overrides;
 - each runtime's `profile` and `role` under `agents` (for example, switching
   Claude's default profile from `composer` to `conductor`), plus whole entries

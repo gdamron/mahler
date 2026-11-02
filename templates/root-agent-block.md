@@ -1,6 +1,6 @@
 ## Mahler Workflow
 
-This workspace uses Mahler. Bare prompts like `work on MAH-123`, `start MAH-123`, or `work on project X in Linear` should route through Mahler before code changes so the agent has the issue brief and shared policies.
+This workspace uses Mahler. Bare prompts like `work on MAH-123`, `start MAH-123`, or `work on project X in Linear` should route through Mahler before code changes so the agent has the issue brief and shared policies. So should work agreed in conversation without Linear: it becomes a local task.
 
 Mahler compiles canonical workflow source into native agent artifacts:
 
@@ -15,6 +15,7 @@ Recommended routing:
 - Active profile check: inspect `.harness/config.json` and the active profile in `.harness/agents/profiles/` ({{codexProfile}}; {{claudeProfile}}) before choosing a skill.
 - Multi-issue or project prompt for a composer: use the native `compose` skill. It plans every eligible issue in `.harness/projects/<slug>/COMPOSITION.md` and dispatches one conductor per issue.
 - Issue prompt (any role, including a composer handed one issue): use the native `conduct` skill, which starts with `work-on-issue`, implements directly by default, and delegates slices only when the issue warrants it. `work-on-issue` fetches Linear metadata, writes `.harness/tmp/linear/<ISSUE>.json`, then runs `{{mahlerCommand}} issue <ISSUE> --agent <codex|claude> --linear-file <issue.json>` to create a brief.
+- Work agreed in conversation, with no Linear issue: agree on acceptance criteria and a risk level, then `work-on-issue` writes `.harness/tmp/tasks/<slug>.json` and runs `{{mahlerCommand}} task <slug> --agent <codex|claude> --task-file <task.json>` to create a brief for `local-<slug>`. Start once the human says go.
 - Project prompt for any other role: use the native `select-project-issue` skill to pick one issue. It fetches Linear project metadata, writes `.harness/tmp/linear/<project>.json`, then runs `{{mahlerCommand}} project "<PROJECT>" --agent <codex|claude> --linear-file <project.json>`.
 - For implement, review, commit, PR, and handoff prompts, use the matching native skill and the policies it names.
 - Sub-agent delegation: use the native `delegate` skill to decide whether to delegate and which model tier (`.harness/MODELS.md`) to launch on, and `.harness/policies/sub-agent-delegation.md` for the brief; default to read-only authority and synthesize results into `HANDOFF.md` or working notes. Mahler does not provide `mahler subagent ...` commands.
@@ -22,7 +23,7 @@ Recommended routing:
 - Create git worktrees only for repos needed by the task, preferably under `{{workspaceDir}}/issues/<ISSUE>/repos/<repo>`.
 - Choose branch names using `.harness/policies/branching.md`; Mahler does not choose branch names for agents.
 - Record deliberate workflow deviations in `.harness/issues/<ISSUE>/HANDOFF.md`; only when the reason generalizes beyond this issue, also append a note with `mahler decide` to `.harness/decisions/`. Read the active ledger (not `archive/`) at session start to recover durable decisions.
-- If the requested skill is outside the active profile, treat it as a Tier 1 deviation: you may proceed deliberately, but record the reason (see `.harness/policies/judgment.md`). Stop and ask the human if Linear metadata is unavailable.
+- If the requested skill is outside the active profile, treat it as a Tier 1 deviation: you may proceed deliberately, but record the reason (see `.harness/policies/judgment.md`). Stop and ask the human if a named Linear issue or project can't be fetched.
 
 Risk decides how much verification a change gets, not who merges it. Every issue or local task carries a risk level ({{riskLabels}}) set when the work is written and only ever raised (see `.harness/policies/risk.md`); `.harness/policies/verification.md` says what each level requires, including independent acceptance tests from a tester sub-agent for medium and high risk.
 

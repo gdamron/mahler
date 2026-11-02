@@ -29,6 +29,8 @@ Removing a rule is usually a better result than adding one.
   Mahler package's own `policies/` and `skills/` (beside its `dist/`:
   `$(dirname "$(realpath "$(command -v mahler)")")/../..`)
 - `mahler doctor --workspace <workspace>`
+- forge PR inspection (`gh pr list`, `gh pr view`, `gh pr diff`) to sample
+  merged work
 - after the human approves: move ledger notes to `.harness/decisions/archive/`,
   edit `.harness/custom/` and the workspace instruction files, then
   `mahler install` to regenerate the native artifacts
@@ -59,7 +61,17 @@ Use judgment about depth: a quick pass over a small workspace is fine.
   - model tiers (a tier routed to an external tool usually wants a
     `fallback`)
   - concurrency caps
-  - merge labels
+  - merge labels, `merge.humanReviewPaths`, and risk labels
+  - the acceptance suite settings
+- **Merged work:** sample a few PRs agents merged since the last audit,
+  weighted toward medium and high risk. For each, check that the
+  verification record holds up: the risk level was fair, the tests check the
+  criteria they claim, frozen tests stayed frozen, and no bug has turned up
+  since. A pattern (say, migrations keep arriving as medium) becomes a
+  proposal: a risk signal, a human-review path, or a policy change.
+- **Disputes:** read the dispute decisions in `COMPOSITION.md` files and
+  freeze histories. Repeated disputes about one kind of criterion usually
+  mean issues are being written too loosely.
 
 ## Output
 

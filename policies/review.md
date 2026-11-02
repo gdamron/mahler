@@ -9,8 +9,10 @@ to a reviewer sub-agent that did not write it; skipping that is a recorded
 deviation. The delegate skill picks the reviewer's tier, which may route to a
 cross-model review (a skill or a command, such as a Codex review); its
 findings are translated into the format below.
-Merging follows the merge policy: a composer may merge the PRs it allows, and
-everything else waits for human sign-off.
+Review is one part of verification; the risk level decides the rest and the
+reviewer's tier (see the verification policy). Merging follows the merge
+policy: a composer merges unless the PR's labels or paths route it to the
+human.
 
 When reviewing:
 

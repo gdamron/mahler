@@ -114,7 +114,7 @@ export function prModeSync(dir: string, branch: string, repo: string, message: s
   resumeSettling(dir, ledger, done);
   const batch = settleBatch(dir, remote, ledger, ask, true, done);
   const pulled = pull(dir, remote, branch, ledger, done, fall);
-  applySettling(dir, ledger, pulled);
+  const settled = applySettling(dir, ledger, pulled, fall);
   const notes = settlePendingNotes(dir, remote, ask, pulled, ledger, done, fall);
   if (quick) return { done, published };
 
@@ -129,7 +129,7 @@ export function prModeSync(dir: string, branch: string, repo: string, message: s
   }
   // After a blocked pull the working tree sits on an old commit, and its
   // files would undo newer changes on the branch.
-  if (!pulled) return { done, published };
+  if (!pulled || !settled) return { done, published };
   try {
     proposeEdits(dir, remote, branch, ledger, batch.state, done, fall);
   } catch (error) {
@@ -243,6 +243,8 @@ interface Carry {
   local: string | null;
   /** The file to write once the pull succeeds. */
   text: string | null;
+  /** The remote's blob id that `text` was folded onto; null when the remote had no such file. */
+  onto: string | null;
 }
 
 /**
@@ -306,12 +308,15 @@ function settleBatch(
       continue;
     }
     kept += 1;
-    if (text !== undefined) carries.push({ path, local: localText, text });
+    if (text !== undefined) carries.push({ path, local: localText, text, onto: theirs });
   }
+  // Files with nothing to keep go first: if one fails, the batch is still
+  // recorded and the next sync settles it again.
+  for (const path of restores) restore(dir, path);
   ledger.settling = [...(ledger.settling ?? []), ...carries];
   delete ledger.batch;
   writeLedger(dir, ledger);
-  for (const path of [...restores, ...carries.map((entry) => entry.path)]) restore(dir, path);
+  for (const carry of carries) restore(dir, carry.path);
   const name = batch.url ?? batch.branch;
   const later = kept > 0 ? `, keeping your later edits to ${kept} ${kept === 1 ? "file" : "files"}` : "";
   done.push(info.state === "MERGED" ? `${name} merged${later}` : `dropped the edits in ${name} (closed unmerged)${later}`);
@@ -337,7 +342,7 @@ function pull(dir: string, remote: string, branch: string, ledger: Ledger, done:
       const theirs = blobId(dir, remote, path);
       const text = local === null || theirs === null ? undefined : merge3(dir, local, head ? readBlob(dir, head) ?? "" : "", readBlob(dir, theirs) ?? "");
       if (text === undefined) conflicts.push(path);
-      else folds.push({ path, local, text });
+      else folds.push({ path, local, text, onto: theirs });
     }
     if (conflicts.length === 0) {
       ledger.settling = [...(ledger.settling ?? []), ...folds];
@@ -361,16 +366,37 @@ function pull(dir: string, remote: string, branch: string, ledger: Ledger, done:
 }
 
 /** Put back edits set aside for the pull: folded after a successful one, as they were after a failed one. */
-function applySettling(dir: string, ledger: Ledger, pulled: boolean): void {
-  if (!ledger.settling || ledger.settling.length === 0) return;
-  for (const carry of ledger.settling) writeOrRemove(resolve(dir, carry.path), pulled ? carry.text : carry.local);
+function applySettling(dir: string, ledger: Ledger, pulled: boolean, fall: (why: string) => void): boolean {
+  if (!ledger.settling || ledger.settling.length === 0) return true;
+  let clean = true;
+  for (const carry of ledger.settling) {
+    let text: string | null | undefined = pulled ? carry.text : carry.local;
+    const head = blobId(dir, "HEAD", carry.path);
+    // Folded onto an older remote (an interrupted sync): fold again onto this one.
+    if (pulled && head !== carry.onto) {
+      const ontoText = carry.onto === null ? "" : readBlob(dir, carry.onto);
+      const headText = head === null ? undefined : readBlob(dir, head);
+      text =
+        carry.text === null || ontoText === undefined || headText === undefined
+          ? undefined
+          : merge3(dir, carry.text, ontoText, headText) ?? undefined;
+      if (text === undefined) {
+        clean = false;
+        text = carry.local;
+        fall(`your edits to ${carry.path} conflict with newer changes on the remote; fold them in by hand in ${dir}, then sync again`);
+      }
+    }
+    writeOrRemove(resolve(dir, carry.path), text ?? null);
+  }
   delete ledger.settling;
   writeLedger(dir, ledger);
+  return clean;
 }
 
 /**
  * Pick up edits an interrupted sync set aside: restore the files it hadn't
- * yet, so this sync's pull puts them back. A file edited since is left alone.
+ * yet, so this sync's pull puts them back. A file edited since is left as
+ * it is, and the earlier edits are saved under `pending/recovered/`.
  */
 function resumeSettling(dir: string, ledger: Ledger, done: string[]): void {
   if (!ledger.settling || ledger.settling.length === 0) return;
@@ -382,7 +408,14 @@ function resumeSettling(dir: string, ledger: Ledger, done: string[]): void {
       return true;
     }
     if (localBlobId(dir, carry.path) === blobId(dir, "HEAD", carry.path)) return true;
-    done.push(`left ${carry.path} as you edited it, instead of finishing an interrupted sync's change to it`);
+    // Edited again since: keep the earlier edits beside it rather than choose.
+    const saved = `pending/recovered/${carry.path}`;
+    if (carry.local !== null) writeOrRemove(resolve(dir, saved), carry.local);
+    done.push(
+      carry.local === null
+        ? `left ${carry.path} as you edited it (an interrupted sync had set aside its deletion)`
+        : `left ${carry.path} as you edited it; your earlier edits to it, set aside by an interrupted sync, are in ${saved}`,
+    );
     return false;
   });
   if (ledger.settling.length === 0) delete ledger.settling;
@@ -734,13 +767,15 @@ export function leavePrMode(dir: string, branch: string): { done: string[]; bloc
   const remote = `refs/remotes/origin/${branch}`;
   git(dir, ["fetch", "--quiet", "--prune", "origin"], NETWORK_TIMEOUT_MS);
   const withdraw: string[] = [];
-  let blocked: string | undefined;
   if (ledger.batch) {
     const batch = ledger.batch;
     const { state } = settleBatch(dir, remote, ledger, ask, false, done);
     if (state === undefined) {
       // It may have closed: don't publish edits a reviewer turned down.
-      blocked = `couldn't check ${batch.url ?? batch.branch}, the PR holding your edits; nothing was published. Make sure \`gh\` works, or close that PR and delete pending/prs.json, then sync again`;
+      return {
+        done,
+        blocked: `couldn't check ${batch.url ?? batch.branch}, the PR holding your edits, so nothing was published. Make sure \`gh\` works (\`gh auth status\`) and sync again, or set knowledge.publish back to "pr"`,
+      };
     } else {
       if (state === "OPEN" && batch.url) withdraw.push(batch.url);
       delete ledger.batch;
@@ -790,7 +825,7 @@ export function leavePrMode(dir: string, branch: string): { done: string[]; bloc
   writeLedger(dir, ledger);
   if (moved > 0) done.push(`moved ${moved} pending ${moved === 1 ? "note" : "notes"} into notes/`);
   if (withdraw.length > 0) done.push(`close ${withdraw.join(", ")} on the forge: this sync publishes ${withdraw.length === 1 ? "its" : "their"} changes directly`);
-  return { done, blocked };
+  return { done };
 }
 
 // ---------------------------------------------------------------------------

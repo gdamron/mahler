@@ -512,35 +512,54 @@ test("a pull folds local edits into overlapping changes instead of blocking", ()
   assert.equal(gh.prs()[0].state, "OPEN", "the batch PR stays open");
 });
 
-test("edits an interrupted sync set aside are put back by the next one", () => {
-  const { ws, gh } = prWorkspace();
-  const file = noteFile(ws, "seed-note");
-  const original = readFileSync(file, "utf8");
-  const edited = `${original}\nCarried over.\n`;
-  const folded = `${original}\nCarried over, folded.\n`;
-  // As if a sync recorded the carry and was killed before restoring the file.
-  writeFileSync(file, edited);
+/** As if a sync set aside an edit to the seed note, folded onto main as it was, and was killed before restoring the file. */
+function interrupted(ws: string, local: string, text: string): void {
+  writeFileSync(noteFile(ws, "seed-note"), local);
   mkdirSync(resolve(store(ws), "pending"), { recursive: true });
+  const onto = git(store(ws), ["rev-parse", "HEAD:notes/seed-note.md"]);
   writeFileSync(
     resolve(store(ws), "pending", "prs.json"),
-    JSON.stringify({ notes: {}, settling: [{ path: "notes/seed-note.md", local: edited, text: folded }] }),
+    JSON.stringify({ notes: {}, settling: [{ path: "notes/seed-note.md", local, text, onto }] }),
   );
+}
+
+test("edits an interrupted sync set aside are put back by the next one, onto newer changes", () => {
+  const { shared, ws, gh } = prWorkspace();
+  const original = readFileSync(noteFile(ws, "seed-note"), "utf8");
+  interrupted(ws, `${original}\nCarried over.\n`, `${original}\nCarried over, folded.\n`);
+  pushToMain(shared, "notes/seed-note.md", original.replace(/^description: .*$/m, 'description: "Newer wording."'));
   const synced = sync(ws, gh);
   assert.equal(synced.status, 0, synced.stderr);
-  assert.equal(readFileSync(file, "utf8"), folded);
+  const note = readFileSync(noteFile(ws, "seed-note"), "utf8");
+  assert.match(note, /Carried over, folded\./);
+  assert.match(note, /Newer wording\./, "the newer remote change isn't undone");
   assert.match(synced.stdout, /proposed 1 edit/);
   assert.equal(ledger(ws).settling, undefined);
+});
+
+test("a file edited after an interrupted sync keeps its earlier edits beside it", () => {
+  const { ws, gh } = prWorkspace();
+  const original = readFileSync(noteFile(ws, "seed-note"), "utf8");
+  interrupted(ws, `${original}\nEarlier edit.\n`, `${original}\nEarlier edit.\n`);
+  writeFileSync(noteFile(ws, "seed-note"), `${original}\nNewer edit.\n`);
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /your earlier edits to it, set aside by an interrupted sync, are in pending\/recovered\/notes\/seed-note\.md/);
+  assert.match(readFileSync(resolve(store(ws), "pending", "recovered", "notes", "seed-note.md"), "utf8"), /Earlier edit\./);
+  assert.match(readFileSync(noteFile(ws, "seed-note"), "utf8"), /Newer edit\./);
 });
 
 test("switching to direct publish without a working gh publishes no batch edits", () => {
   const { shared, ws, gh } = prWorkspace();
   writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nRejected claim.\n");
   assert.match(sync(ws, gh).stdout, /proposed 1 edit/);
+  assert.equal(learn(ws, "Still pending", gh.env).status, 0);
   gh.setState(gh.prs()[0].url, "CLOSED");
   assert.equal(setRepo(ws, { publish: "direct" }, gh.env).status, 0);
   const synced = sync(ws, { ...gh, env: { ...gh.env, FAKE_GH_DOWN: "1" } });
-  assert.match(synced.stderr, /couldn't check https:\/\/forge\.example\/pr\/1, the PR holding your edits; nothing was published/);
+  assert.match(synced.stderr, /couldn't check https:\/\/forge\.example\/pr\/1, the PR holding your edits, so nothing was published/);
   assert.doesNotMatch(git(shared, ["show", "main:notes/seed-note.md"]), /Rejected claim/);
+  assert.ok(existsSync(pending(ws, "still-pending")), "nothing moves while blocked");
 
   const settled = sync(ws, gh);
   assert.equal(settled.status, 0, settled.stderr);

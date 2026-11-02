@@ -5,67 +5,7 @@ import { tmpdir } from "node:os";
 import { relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { withLock } from "../src/knowledge-repo.js";
-
-const cliPath = resolve("dist/src/cli.js");
-// Commits need an identity, and CI machines may have none.
-const env = {
-  ...process.env,
-  GIT_AUTHOR_NAME: "t",
-  GIT_AUTHOR_EMAIL: "t@t",
-  GIT_COMMITTER_NAME: "t",
-  GIT_COMMITTER_EMAIL: "t@t",
-};
-
-function run(args: string[], extraEnv: Record<string, string> = {}): { status: number | null; stdout: string; stderr: string } {
-  const result = spawnSync("node", [cliPath, ...args], { encoding: "utf8", env: { ...env, ...extraEnv } });
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
-}
-
-function git(cwd: string, args: string[]): string {
-  const result = spawnSync("git", args, { cwd, encoding: "utf8", env });
-  assert.equal(result.status, 0, `git ${args.join(" ")}: ${result.stderr}`);
-  return result.stdout.trim();
-}
-
-/** A bare repo standing in for the shared knowledge remote. */
-function remote(): string {
-  const dir = resolve(mkdtempSync(resolve(tmpdir(), "mahler-remote-")), "knowledge.git");
-  spawnSync("git", ["init", "-q", "--bare", "-b", "main", dir]);
-  return dir;
-}
-
-/** An installed workspace with one repo, optionally switched to repo mode and reinstalled. */
-function workspace(repo?: string, notes: string[] = []): string {
-  const dir = mkdtempSync(resolve(tmpdir(), "mahler-ws-"));
-  const app = resolve(dir, "app");
-  spawnSync("git", ["init", "-q", "-b", "main", app]);
-  writeFileSync(resolve(app, "README.md"), "x\n");
-  git(app, ["add", "."]);
-  git(app, ["commit", "-q", "-m", "init"]);
-  assert.equal(run(["install", dir]).status, 0);
-  for (const title of notes) assert.equal(learn(dir, title).status, 0);
-  if (repo) setRepo(dir, { repo });
-  return dir;
-}
-
-function setRepo(
-  dir: string,
-  knowledge: Record<string, string>,
-  extraEnv: Record<string, string> = {},
-): { status: number | null; stdout: string; stderr: string } {
-  const file = resolve(dir, ".harness/config.json");
-  const config = JSON.parse(readFileSync(file, "utf8"));
-  config.knowledge = { ...config.knowledge, ...knowledge };
-  writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
-  return run(["install", dir], extraEnv);
-}
-
-function learn(dir: string, title: string, extraEnv: Record<string, string> = {}) {
-  return run(["learn", "--workspace", dir, "--title", title, "--description", `${title}.`], extraEnv);
-}
-
-const store = (dir: string) => resolve(dir, ".harness/knowledge");
-const noteFile = (dir: string, slug: string) => resolve(store(dir), "notes", `${slug}.md`);
+import { env, git, learn, noteFile, remote, run, setRepo, store, workspace } from "./knowledge-fixtures.js";
 
 test("two workspaces sharing a knowledge repo each see the other's notes after sync", () => {
   const shared = remote();
@@ -178,15 +118,6 @@ test("doctor reports the store's mode and state", () => {
   const blocked = learn(local, "Not yet shared");
   assert.notEqual(blocked.status, 0);
   assert.match(blocked.stderr, /notes\/not-yet-shared\.md is saved locally, but publishing it failed/);
-});
-
-test("PR publish mode refuses to publish until it is supported", () => {
-  const a = workspace(remote());
-  setRepo(a, { publish: "pr" });
-  const refused = learn(a, "Needs review");
-  assert.notEqual(refused.status, 0);
-  assert.match(refused.stderr, /knowledge\.publish "pr" is not supported yet/);
-  assert.match(run(["doctor", a]).stdout, /knowledge\.publish "pr" is not supported yet/);
 });
 
 test("the store lock reclaims a dead holder's lock and waits for a live one", () => {

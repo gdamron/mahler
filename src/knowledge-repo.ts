@@ -14,6 +14,8 @@ import {
 import { randomBytes } from "node:crypto";
 import { dirname, relative, resolve, sep } from "node:path";
 import { knowledgeDir, writeIndexes } from "./knowledge.js";
+import { prModeSync } from "./knowledge-pr.js";
+import { firstLine, git, GIT_ENV, gitOrThrow, IGNORED, NETWORK_TIMEOUT_MS } from "./knowledge-git.js";
 import type { HarnessConfig } from "./types.js";
 
 /**
@@ -22,40 +24,11 @@ import type { HarnessConfig } from "./types.js";
  * Without `repo`, the store is a plain local folder and none of this runs.
  */
 
-/**
- * Generated or machine-local files the store's repo never tracks: the index
- * each clone builds, PR-mode pending notes, and editor and OS state that would
- * otherwise conflict between people.
- */
-const IGNORED = ["INDEX.md", "pending/", ".obsidian/", ".trash/", ".DS_Store"];
-
-/** Fetch and push give up after this, so a stalled remote can't hang a brief. */
-const NETWORK_TIMEOUT_MS = 30_000;
-
 /** A lock held longer than this belongs to a crashed process. */
 const STALE_LOCK_MS = 10 * 60 * 1000;
 
 export function knowledgeBranch(config: HarnessConfig): string {
   return config.knowledge.branch ?? "main";
-}
-
-interface GitResult {
-  ok: boolean;
-  stdout: string;
-  stderr: string;
-}
-
-/** Never prompt for credentials: there may be no one at the terminal. */
-const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
-
-function git(dir: string, args: string[], timeout?: number): GitResult {
-  const result = spawnSync("git", args, { cwd: dir, encoding: "utf8", env: GIT_ENV, timeout });
-  const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT";
-  return {
-    ok: result.status === 0,
-    stdout: (result.stdout ?? "").trim(),
-    stderr: timedOut ? `timed out after ${timeout} ms` : (result.stderr ?? "").trim(),
-  };
 }
 
 /**
@@ -77,12 +50,6 @@ function sameRepo(workspace: string, origin: string, repo: string): boolean {
   const trim = (url: string) => url.replace(/\/+$/, "");
   if (isLocalPath(origin) && isLocalPath(repo)) return resolve(workspace, origin) === resolve(workspace, repo);
   return trim(origin) === trim(repo);
-}
-
-function gitOrThrow(dir: string, args: string[]): string {
-  const result = git(dir, args);
-  if (!result.ok) throw new Error(`git ${args.join(" ")} failed in ${dir}: ${result.stderr || result.stdout}`);
-  return result.stdout;
 }
 
 /**
@@ -244,18 +211,22 @@ function commitCount(dir: string): number {
   return count.ok ? Number(count.stdout) : 0;
 }
 
-/** Throws when Mahler can't publish this config yet. */
+/** Throws on a publish mode Mahler doesn't know. */
 function checkPublishMode(config: HarnessConfig): void {
-  if (config.knowledge.publish === "pr") {
-    throw new Error(
-      'knowledge.publish "pr" is not supported yet; set it to "direct" (or remove it) in .harness/config.json',
-    );
+  const { publish } = config.knowledge;
+  if (publish !== undefined && publish !== "direct" && publish !== "pr") {
+    throw new Error(`knowledge.publish must be "direct" or "pr", not ${JSON.stringify(publish)}`);
   }
 }
 
+export function prPublish(config: HarnessConfig): boolean {
+  return Boolean(config.knowledge.repo) && config.knowledge.publish === "pr";
+}
+
 /**
- * Sync the store with its repo: commit local changes with `message`, rebase
- * onto the remote branch, and push. A push rejected because the remote moved
+ * Sync the store with its repo. With `publish: "pr"`, propose local changes
+ * as PRs instead (see knowledge-pr.ts). Otherwise commit local changes with
+ * `message`, rebase onto the remote branch, and push. A push rejected because the remote moved
  * gets one more fetch, rebase, and push. Can't reach the remote: the commit
  * stays local and the result says so. A rebase conflict throws, with the
  * rebase aborted and the local commit kept. In local mode, it only rebuilds
@@ -276,56 +247,67 @@ export function syncKnowledge(
   if (state.problem) throw new Error(state.problem);
   const dir = knowledgeDir(workspace, config);
   const branch = knowledgeBranch(config);
-  const { done, published } = withLock(workspace, "knowledge", (): { done: string[]; published: boolean } => {
-    const done: string[] = [];
-    const unpublished = (why: string) => ({ done: [...done, why], published: false });
-    ensureGitignore(dir);
-    // Ignoring a file the repo already tracks does nothing, so untrack it too.
-    gitOrThrow(dir, ["rm", "-r", "--cached", "--quiet", "--ignore-unmatch", "--", ...IGNORED.map(ignoredPathspec)]);
-    gitOrThrow(dir, ["add", "--all"]);
-    if (!git(dir, ["diff", "--cached", "--quiet"]).ok) {
-      gitOrThrow(dir, ["commit", "--quiet", "-m", message]);
-      done.push("committed local changes");
-    }
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      const fetch = git(dir, ["fetch", "--quiet", "origin"], NETWORK_TIMEOUT_MS);
-      if (!fetch.ok) {
-        return unpublished(`couldn't reach ${config.knowledge.repo} (${firstLine(fetch.stderr)}); run \`mahler knowledge sync\` later to publish`);
-      }
-      const remote = `refs/remotes/origin/${branch}`;
-      if (git(dir, ["rev-parse", "--verify", "--quiet", remote]).ok) {
-        const behind = Number(git(dir, ["rev-list", "--count", `HEAD..${remote}`]).stdout || 0);
-        if (behind > 0) {
-          const rebase = git(dir, ["rebase", "--quiet", remote]);
-          if (!rebase.ok && !rebaseInProgress(dir)) {
-            // It never started: a note was edited after this sync committed.
-            return unpublished("notes changed while syncing; run `mahler knowledge sync` again to publish");
-          }
-          if (!rebase.ok) {
-            const conflicts = git(dir, ["diff", "--name-only", "--diff-filter=U"]).stdout.split("\n").filter(Boolean);
-            git(dir, ["rebase", "--abort"]);
-            throw new Error(
-              `Knowledge sync stopped: your changes conflict with the remote in ${conflicts.join(", ") || "the store"}. Your commit is kept locally in ${dir}; merge the notes by hand there (git pull --rebase), then run \`mahler knowledge sync\`.`,
-            );
-          }
-          done.push(`pulled ${behind} ${behind === 1 ? "commit" : "commits"}`);
-        }
-      }
-      const ahead = git(dir, ["rev-parse", "--verify", "--quiet", remote]).ok
-        ? Number(git(dir, ["rev-list", "--count", `${remote}..HEAD`]).stdout || 0)
-        : commitCount(dir);
-      if (ahead === 0) return { done, published: true };
-      const push = git(dir, ["push", "--quiet", "-u", "origin", `HEAD:refs/heads/${branch}`], NETWORK_TIMEOUT_MS);
-      if (push.ok) return { done: [...done, `pushed ${ahead} ${ahead === 1 ? "commit" : "commits"}`], published: true };
-      const rejected = /\[rejected\]|non-fast-forward|fetch first/i.test(push.stderr);
-      if (!rejected) {
-        return unpublished(`couldn't push to ${config.knowledge.repo} (${firstLine(push.stderr)}); run \`mahler knowledge sync\` later to publish`);
-      }
-    }
-    return unpublished("the remote kept moving, so nothing was pushed; run `mahler knowledge sync` again");
-  }, lockWaitMs);
+  const repo = config.knowledge.repo;
+  const { done, published } = withLock(
+    workspace,
+    "knowledge",
+    () => {
+      ensureGitignore(dir);
+      return prPublish(config) ? prModeSync(dir, branch, repo, message) : directSync(dir, branch, repo, message);
+    },
+    lockWaitMs,
+  );
   writeIndexes(workspace, config);
   return { summary: `Knowledge sync: ${done.length > 0 ? done.join("; ") : "already up to date"}.`, published };
+}
+
+/** Direct publish: commit, rebase onto the remote branch, push (one retry). */
+function directSync(dir: string, branch: string, repo: string, message: string): { done: string[]; published: boolean } {
+  const done: string[] = [];
+  const unpublished = (why: string) => ({ done: [...done, why], published: false });
+  // Ignoring a file the repo already tracks does nothing, so untrack it too.
+  gitOrThrow(dir, ["rm", "-r", "--cached", "--quiet", "--ignore-unmatch", "--", ...IGNORED.map(ignoredPathspec)]);
+  gitOrThrow(dir, ["add", "--all"]);
+  if (!git(dir, ["diff", "--cached", "--quiet"]).ok) {
+    gitOrThrow(dir, ["commit", "--quiet", "-m", message]);
+    done.push("committed local changes");
+  }
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const fetch = git(dir, ["fetch", "--quiet", "origin"], NETWORK_TIMEOUT_MS);
+    if (!fetch.ok) {
+      return unpublished(`couldn't reach ${repo} (${firstLine(fetch.stderr)}); run \`mahler knowledge sync\` later to publish`);
+    }
+    const remote = `refs/remotes/origin/${branch}`;
+    if (git(dir, ["rev-parse", "--verify", "--quiet", remote]).ok) {
+      const behind = Number(git(dir, ["rev-list", "--count", `HEAD..${remote}`]).stdout || 0);
+      if (behind > 0) {
+        const rebase = git(dir, ["rebase", "--quiet", remote]);
+        if (!rebase.ok && !rebaseInProgress(dir)) {
+          // It never started: a note was edited after this sync committed.
+          return unpublished("notes changed while syncing; run `mahler knowledge sync` again to publish");
+        }
+        if (!rebase.ok) {
+          const conflicts = git(dir, ["diff", "--name-only", "--diff-filter=U"]).stdout.split("\n").filter(Boolean);
+          git(dir, ["rebase", "--abort"]);
+          throw new Error(
+            `Knowledge sync stopped: your changes conflict with the remote in ${conflicts.join(", ") || "the store"}. Your commit is kept locally in ${dir}; merge the notes by hand there (git pull --rebase), then run \`mahler knowledge sync\`.`,
+          );
+        }
+        done.push(`pulled ${behind} ${behind === 1 ? "commit" : "commits"}`);
+      }
+    }
+    const ahead = git(dir, ["rev-parse", "--verify", "--quiet", remote]).ok
+      ? Number(git(dir, ["rev-list", "--count", `${remote}..HEAD`]).stdout || 0)
+      : commitCount(dir);
+    if (ahead === 0) return { done, published: true };
+    const push = git(dir, ["push", "--quiet", "-u", "origin", `HEAD:refs/heads/${branch}`], NETWORK_TIMEOUT_MS);
+    if (push.ok) return { done: [...done, `pushed ${ahead} ${ahead === 1 ? "commit" : "commits"}`], published: true };
+    const rejected = /\[rejected\]|non-fast-forward|fetch first/i.test(push.stderr);
+    if (!rejected) {
+      return unpublished(`couldn't push to ${repo} (${firstLine(push.stderr)}); run \`mahler knowledge sync\` later to publish`);
+    }
+  }
+  return unpublished("the remote kept moving, so nothing was pushed; run `mahler knowledge sync` again");
 }
 
 export interface SyncResult {
@@ -341,10 +323,6 @@ function rebaseInProgress(dir: string): boolean {
 /** `.DS_Store` appears in any folder; the rest sit at the store's root. */
 function ignoredPathspec(entry: string): string {
   return entry.endsWith("/") ? entry.slice(0, -1) : entry === ".DS_Store" ? ":(glob)**/.DS_Store" : entry;
-}
-
-function firstLine(text: string): string {
-  return text.split("\n").find((line) => line.trim() !== "")?.replace(/^(fatal|error): /, "") ?? "unknown error";
 }
 
 /**

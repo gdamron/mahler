@@ -3,7 +3,8 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
 import { decisionsDir, knowledgeDir, knowledgeIndex, readLedger, readNotes } from "../knowledge.js";
-import { storeState } from "../knowledge-repo.js";
+import { prPublish, storeState } from "../knowledge-repo.js";
+import { frontmatterField, pendingNotes, readProposals } from "../knowledge-pr.js";
 import { modelConfigProblems, tierVariants } from "../models.js";
 import { spotlightFinding } from "../spotlight.js";
 import {
@@ -373,20 +374,59 @@ export function knowledgeFindings(workspace: string, config: HarnessConfig): Fin
       findings.push({ level: "error", message: `knowledge store: ${state.problem}` });
       return findings;
     }
-    findings.push({ level: "ok", message: `knowledge store: clone of ${repo} on ${state.branch}` });
-    if (publish === "pr") {
-      findings.push({ level: "warn", message: 'knowledge.publish "pr" is not supported yet; learn and sync refuse to publish until it is "direct"' });
+    findings.push({
+      level: "ok",
+      message: `knowledge store: clone of ${repo} on ${state.branch}${prPublish(config) ? ", publishing through PRs" : ""}`,
+    });
+    if (publish !== undefined && publish !== "direct" && publish !== "pr") {
+      findings.push({ level: "error", message: `knowledge.publish must be "direct" or "pr", not ${JSON.stringify(publish)}` });
     }
-    if ((state.ahead ?? 0) > 0) {
-      findings.push({ level: "warn", message: `knowledge store has ${state.ahead} unpublished ${state.ahead === 1 ? "commit" : "commits"}; run \`mahler knowledge sync\`` });
-    }
-    if (state.dirty) {
-      findings.push({ level: "info", message: "knowledge store has uncommitted changes; the next sync commits and publishes them" });
+    if (prPublish(config)) {
+      findings.push(...pendingFindings(dir));
+      if ((state.ahead ?? 0) > 0) {
+        findings.push({ level: "warn", message: `knowledge store has ${state.ahead} local ${state.ahead === 1 ? "commit" : "commits"} that PR publish never pushes; sync explains how to publish them` });
+      }
+    } else {
+      if ((state.ahead ?? 0) > 0) {
+        findings.push({ level: "warn", message: `knowledge store has ${state.ahead} unpublished ${state.ahead === 1 ? "commit" : "commits"}; run \`mahler knowledge sync\`` });
+      }
+      if (state.dirty) {
+        findings.push({ level: "info", message: "knowledge store has uncommitted changes; the next sync commits and publishes them" });
+      }
     }
   }
   const index = resolve(dir, "INDEX.md");
   if (existsSync(dir) && (!existsSync(index) || readFileSync(index, "utf8") !== knowledgeIndex(dir, readNotes(dir)))) {
     findings.push({ level: "info", message: "knowledge INDEX.md is out of date; run `mahler knowledge index`" });
+  }
+  return findings;
+}
+
+/** A pending note older than this has waited too long for review. */
+const PENDING_REVIEW_DAYS = 7;
+
+/** PR publish: what waits for review, and what hasn't been proposed yet. */
+function pendingFindings(dir: string): Finding[] {
+  const findings: Finding[] = [];
+  const notes = pendingNotes(dir).map((file) => readFileSync(file, "utf8"));
+  const proposals = readProposals(dir);
+  const unopened = notes.filter((text) => !frontmatterField(text, "pr")).length + proposals.filter((p) => !p.url).length;
+  const cutoff = new Date(Date.now() - PENDING_REVIEW_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const stale = notes.filter((text) => (frontmatterField(text, "created") ?? cutoff) < cutoff).length;
+  if (notes.length + proposals.length > 0) {
+    findings.push({
+      level: "info",
+      message: `knowledge PRs awaiting review: ${notes.length} pending ${notes.length === 1 ? "note" : "notes"}, ${proposals.length} ${proposals.length === 1 ? "batch" : "batches"} of edits`,
+    });
+  }
+  if (unopened > 0) {
+    findings.push({ level: "warn", message: `${unopened} knowledge ${unopened === 1 ? "change has" : "changes have"} no PR yet; run \`mahler knowledge sync\`` });
+  }
+  if (stale > 0) {
+    findings.push({
+      level: "warn",
+      message: `${stale} pending knowledge ${stale === 1 ? "note has" : "notes have"} waited more than ${PENDING_REVIEW_DAYS} days for review; merge or close ${stale === 1 ? "its PR" : "their PRs"}`,
+    });
   }
   return findings;
 }

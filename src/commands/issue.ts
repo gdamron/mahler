@@ -96,10 +96,11 @@ function writeBrief(
   }
   ensureDir(paths.meta);
   // Pull notes others published, and rebuild the indexes: notes may also have
-  // been edited by hand (in Obsidian, say) since the last write. A brief never
-  // waits on the network: a failed sync warns and uses the local notes.
+  // been edited by hand (in Obsidian, say) since the last write. A brief waits
+  // on the network and on other syncs only briefly: a failed sync warns and
+  // uses the local notes.
   try {
-    const result = syncKnowledge(workspace, config);
+    const result = syncKnowledge(workspace, config, undefined, 15_000);
     if (!result.published) console.warn(result.summary);
   } catch (error) {
     writeIndexes(workspace, config);

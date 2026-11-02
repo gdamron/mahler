@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { withLock } from "../src/knowledge-repo.js";
 
@@ -16,8 +16,8 @@ const env = {
   GIT_COMMITTER_EMAIL: "t@t",
 };
 
-function run(args: string[]): { status: number | null; stdout: string; stderr: string } {
-  const result = spawnSync("node", [cliPath, ...args], { encoding: "utf8", env });
+function run(args: string[], extraEnv: Record<string, string> = {}): { status: number | null; stdout: string; stderr: string } {
+  const result = spawnSync("node", [cliPath, ...args], { encoding: "utf8", env: { ...env, ...extraEnv } });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
@@ -48,16 +48,20 @@ function workspace(repo?: string, notes: string[] = []): string {
   return dir;
 }
 
-function setRepo(dir: string, knowledge: Record<string, string>): { status: number | null; stdout: string; stderr: string } {
+function setRepo(
+  dir: string,
+  knowledge: Record<string, string>,
+  extraEnv: Record<string, string> = {},
+): { status: number | null; stdout: string; stderr: string } {
   const file = resolve(dir, ".harness/config.json");
   const config = JSON.parse(readFileSync(file, "utf8"));
   config.knowledge = { ...config.knowledge, ...knowledge };
   writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
-  return run(["install", dir]);
+  return run(["install", dir], extraEnv);
 }
 
-function learn(dir: string, title: string) {
-  return run(["learn", "--workspace", dir, "--title", title, "--description", `${title}.`]);
+function learn(dir: string, title: string, extraEnv: Record<string, string> = {}) {
+  return run(["learn", "--workspace", dir, "--title", title, "--description", `${title}.`], extraEnv);
 }
 
 const store = (dir: string) => resolve(dir, ".harness/knowledge");
@@ -137,7 +141,7 @@ test("switching a local store to a repo carries its notes into the clone", () =>
   const local = workspace(undefined, ["Local fact"]);
   const installed = setRepo(local, { repo: shared });
   assert.equal(installed.status, 0, installed.stderr);
-  assert.match(installed.stdout, /Copied 1 local note into the clone; `mahler knowledge sync` publishes them\. The old folder is at .*knowledge\.before-clone/);
+  assert.match(installed.stdout, /Copied 1 local note into the clone; `mahler knowledge sync` publishes them\.\nThe old folder is at .*knowledge\.before-clone;/);
   assert.ok(existsSync(noteFile(local, "remote-fact")));
   assert.ok(existsSync(noteFile(local, "local-fact")));
   assert.ok(existsSync(resolve(local, ".harness/knowledge.before-clone/notes/local-fact.md")));
@@ -193,7 +197,90 @@ test("the store lock reclaims a dead holder's lock and waits for a live one", ()
   assert.equal(withLock(dir, "knowledge", () => "ran"), "ran");
   assert.ok(!existsSync(lock), "released after running");
 
+  // A lock taken over while running isn't released by the old holder.
+  withLock(dir, "knowledge", () => writeFileSync(resolve(lock, "owner"), "someone else\n"));
+  assert.ok(existsSync(lock));
+  rmSync(lock, { recursive: true });
+
   mkdirSync(lock, { recursive: true });
   writeFileSync(resolve(lock, "owner"), `${process.pid}\n`);
   assert.throws(() => withLock(dir, "knowledge", () => "ran", 300), /Timed out waiting for .*knowledge\.lock/);
+});
+
+test("a relative or rewritten repo URL still counts as the store's origin", () => {
+  const shared = remote();
+  const near = workspace();
+  const installed = setRepo(near, { repo: relative(near, shared) });
+  assert.equal(installed.status, 0, installed.stderr);
+  const learned = learn(near, "Relative remotes work");
+  assert.equal(learned.status, 0, learned.stderr);
+  assert.match(learned.stdout, /pushed 1 commit/);
+
+  // insteadOf maps the configured URL onto the bare repo, as it might map
+  // https onto ssh; the clone's remote get-url then differs from config.
+  const rewrite = {
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: `url.${shared}.insteadOf`,
+    GIT_CONFIG_VALUE_0: "https://git.example.invalid/knowledge.git",
+  };
+  const far = workspace();
+  assert.equal(setRepo(far, { repo: "https://git.example.invalid/knowledge.git" }, rewrite).status, 0);
+  const synced = learn(far, "Rewritten remotes work", rewrite);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /pushed 1 commit/);
+  assert.ok(existsSync(noteFile(far, "relative-remotes-work")), "the clone has the other workspace's note");
+  assert.match(run(["doctor", far], rewrite).stdout, /ok +knowledge store: clone of/);
+});
+
+test("generated and editor files the remote tracks are untracked, so they can't conflict", () => {
+  const shared = remote();
+  const seed = mkdtempSync(resolve(tmpdir(), "mahler-seed-"));
+  spawnSync("git", ["clone", "-q", shared, seed], { env });
+  mkdirSync(resolve(seed, ".obsidian"));
+  writeFileSync(resolve(seed, ".obsidian/workspace.json"), "{}\n");
+  writeFileSync(resolve(seed, "INDEX.md"), "# Knowledge Index\n");
+  git(seed, ["add", "-A"]);
+  git(seed, ["commit", "-q", "-m", "seed"]);
+  git(seed, ["push", "-q", "origin", "HEAD:main"]);
+
+  const a = workspace(shared);
+  const b = workspace(shared);
+  writeFileSync(resolve(store(a), ".obsidian/workspace.json"), '{"open":"a"}\n');
+  writeFileSync(resolve(store(b), ".obsidian/workspace.json"), '{"open":"b"}\n');
+  assert.equal(learn(a, "First from a").status, 0);
+  const second = learn(b, "First from b");
+  assert.equal(second.status, 0, second.stderr);
+  assert.match(second.stdout, /pushed 1 commit/);
+  const tracked = git(shared, ["ls-tree", "-r", "--name-only", "main"]).split("\n");
+  assert.ok(!tracked.includes("INDEX.md"));
+  assert.ok(!tracked.includes(".obsidian/workspace.json"));
+  assert.match(readFileSync(resolve(store(b), ".obsidian/workspace.json"), "utf8"), /"b"/, "the local file stays");
+});
+
+test("switching keeps the old folder even when no notes carry over", () => {
+  const shared = remote();
+  const local = workspace();
+  writeFileSync(resolve(store(local), "README.md"), "# Our own readme\n");
+  const installed = setRepo(local, { repo: shared });
+  assert.equal(installed.status, 0, installed.stderr);
+  assert.doesNotMatch(installed.stdout, /Copied/);
+  assert.match(installed.stdout, /The old folder is at .*knowledge\.before-clone;/);
+  assert.match(readFileSync(resolve(local, ".harness/knowledge.before-clone/README.md"), "utf8"), /Our own readme/);
+
+  // A second switch doesn't overwrite the first backup.
+  rmSync(resolve(store(local), ".git"), { recursive: true });
+  assert.match(setRepo(local, { repo: shared }).stdout, /knowledge\.before-clone-2/);
+});
+
+test("a branch the remote doesn't have yet starts empty", () => {
+  const shared = remote();
+  const a = workspace(shared);
+  assert.equal(learn(a, "Only on main").status, 0);
+  const b = workspace();
+  assert.equal(setRepo(b, { repo: shared, branch: "other" }).status, 0);
+  assert.ok(!existsSync(noteFile(b, "only-on-main")));
+  assert.equal(learn(b, "Only on other").status, 0);
+  const onOther = git(shared, ["ls-tree", "-r", "--name-only", "other"]).split("\n");
+  assert.ok(onOther.includes("notes/only-on-other.md"));
+  assert.ok(!onOther.includes("notes/only-on-main.md"));
 });

@@ -164,8 +164,11 @@ sync.
 - `mahler knowledge sync`: in repo mode, pulls, publishes anything unpushed,
   clears pending notes once merged, and rebuilds the indexes. It runs
   automatically in `mahler issue` and `mahler task`, and after `learn`,
-  `verify`, and `import`. A sync that can't reach the remote keeps the commit
-  and warns; the next sync publishes it.
+  `verify`, and `import`. A sync that can't reach the remote within 30
+  seconds keeps the commit and warns; the next sync publishes it. Git never
+  prompts for credentials. Besides `INDEX.md` and `pending/`, the store's repo
+  ignores (and untracks) `.obsidian/`, `.trash/`, and `.DS_Store`, so editor
+  state can't conflict between people.
 - `mahler knowledge verify <slug>`: sets `verified:` to today.
 - `mahler knowledge import <ledger-note> [--title t] [--description d]
   [--tags a,b] [--repos r] [--paths glob,glob] [--slug s] [--archive]`:
@@ -202,7 +205,8 @@ Both stores use the same shape and backend code:
   them) and keeps the old folder beside it; a note that differs between the
   two stops the install with nothing changed. Doctor reports a folder that
   isn't a clone of that repo, for example when `repo` was set without
-  rerunning install. Each
+  rerunning install. A `branch` the remote doesn't have yet starts empty,
+  not from the remote's default branch. Each
   workspace has its own store; the repo is how that store is shared between
   machines and people working in the same workspace.
 - `publish: "direct"` (the default): `learn` commits on `branch` and pushes. On

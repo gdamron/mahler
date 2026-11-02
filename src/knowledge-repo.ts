@@ -11,6 +11,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { dirname, relative, resolve, sep } from "node:path";
 import { knowledgeDir, writeIndexes } from "./knowledge.js";
 import type { HarnessConfig } from "./types.js";
@@ -21,8 +22,15 @@ import type { HarnessConfig } from "./types.js";
  * Without `repo`, the store is a plain local folder and none of this runs.
  */
 
-/** Generated or machine-local files the store's repo never tracks. */
-const IGNORED = ["INDEX.md", "pending/"];
+/**
+ * Generated or machine-local files the store's repo never tracks: the index
+ * each clone builds, PR-mode pending notes, and editor and OS state that would
+ * otherwise conflict between people.
+ */
+const IGNORED = ["INDEX.md", "pending/", ".obsidian/", ".trash/", ".DS_Store"];
+
+/** Fetch and push give up after this, so a stalled remote can't hang a brief. */
+const NETWORK_TIMEOUT_MS = 30_000;
 
 /** A lock held longer than this belongs to a crashed process. */
 const STALE_LOCK_MS = 10 * 60 * 1000;
@@ -37,9 +45,38 @@ interface GitResult {
   stderr: string;
 }
 
-function git(dir: string, args: string[]): GitResult {
-  const result = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
-  return { ok: result.status === 0, stdout: (result.stdout ?? "").trim(), stderr: (result.stderr ?? "").trim() };
+/** Never prompt for credentials: there may be no one at the terminal. */
+const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
+
+function git(dir: string, args: string[], timeout?: number): GitResult {
+  const result = spawnSync("git", args, { cwd: dir, encoding: "utf8", env: GIT_ENV, timeout });
+  const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT";
+  return {
+    ok: result.status === 0,
+    stdout: (result.stdout ?? "").trim(),
+    stderr: timedOut ? `timed out after ${timeout} ms` : (result.stderr ?? "").trim(),
+  };
+}
+
+/**
+ * The remote to clone: a relative local path is relative to the workspace,
+ * not to wherever mahler happens to run.
+ */
+function repoUrl(workspace: string, repo: string): string {
+  return isLocalPath(repo) ? resolve(workspace, repo) : repo;
+}
+
+/** URLs (`scheme://`) and scp-style remotes (`host:path`) aren't local paths. */
+function isLocalPath(repo: string): boolean {
+  if (/^[A-Za-z]:[\\/]/.test(repo)) return true;
+  return !/^[A-Za-z][\w+.-]*:\/\//.test(repo) && !/^[^/\\]+:/.test(repo);
+}
+
+/** Whether a clone's configured origin is `repo`, allowing for path spellings. */
+function sameRepo(workspace: string, origin: string, repo: string): boolean {
+  const trim = (url: string) => url.replace(/\/+$/, "");
+  if (isLocalPath(origin) && isLocalPath(repo)) return resolve(workspace, origin) === resolve(workspace, repo);
+  return trim(origin) === trim(repo);
 }
 
 function gitOrThrow(dir: string, args: string[]): string {
@@ -65,7 +102,11 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
   const temp = `${dir}.cloning`;
   rmSync(temp, { recursive: true, force: true });
   mkdirSync(dirname(dir), { recursive: true });
-  const clone = spawnSync("git", ["clone", "--quiet", repo, temp], { encoding: "utf8" });
+  const clone = spawnSync("git", ["clone", "--quiet", repoUrl(workspace, repo), temp], {
+    cwd: workspace,
+    encoding: "utf8",
+    env: GIT_ENV,
+  });
   if (clone.status !== 0) {
     rmSync(temp, { recursive: true, force: true });
     throw new Error(`Couldn't clone the knowledge repo ${repo}: ${(clone.stderr ?? "").trim()}`);
@@ -102,9 +143,9 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
       copyFileSync(resolve(dir, file), resolve(temp, file));
       if (isNote(file)) carried += 1;
     }
-    if (carried > 0) {
-      kept = `${dir}.before-clone`;
-      rmSync(kept, { recursive: true, force: true });
+    if (files.length > 0) {
+      // Keep the old folder: the repo's copy won for files that aren't notes.
+      kept = unusedPath(`${dir}.before-clone`);
       renameSync(dir, kept);
     } else {
       rmSync(dir, { recursive: true, force: true });
@@ -115,21 +156,32 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
   const lines = [`Cloned the knowledge store from ${repo} into ${dir}`];
   if (carried > 0) {
     lines.push(
-      `Copied ${carried} local ${carried === 1 ? "note" : "notes"} into the clone; \`mahler knowledge sync\` publishes them. The old folder is at ${kept}; delete it once you've checked.`,
+      `Copied ${carried} local ${carried === 1 ? "note" : "notes"} into the clone; \`mahler knowledge sync\` publishes them.`,
     );
   }
+  if (kept) lines.push(`The old folder is at ${kept}; delete it once you've checked.`);
   return lines.join("\n");
 }
 
+/** Notes the repo tracks (pending notes are machine-local). */
 function isNote(file: string): boolean {
-  return /^(notes|archive|pending)[\\/].*\.md$/.test(file);
+  return /^(notes|archive)[\\/].*\.md$/.test(file);
+}
+
+function unusedPath(base: string): string {
+  let candidate = base;
+  for (let n = 2; existsSync(candidate); n += 1) candidate = `${base}-${n}`;
+  return candidate;
 }
 
 function checkOutBranch(dir: string, branch: string): void {
   if (git(dir, ["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${branch}`]).ok) {
     gitOrThrow(dir, ["checkout", "--quiet", "-B", branch, "--track", `origin/${branch}`]);
   } else if (git(dir, ["rev-parse", "--verify", "--quiet", "HEAD"]).ok) {
-    gitOrThrow(dir, ["checkout", "--quiet", "-B", branch]);
+    // The remote has other branches but not this one: start it empty rather
+    // than from whatever the default branch holds.
+    gitOrThrow(dir, ["checkout", "--quiet", "--orphan", branch]);
+    gitOrThrow(dir, ["rm", "-r", "-f", "--quiet", "--ignore-unmatch", "."]);
   } else {
     // An empty remote: the first sync creates the branch.
     gitOrThrow(dir, ["symbolic-ref", "HEAD", `refs/heads/${branch}`]);
@@ -168,8 +220,9 @@ export function storeState(workspace: string, config: HarnessConfig): StoreState
       problem: `${dir} exists but isn't a clone of ${repo}: move it aside, run \`mahler install\` to clone, copy its notes back in, then run \`mahler knowledge sync\``,
     };
   }
-  const origin = git(dir, ["remote", "get-url", "origin"]);
-  if (!origin.ok || origin.stdout !== repo) {
+  // The configured URL, not `remote get-url`, which applies insteadOf rewrites.
+  const origin = git(dir, ["config", "--get", "remote.origin.url"]);
+  if (!origin.ok || !sameRepo(workspace, origin.stdout, repo)) {
     return { problem: `${dir} is a clone of ${origin.stdout || "(no origin)"}, not ${repo}` };
   }
   for (const marker of ["rebase-merge", "rebase-apply", "MERGE_HEAD"]) {
@@ -212,6 +265,7 @@ export function syncKnowledge(
   workspace: string,
   config: HarnessConfig,
   message = "knowledge: update notes",
+  lockWaitMs = 60_000,
 ): SyncResult {
   if (!config.knowledge.repo) {
     writeIndexes(workspace, config);
@@ -226,13 +280,15 @@ export function syncKnowledge(
     const done: string[] = [];
     const unpublished = (why: string) => ({ done: [...done, why], published: false });
     ensureGitignore(dir);
+    // Ignoring a file the repo already tracks does nothing, so untrack it too.
+    gitOrThrow(dir, ["rm", "-r", "--cached", "--quiet", "--ignore-unmatch", "--", ...IGNORED.map(ignoredPathspec)]);
     gitOrThrow(dir, ["add", "--all"]);
     if (!git(dir, ["diff", "--cached", "--quiet"]).ok) {
       gitOrThrow(dir, ["commit", "--quiet", "-m", message]);
       done.push("committed local changes");
     }
     for (let attempt = 1; attempt <= 2; attempt += 1) {
-      const fetch = git(dir, ["fetch", "--quiet", "origin"]);
+      const fetch = git(dir, ["fetch", "--quiet", "origin"], NETWORK_TIMEOUT_MS);
       if (!fetch.ok) {
         return unpublished(`couldn't reach ${config.knowledge.repo} (${firstLine(fetch.stderr)}); run \`mahler knowledge sync\` later to publish`);
       }
@@ -241,6 +297,10 @@ export function syncKnowledge(
         const behind = Number(git(dir, ["rev-list", "--count", `HEAD..${remote}`]).stdout || 0);
         if (behind > 0) {
           const rebase = git(dir, ["rebase", "--quiet", remote]);
+          if (!rebase.ok && !rebaseInProgress(dir)) {
+            // It never started: a note was edited after this sync committed.
+            return unpublished("notes changed while syncing; run `mahler knowledge sync` again to publish");
+          }
           if (!rebase.ok) {
             const conflicts = git(dir, ["diff", "--name-only", "--diff-filter=U"]).stdout.split("\n").filter(Boolean);
             git(dir, ["rebase", "--abort"]);
@@ -255,7 +315,7 @@ export function syncKnowledge(
         ? Number(git(dir, ["rev-list", "--count", `${remote}..HEAD`]).stdout || 0)
         : commitCount(dir);
       if (ahead === 0) return { done, published: true };
-      const push = git(dir, ["push", "--quiet", "-u", "origin", `HEAD:refs/heads/${branch}`]);
+      const push = git(dir, ["push", "--quiet", "-u", "origin", `HEAD:refs/heads/${branch}`], NETWORK_TIMEOUT_MS);
       if (push.ok) return { done: [...done, `pushed ${ahead} ${ahead === 1 ? "commit" : "commits"}`], published: true };
       const rejected = /\[rejected\]|non-fast-forward|fetch first/i.test(push.stderr);
       if (!rejected) {
@@ -263,7 +323,7 @@ export function syncKnowledge(
       }
     }
     return unpublished("the remote kept moving, so nothing was pushed; run `mahler knowledge sync` again");
-  });
+  }, lockWaitMs);
   writeIndexes(workspace, config);
   return { summary: `Knowledge sync: ${done.length > 0 ? done.join("; ") : "already up to date"}.`, published };
 }
@@ -272,6 +332,15 @@ export interface SyncResult {
   summary: string;
   /** False when local commits couldn't reach the remote (offline, say). */
   published: boolean;
+}
+
+function rebaseInProgress(dir: string): boolean {
+  return ["rebase-merge", "rebase-apply"].some((marker) => existsSync(resolve(dir, ".git", marker)));
+}
+
+/** `.DS_Store` appears in any folder; the rest sit at the store's root. */
+function ignoredPathspec(entry: string): string {
+  return entry.endsWith("/") ? entry.slice(0, -1) : entry === ".DS_Store" ? ":(glob)**/.DS_Store" : entry;
 }
 
 function firstLine(text: string): string {
@@ -287,15 +356,17 @@ export function withLock<T>(workspace: string, name: string, fn: () => T, waitMs
   const lock = resolve(workspace, ".harness", "tmp", "locks", `${name}.lock`);
   mkdirSync(dirname(lock), { recursive: true });
   const deadline = Date.now() + waitMs;
+  const owner = `${process.pid} ${randomBytes(6).toString("hex")}\n`;
   for (;;) {
     try {
       mkdirSync(lock);
-      writeFileSync(resolve(lock, "owner"), `${process.pid}\n`);
+      writeFileSync(resolve(lock, "owner"), owner);
       break;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      if (lockIsStale(lock)) {
-        rmSync(lock, { recursive: true, force: true });
+      const stale = staleOwner(lock);
+      if (stale !== undefined) {
+        reclaim(lock, stale);
         continue;
       }
       if (Date.now() > deadline) {
@@ -307,21 +378,63 @@ export function withLock<T>(workspace: string, name: string, fn: () => T, waitMs
   try {
     return fn();
   } finally {
-    rmSync(lock, { recursive: true, force: true });
+    // Only release our own lock, in case it was reclaimed from under us.
+    let current: string | undefined;
+    try {
+      current = readFileSync(resolve(lock, "owner"), "utf8");
+    } catch {
+      current = undefined;
+    }
+    if (current === owner) rmSync(lock, { recursive: true, force: true });
   }
 }
 
-function lockIsStale(lock: string): boolean {
+/** The owner line of a lock whose holder has exited or that is too old. */
+function staleOwner(lock: string): string | undefined {
   try {
-    if (Date.now() - statSync(lock).mtimeMs > STALE_LOCK_MS) return true;
-    const pid = Number(readFileSync(resolve(lock, "owner"), "utf8"));
-    if (!Number.isInteger(pid) || pid <= 0) return false;
+    const owner = readFileSync(resolve(lock, "owner"), "utf8");
+    if (Date.now() - statSync(lock).mtimeMs > STALE_LOCK_MS) return owner;
+    const pid = Number(owner.split(/\s+/)[0]);
+    if (!Number.isInteger(pid) || pid <= 0) return undefined;
     process.kill(pid, 0);
-    return false;
+    return undefined;
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
     // ESRCH: the holder has exited. ENOENT: the lock vanished, or its owner
     // file isn't written yet; retry rather than steal it.
-    return code === "ESRCH";
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") return undefined;
+    try {
+      return readFileSync(resolve(lock, "owner"), "utf8");
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * Move a stale lock aside (atomic, so only one waiter gets it), and delete it
+ * only if it is still the stale one: another waiter may have reclaimed it and
+ * taken a fresh lock in between, and that one must be put back.
+ */
+function reclaim(lock: string, staleOwnerLine: string): void {
+  const aside = `${lock}.stale-${process.pid}-${randomBytes(4).toString("hex")}`;
+  try {
+    renameSync(lock, aside);
+  } catch {
+    return;
+  }
+  let owner: string | undefined;
+  try {
+    owner = readFileSync(resolve(aside, "owner"), "utf8");
+  } catch {
+    owner = undefined;
+  }
+  if (owner === staleOwnerLine) {
+    rmSync(aside, { recursive: true, force: true });
+    return;
+  }
+  try {
+    renameSync(aside, lock);
+  } catch {
+    rmSync(aside, { recursive: true, force: true });
   }
 }

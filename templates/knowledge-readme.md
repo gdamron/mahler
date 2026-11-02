@@ -13,7 +13,8 @@ When `knowledge.repo` is set in `.harness/config.json`, this folder is a git
 clone of that repo, shared by everyone working in the workspace. Mahler
 commits and pushes after each `learn`, `verify`, and `import`, and pulls when
 it writes a brief. After editing notes by hand, run `mahler knowledge sync`.
-`INDEX.md` is gitignored; each clone builds its own.
+`INDEX.md` is gitignored, since each clone builds its own, and so are
+Obsidian's settings (`.obsidian/`, `.trash/`) and `.DS_Store`.
 
 ## Commands
 

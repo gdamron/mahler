@@ -66,7 +66,7 @@ areas. Standard grants by role:
   worktree, commit, and push its slice branch. It does not open PRs, merge,
   force-push shared branches, change issue-tracker state, or delegate further.
 - **Reviewer:** read-only. It may run tests and checks to validate findings.
-- **Tester:** edit test files only, in its own tester worktree cut from the
+- **Tester:** edit test files only, in its own worktree outside `repos/`, cut from the
   base branch, and commit and push its tester branch. It does not read the
   implementation diff, merge its branch, freeze tests, open PRs, or delegate.
   Its parent merges the branch and records the freeze.

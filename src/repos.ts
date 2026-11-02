@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { configPath, loadConfig } from "./config.js";
-import type { HarnessConfig, RepoChecks } from "./types.js";
-import { listDirectories } from "./util.js";
+import type { HarnessConfig, RepoChecks, RepoConfig } from "./types.js";
+import { abs, listDirectories } from "./util.js";
 
 /** Git repos directly under the workspace root, with detected base branch and checks. */
 export function discoverRepos(workspace: string): HarnessConfig["repos"] {
@@ -89,4 +89,20 @@ function detectBaseBranch(repoPath: string): string {
     if (result.status === 0) return candidate;
   }
   return readGit(repoPath, ["branch", "--show-current"]) || "main";
+}
+
+/** Matches a worktree to its repo by shared git dir, falling back to the dir name. */
+export function repoForDir(
+  workspace: string,
+  repos: RepoConfig[],
+  dir: string,
+): RepoConfig | undefined {
+  const common = gitCommonDir(dir);
+  if (common) {
+    const match = repos.find(
+      (repo) => gitCommonDir(abs(workspace, repo.path)) === common,
+    );
+    if (match) return match;
+  }
+  return repos.find((repo) => repo.name === basename(dir));
 }

@@ -203,3 +203,64 @@ test("check reports changes to human-review paths", () => {
   assert.equal(result.status, 0, result.stdout);
   assert.match(result.stdout, /info app: changes paths in merge\.humanReviewPaths.*db\/migrations\/001\.sql/);
 });
+
+test("a range freeze takes only the tester's commits, and a merge commit counts against its first parent", () => {
+  const { workspace, app } = setup();
+  // The base branch moves on after the tester branched.
+  writeFileSync(resolve(app, "unrelated.txt"), "base work\n");
+  git(app, "add", ".");
+  git(app, "commit", "-qm", "base moves on");
+
+  const ranged = run([
+    "acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1",
+    "--repo", "app", "--commit", "main..tests",
+  ]);
+  assert.equal(ranged.status, 0, ranged.stderr);
+  assert.match(ranged.stdout, /Froze 1 acceptance file/);
+  assert.doesNotMatch(ranged.stdout, /unrelated\.txt/);
+
+  git(app, "merge", "-q", "--no-ff", "-m", "merge tests", "tests");
+  const merged = run([
+    "acceptance", "freeze", "--workspace", workspace, "--project", "p",
+    "--repo", "app", "--commit", "main",
+  ]);
+  assert.equal(merged.status, 0, merged.stderr);
+  assert.match(merged.stdout, /- tests\/accept\.txt/);
+  assert.doesNotMatch(merged.stdout, /unrelated\.txt/);
+
+  const halfRange = run([
+    "acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-2",
+    "--repo", "app", "--commit", "main..",
+  ]);
+  assert.notEqual(halfRange.status, 0);
+  assert.match(halfRange.stderr, /a range needs both ends/);
+});
+
+test("manifest needs --worktree when an issue has several worktrees of one repo", () => {
+  const { workspace, app, worktree } = setup();
+  const slice = resolve(workspace, "workspaces", "issues", "MAH-1", "repos", "app-ui");
+  git(app, "worktree", "add", "-q", "-b", "t/mah-1-ui", slice, "tests");
+
+  const ambiguous = run(["acceptance", "manifest", "--workspace", workspace, "--issue", "MAH-1"]);
+  assert.notEqual(ambiguous.status, 0);
+  assert.match(ambiguous.stderr, /several worktrees of app \(app, app-ui\)\. Pass --worktree/);
+
+  const picked = run(["acceptance", "manifest", "--workspace", workspace, "--issue", "MAH-1", "--worktree", "app-ui"]);
+  assert.equal(picked.status, 0, picked.stderr);
+  const manifest = JSON.parse(
+    readFileSync(resolve(workspace, ".harness", "issues", "MAH-1", "acceptance-manifest.json"), "utf8"),
+  );
+  assert.equal(manifest.repos.app.rev, git(slice, "rev-parse", "HEAD"));
+  assert.notEqual(manifest.repos.app.rev, git(worktree, "rev-parse", "HEAD"));
+});
+
+test("check warns when an issue's frozen tests belong to a different worktree", () => {
+  const { workspace } = setup();
+  const frozen = run([
+    "acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1",
+    "--repo", "app", "--commit", "tests", "--worktree", "app-ui",
+  ]);
+  assert.equal(frozen.status, 0, frozen.stderr);
+  const result = check(workspace);
+  assert.match(result.stdout, /warn app: issue MAH-1 has acceptance tests frozen in app for app-ui, not app/);
+});

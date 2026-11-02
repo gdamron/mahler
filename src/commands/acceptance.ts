@@ -4,6 +4,7 @@ import { basename, relative, resolve, sep } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
 import type { Finding, HarnessConfig, RepoConfig } from "../types.js";
+import { repoForDir } from "../repos.js";
 import { abs, listDirectories, slugify, writeFileEnsured } from "../util.js";
 
 /**
@@ -58,19 +59,13 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
   const commitArg = stringFlag(flags, "commit");
   if (!commitArg) throw new Error("--commit <sha> or --commit <base>..<sha> is required");
   const source = abs(workspace, repo.path);
-  const [from, to] = commitArg.includes("..")
-    ? commitArg.split(/\.\.\.?/)
-    : [undefined, commitArg];
-  const commit = gitOrThrow(source, ["rev-parse", "--verify", `${to}^{commit}`]);
-  const listed = from
-    ? gitOrThrow(source, ["diff", "--name-only", "--diff-filter=ACMR", from, commit])
-    : gitOrThrow(source, [
-        "diff-tree", "--no-commit-id", "--name-only", "-r", "--root",
-        "--diff-filter=ACMR", commit,
-      ]);
-  const files = listed.split("\n").filter(Boolean);
+  const commit = frozenCommit(source, commitArg);
+  const files = frozenFiles(source, commitArg, commit);
   if (files.length === 0) {
     throw new Error(`${commitArg} adds or changes no files in ${repo.name}; nothing to freeze.`);
+  }
+  if (scope.kind === "project" && stringFlag(flags, "worktree")) {
+    throw new Error("--worktree applies to issue freezes only; a project freeze applies to every worktree that contains its commit.");
   }
   const worktree =
     scope.kind === "issue" ? (stringFlag(flags, "worktree") ?? repo.name) : undefined;
@@ -113,13 +108,11 @@ function writeManifest(workspace: string, config: HarnessConfig, flags: Flags): 
   const issue = stringFlag(flags, "issue");
   const project = stringFlag(flags, "project");
   if (!issue && !project) throw new Error("Pass --issue <ISSUE> or --project <slug>.");
-  const worktrees = issue
-    ? resolve(issuePaths(workspace, config, issue).worktreeRoot, "repos")
-    : undefined;
+  const worktrees = issue ? issueWorktrees(workspace, config, issue, flags) : new Map<string, string>();
   const repos: Record<string, { rev: string; from: "worktree" | "base"; ref?: string; path?: string }> = {};
   for (const repo of config.repos) {
-    const worktree = worktrees ? resolve(worktrees, repo.name) : undefined;
-    if (worktree && existsSync(worktree)) {
+    const worktree = worktrees.get(repo.name);
+    if (worktree) {
       repos[repo.name] = {
         rev: gitOrThrow(worktree, ["rev-parse", "HEAD"]),
         from: "worktree",
@@ -164,10 +157,15 @@ function run(workspace: string, config: HarnessConfig, flags: Flags): void {
   const manifest = writeManifest(workspace, config, flags);
   const issue = stringFlag(flags, "issue");
   const issueCheckout = issue
-    ? resolve(issuePaths(workspace, config, issue).worktreeRoot, "repos", repo.name)
+    ? issueWorktrees(workspace, config, issue, flags).get(repo.name)
     : undefined;
-  const cwd =
-    issueCheckout && existsSync(issueCheckout) ? issueCheckout : abs(workspace, repo.path);
+  const cwd = issueCheckout ?? abs(workspace, repo.path);
+  if (!issueCheckout) {
+    const branch = spawnSync("git", ["branch", "--show-current"], { cwd, encoding: "utf8" }).stdout.trim();
+    if (branch !== repo.baseBranch) {
+      console.log(`warn: running the suite from ${cwd} on "${branch || "a detached HEAD"}", not ${repo.baseBranch}.`);
+    }
+  }
   const filled = command
     .replaceAll("<manifest>", shellQuote(manifest))
     .replaceAll("<project>", shellQuote(slugify(project ?? "")));
@@ -197,10 +195,15 @@ export function frozenAcceptanceFindings(
   const owner = issue ?? issueForDir(workspace, config, cwd);
   const sets: Array<{ set: FrozenSet; scope: string }> = [];
   if (owner) {
-    for (const set of readRecord(issuePaths(workspace, config, owner).meta).frozen) {
-      if (set.repo === repo.name && (set.worktree ?? repo.name) === basename(cwd)) {
-        sets.push({ set, scope: `issue ${owner}` });
-      }
+    const own = readRecord(issuePaths(workspace, config, owner).meta).frozen
+      .filter((set) => set.repo === repo.name);
+    const matched = own.filter((set) => (set.worktree ?? repo.name) === basename(cwd));
+    for (const set of matched) sets.push({ set, scope: `issue ${owner}` });
+    if (own.length > 0 && matched.length === 0) {
+      findings.push({
+        level: "warn",
+        message: `${label}: issue ${owner} has acceptance tests frozen in ${repo.name} for ${own.map((set) => set.worktree ?? repo.name).join(", ")}, not ${basename(cwd)}; they were not compared here`,
+      });
     }
   }
   const projects = resolve(workspace, ".harness", "projects");
@@ -215,7 +218,7 @@ export function frozenAcceptanceFindings(
   }
   for (const { set, scope } of sets) {
     const diff = spawnSync(
-      "git", ["diff", "--name-only", set.commit, "--", ...set.files],
+      "git", ["diff", "--name-only", set.commit, "--", ...set.files.map((file) => `:(top,literal)${file}`)],
       { cwd, encoding: "utf8" },
     );
     const short = set.commit.slice(0, 12);
@@ -246,6 +249,72 @@ function issueForDir(workspace: string, config: HarnessConfig, dir: string): str
   if (!rel || rel.startsWith("..")) return undefined;
   const [issue, repos] = rel.split(sep);
   return repos === "repos" ? issue : undefined;
+}
+
+/** The commit a `--commit <sha>` or `--commit <base>..<sha>` freeze pins. */
+function frozenCommit(source: string, commitArg: string): string {
+  const [from, to] = splitRange(commitArg);
+  if (from !== undefined && (!from || !to)) {
+    throw new Error(`--commit ${commitArg}: a range needs both ends, as in <base>..<sha>.`);
+  }
+  return gitOrThrow(source, ["rev-parse", "--verify", `${to}^{commit}`]);
+}
+
+/**
+ * Files the tester added or changed. A range counts only the range's own
+ * commits (from the merge base), so base-branch changes made after the
+ * tester branched are not frozen. A merge commit counts against its first
+ * parent.
+ */
+function frozenFiles(source: string, commitArg: string, commit: string): string[] {
+  const [from] = splitRange(commitArg);
+  const parents = gitOrThrow(source, ["rev-list", "--parents", "-n", "1", commit]).split(" ").length - 1;
+  const listed = from
+    ? gitOrThrow(source, ["diff", "--name-only", "--no-renames", "--diff-filter=AM", `${from}...${commit}`])
+    : parents === 0
+      ? gitOrThrow(source, ["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", "--diff-filter=AM", commit])
+      : gitOrThrow(source, ["diff", "--name-only", "--no-renames", "--diff-filter=AM", `${commit}^1`, commit]);
+  const files = listed.split("\n").filter(Boolean);
+  if (files.length === 0) {
+    throw new Error(`${commitArg} adds or changes no files; nothing to freeze.`);
+  }
+  return files;
+}
+
+function splitRange(commitArg: string): [string | undefined, string] {
+  const match = /^(.*?)\.\.\.?(.*)$/.exec(commitArg);
+  return match ? [match[1], match[2]] : [undefined, commitArg];
+}
+
+/**
+ * Each repo's worktree for an issue. A repo with several worktrees (slices)
+ * needs `--worktree <dir>[,<dir>...]` to say which one to test.
+ */
+function issueWorktrees(
+  workspace: string,
+  config: HarnessConfig,
+  issue: string,
+  flags: Flags,
+): Map<string, string> {
+  const root = resolve(issuePaths(workspace, config, issue).worktreeRoot, "repos");
+  const picked = (stringFlag(flags, "worktree") ?? "").split(",").map((dir) => dir.trim()).filter(Boolean);
+  const byRepo = new Map<string, string[]>();
+  for (const dir of listDirectories(root)) {
+    const repo = repoForDir(workspace, config.repos, resolve(root, dir));
+    if (!repo) continue;
+    byRepo.set(repo.name, [...(byRepo.get(repo.name) ?? []), dir]);
+  }
+  const result = new Map<string, string>();
+  for (const [name, dirs] of byRepo) {
+    const chosen = dirs.length === 1 ? dirs : dirs.filter((dir) => picked.includes(dir));
+    if (chosen.length !== 1) {
+      throw new Error(
+        `Issue ${issue} has several worktrees of ${name} (${dirs.join(", ")}). Pass --worktree <dir> to pick the one to test.`,
+      );
+    }
+    result.set(name, resolve(root, chosen[0]));
+  }
+  return result;
 }
 
 function scopeFrom(workspace: string, config: HarnessConfig, flags: Flags): Scope {

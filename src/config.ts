@@ -257,7 +257,11 @@ export function loadConfig(workspace: string): HarnessConfig {
         parsed.merge?.humanReviewPaths ?? defaults.merge.humanReviewPaths,
     },
     risk: {
-      labels: { ...defaults.risk.labels, ...parsed.risk?.labels },
+      labels: {
+        ...defaults.risk.labels,
+        ...legacyHighRiskLabel(parsed),
+        ...parsed.risk?.labels,
+      },
     },
     acceptance: { ...defaults.acceptance, ...parsed.acceptance },
     models: resolveModels(defaults.models, parsed.models as ModelsOverrides | undefined),
@@ -372,4 +376,15 @@ export function issuePaths(
     meta: resolve(workspace, ".harness", "issues", identifier),
     worktreeRoot: resolve(workspace, config.workspaceDir, "issues", identifier),
   };
+}
+
+/**
+ * Configs from before risk levels routed a `high-risk` label to the human.
+ * Until the install sets `risk.labels`, treat that label as the high risk
+ * label, so issues carrying it get high-risk verification rather than none.
+ */
+function legacyHighRiskLabel(parsed: { risk?: unknown; merge?: { humanReviewLabels?: string[] } }): { high?: string } {
+  if (parsed.risk) return {};
+  const label = parsed.merge?.humanReviewLabels?.find((candidate) => candidate.toLowerCase() === "high-risk");
+  return label ? { high: label } : {};
 }

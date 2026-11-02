@@ -59,9 +59,10 @@ The tester profile follows the acceptance-test skill. In short:
 - It works from the spec: `TASK.md`, the project's criteria, and public
   interfaces (types, API docs, CLI help). It does not read the implementation
   diff or the implementer's tests.
-- It works in its own worktree, cut from the base branch, under the issue's
-  `repos/` directory (for example `repos/<repo>-tests`), and commits to its
-  own branch.
+- It works in its own worktree, cut from the base branch, at
+  `<issue root>/tests/<repo>`, and commits to its own branch. The worktree
+  stays outside `repos/` because its tests fail until the implementation
+  lands, and `mahler check --issue` runs every worktree under `repos/`.
 - Each test names the criterion it checks.
 - It reports which criterion each test covers, and any criterion it could not
   test, with the reason.
@@ -75,10 +76,12 @@ mahler acceptance freeze --issue <ISSUE> --repo <repo> --commit <sha>
 # or, for several commits: --commit <base>..<sha>
 ```
 
-Then it merges the tester's branch into the issue branch. From then on,
-`mahler check` fails if a checked worktree's copy of those files differs from
-the frozen commit, or is missing. For a slice worktree, pass `--worktree
-<dir>`.
+Then it merges the tester's branch into the issue branch and removes the
+tester's worktree (`git worktree remove`). From then on, `mahler check` fails
+if a checked worktree's copy of those files differs from the frozen commit, or
+is missing. For a slice worktree, pass `--worktree <dir>`. A range freeze
+counts only the range's own commits, so base-branch changes made after the
+tester branched are not frozen.
 
 Only the tester changes frozen tests, and only after a dispute decision.
 
@@ -98,6 +101,13 @@ After a change, the conductor freezes again with the decision:
 `mahler acceptance freeze ... --reason "<decision>"`. The replaced freeze stays
 in the history. A dispute that changes what the human's project criteria mean
 goes to the human.
+
+For a project suite, the tester's fix goes through a PR in the acceptance
+repo, and `mahler check` on that branch would fail against the old freeze. So
+the composer freezes twice: first at the fix branch's commit, with
+`--reason`, so the PR's checks pass; then, once it merges, at the merged
+commit on the base branch, with `--reason "<decision>; merged"`, so the
+freeze applies to every branch that contains it.
 
 ## Project Acceptance
 
@@ -122,7 +132,9 @@ them into an acceptance suite that every issue in the project runs against.
   writes a revision manifest (each repo's issue worktree when it has one, and
   its base branch otherwise) and runs `acceptance.run` with `<manifest>` and
   `<project>` filled in. The suite reads the manifest to test those revisions.
-  `mahler acceptance manifest` writes the manifest alone.
+  When an issue has several worktrees of one repo (slices), pass `--worktree
+  <dir>` to name the one to test. `mahler acceptance manifest` writes the
+  manifest alone.
 - **Tracking it:** `COMPOSITION.md` keeps a table of each criterion, the
   issues that serve it, the tests that check it, and whether it passes.
 - **Done:** the composer runs the suite on the base branches after each wave

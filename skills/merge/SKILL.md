@@ -15,6 +15,8 @@ description: Decide whether a verified PR may be merged by an agent, then merge 
 
 - judgment
 - merge
+- risk
+- verification
 - pr
 - branching
 - workspace-safety

@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { basename, matchesGlob, resolve } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
-import { gitCommonDir } from "../repos.js";
+import { repoForDir } from "../repos.js";
 import { baseRef, frozenAcceptanceFindings } from "./acceptance.js";
 import type { Finding, HarnessConfig, RepoConfig } from "../types.js";
 import { abs, listDirectories } from "../util.js";
@@ -206,11 +206,11 @@ function humanReviewChanges(
     { cwd, encoding: "utf8" },
   );
   if (base.status !== 0) return [];
-  const diff = spawnSync("git", ["diff", "--name-only", base.stdout.trim()], {
+  const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", base.stdout.trim()], {
     cwd,
     encoding: "utf8",
   });
-  const untracked = spawnSync("git", ["ls-files", "--others", "--exclude-standard"], {
+  const untracked = spawnSync("git", ["ls-files", "--others", "--exclude-standard", "--full-name", ":/"], {
     cwd,
     encoding: "utf8",
   });
@@ -218,22 +218,6 @@ function humanReviewChanges(
     .split("\n")
     .filter(Boolean)
     .filter((file) => patterns.some((pattern) => matchesGlob(file, pattern)));
-}
-
-/** Matches a worktree to its repo by shared git dir, falling back to the dir name. */
-function repoForDir(
-  workspace: string,
-  repos: RepoConfig[],
-  dir: string,
-): RepoConfig | undefined {
-  const common = gitCommonDir(dir);
-  if (common) {
-    const match = repos.find(
-      (repo) => gitCommonDir(abs(workspace, repo.path)) === common,
-    );
-    if (match) return match;
-  }
-  return repos.find((repo) => repo.name === basename(dir));
 }
 
 function targetLabel(repo: RepoConfig, cwd: string): string {

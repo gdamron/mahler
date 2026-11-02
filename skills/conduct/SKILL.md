@@ -75,10 +75,11 @@ commit, handoff. Skip the rest; your parent owns them.
    your parent, notice when the work has grown into something else.
 3. **Tests first (high risk).** Before anyone implements, launch a tester
    (pick its tier with the delegate skill: a different model from the
-   implementer) to write acceptance tests from the spec in its own worktree,
-   cut from the base branch. Freeze its commit with `mahler acceptance freeze
-   --issue <ISSUE> --repo <repo> --commit <sha>`, then merge its branch into
-   the issue branch. The implementer makes those tests pass without changing
+   implementer) to write acceptance tests from the spec in its own worktree
+   at `<issue root>/tests/<repo>`, cut from the base branch. Freeze its
+   commit with `mahler acceptance freeze --issue <ISSUE> --repo <repo>
+   --commit <sha>`, merge its branch into the issue branch, and remove its
+   worktree. The implementer makes those tests pass without changing
    them.
 4. **Implement.** Do your own slice with the implement skill. For each
    delegated slice, use the delegate skill to pick the tier and write the

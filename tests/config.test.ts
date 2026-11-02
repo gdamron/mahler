@@ -65,6 +65,11 @@ test("loadConfig backfills risk labels, the acceptance suite, and human-review p
   assert.deepEqual(config.merge.humanReviewPaths, []);
   assert.deepEqual(config.risk.labels, { low: "risk:low", medium: "risk:medium", high: "danger" });
   assert.deepEqual(config.acceptance, { path: "acceptance" });
+
+  delete oldConfig.risk;
+  writeFileSync(resolve(workspace, ".harness", "config.json"), `${JSON.stringify(oldConfig)}\n`);
+  // A pre-risk config's high-risk review label doubles as the high risk label.
+  assert.equal(loadConfig(workspace).risk.labels.high, "high-risk");
 });
 
 test("loadConfig backfills Definition of Done for older config files", () => {

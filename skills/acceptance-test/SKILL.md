@@ -61,8 +61,8 @@ in project mode (see the verification policy).
    Write the test for the reading the spec most supports and flag it as a
    possible spec gap in your report.
 3. Create the worktree the brief names (for example
-   `<issue root>/repos/<repo>-tests`) from the base branch, on the brief's
-   branch.
+   `<issue root>/tests/<repo>`, outside `repos/`) from the base branch, on
+   the brief's branch.
 4. Write tests that check observable behavior: inputs, outputs, errors, and
    limits. Put the criterion's ID or quote in each test's name or a comment.
    Follow the repo's test conventions and put the tests where its other tests

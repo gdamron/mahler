@@ -38,6 +38,8 @@ export interface HarnessConfig {
   models: ModelsConfig;
   /** Caps on parallel agents and heavy commands; reported by `mahler capacity`. */
   concurrency: ConcurrencyConfig;
+  /** Where the knowledge store lives; see policies/knowledge.md. */
+  knowledge: KnowledgeConfig;
   /** Each runtime's profile; a reinstall keeps `profile` and `role` and refreshes the skill and policy lists. */
   agents: Record<string, AgentProfile>;
 }
@@ -101,6 +103,11 @@ export interface ProfileTiers {
   default: string;
   /** Tiers a parent may choose per launch; picking another is a recorded Tier 1 deviation. */
   allowed: string[];
+}
+
+export interface KnowledgeConfig {
+  /** The store's folder, relative to the workspace or absolute. */
+  path: string;
 }
 
 export interface ConcurrencyConfig {

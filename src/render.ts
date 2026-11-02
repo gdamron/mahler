@@ -81,6 +81,7 @@ export function sessionMarkdown(
   definitionOfDone: string[] = [],
   merge?: MergeConfig,
   risk?: RiskConfig,
+  knowledge = "",
 ): string {
   const profileLines = profile
     ? `- Profile: ${profile.name}
@@ -107,6 +108,7 @@ export function sessionMarkdown(
     definitionOfDone: definitionOfDoneChecklist(issue, definitionOfDone),
     risk: riskLines(issue, risk),
     merge: mergeRouting(issue, merge),
+    knowledge: knowledge || "No knowledge notes yet.",
   });
 }
 

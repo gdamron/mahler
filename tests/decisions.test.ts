@@ -41,7 +41,7 @@ function runDecide(
 function decisionFiles(workspace: string): string[] {
   const dir = resolve(workspace, ".harness", "decisions");
   return readdirSync(dir).filter(
-    (name) => name !== "README.md" && name.endsWith(".md"),
+    (name) => !["README.md", "INDEX.md"].includes(name) && name.endsWith(".md"),
   );
 }
 

@@ -22,6 +22,8 @@ description: Review an issue-scoped diff and report findings before handoff.
 
 - git diff and status commands in selected issue worktrees
 - repo-local test or check commands needed to validate findings
+- `mahler knowledge search --changed` (from the worktree) or
+  `mahler knowledge search <terms>`
 
 ## Expected Inputs
 
@@ -38,6 +40,9 @@ description: Review an issue-scoped diff and report findings before handoff.
   diff introduced it (see the review policy)
 - On a re-review: what the fix commits changed, rather than a fresh review of
   the whole diff
+- Knowledge notes the diff contradicts, as findings; and facts worth a new
+  note, proposed in the report (title, description, scope) for the conductor
+  to record
 - Updated `HANDOFF.md`, or, when delegated, findings reported to the
   conductor that owns it (record your own workflow deviations in
   `HANDOFF.md` either way)

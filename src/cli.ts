@@ -14,6 +14,7 @@ import { cleanup } from "./commands/cleanup.js";
 import { decide } from "./commands/decide.js";
 import { doctor } from "./commands/doctor.js";
 import { install } from "./commands/install.js";
+import { knowledge, learn } from "./commands/knowledge.js";
 import { acceptance } from "./commands/acceptance.js";
 import { createIssue, createProject, createTask, handoff } from "./commands/issue.js";
 import { printLinearTemplate } from "./commands/linear-template.js";
@@ -135,6 +136,39 @@ const commands: Record<string, Command> = {
       slug: "string",
     },
     run: (args) => decide(args.flags),
+  },
+  learn: {
+    usage:
+      'mahler learn --title "<claim>" --description "<one or two sentences>" [--tags a,b] [--repos r] [--paths glob,glob] [--body "<text>" | --body-file f] [--slug s] [--source ISSUE] [--workspace <path>]',
+    summary: "Record a fact as a knowledge note.",
+    positionals: 0,
+    flags: {
+      ...workspace,
+      title: "string",
+      description: "string",
+      tags: "string",
+      repos: "string",
+      paths: "string",
+      body: "string",
+      "body-file": "string",
+      slug: "string",
+      source: "string",
+    },
+    run: (args) => learn(args.flags),
+  },
+  knowledge: {
+    usage:
+      "mahler knowledge index | search [terms...] [--paths file,file | --changed] [--repo r] [--limit n] | verify <slug> [--workspace <path>]",
+    summary:
+      "Rebuild the knowledge and ledger indexes, search notes by terms or changed files, or mark a note verified today.",
+    positionals: 50,
+    flags: { ...workspace, paths: "string", changed: "boolean", repo: "string", limit: "string" },
+    run: (args) =>
+      knowledge(
+        required(args.rest[0], "action is required: index, search, or verify"),
+        args.rest.slice(1),
+        args.flags,
+      ),
   },
   check: {
     usage:

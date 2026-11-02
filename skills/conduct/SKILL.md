@@ -36,6 +36,8 @@ commit, handoff. Skip the rest; your parent owns them.
 - `mahler acceptance freeze --workspace <workspace> --issue <ISSUE> --repo <repo> --commit <sha>`
 - `mahler acceptance run --workspace <workspace> --project <slug> --issue <ISSUE>`
 - `mahler capacity --workspace <workspace>`
+- `mahler knowledge search`, `mahler learn`, and `mahler knowledge verify`
+  (see the knowledge policy)
 - `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
 - git worktree, branch, status, diff, log, add, commit, and push commands for
   the issue's own branches
@@ -76,6 +78,10 @@ commit, handoff. Skip the rest; your parent owns them.
    Record the shape and the reason in `HANDOFF.md`, with a rough estimate
    (PRs, changed lines). The estimate is not a limit. It is what lets you, and
    your parent, notice when the work has grown into something else.
+   Once you know which files the work will change, run `mahler knowledge
+   search --paths <repo>/<file>,...` (paths inside each repo, prefixed with
+   the repo's name, or `--repo <repo>` with plain paths) and read the notes it
+   finds; pass the relevant ones on in slice briefs.
 3. **Tests first (high risk).** Before anyone implements, launch a tester
    (pick its tier with the delegate skill: a different model from the
    implementer) to write acceptance tests from the spec in its own worktree
@@ -134,7 +140,10 @@ commit, handoff. Skip the rest; your parent owns them.
     the merge routing (labels and any human-review paths `mahler check`
     reported). Do not merge: the composer decides, or the human when you were
     tasked directly.
-11. **Report.** Update `HANDOFF.md` (you own it for this issue; phase
+11. **Record knowledge.** Write the notes this issue taught you, and the ones
+    slice conductors, testers, and reviewers proposed, with `mahler learn`;
+    update or verify existing notes the work confirmed or corrected.
+12. **Report.** Update `HANDOFF.md` (you own it for this issue; phase
     `ready-to-merge`) and reply to your parent with PR URLs, verification
     records, checks, review status, risks, and deviations.
 
@@ -147,7 +156,7 @@ issue:
 2. Run the implement skill in your worktree only, committing save points.
 3. Run `mahler check --path <worktree>`, then push your slice branch.
 4. Report the implementation policy's change summary, commit list, checks run,
-   and pushed branch to your parent. Your parent owns `HANDOFF.md`; record only
+   pushed branch, and any proposed knowledge notes to your parent. Your parent owns `HANDOFF.md`; record only
    your own workflow deviations there.
 
 Do not set up the issue, open PRs, write verification records, or delegate.

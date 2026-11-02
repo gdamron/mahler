@@ -242,7 +242,10 @@ Both stores use the same shape and backend code:
     edited file is three-way merged into the merged version, keeping any
     reviewer's changes, and proposed afresh. Folded edits are recorded in
     `pending/prs.json` before any file is touched, so an interrupted sync
-    can't lose them. A merged pending note waits for the pull that brings
+    can't lose them. The next sync folds them onto whatever the remote
+    holds by then. If the file was edited again in the meantime, the earlier
+    edits are saved under `pending/recovered/` instead of being chosen
+    between. A merged pending note waits for the pull that brings
     it; one whose later edit conflicts stays in `pending/` for a hand
     merge, which doctor reports.
   - **Closed:** files unchanged since their last push are dropped. Ones

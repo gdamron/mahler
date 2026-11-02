@@ -9,7 +9,7 @@ import {
   withInstallOptions,
 } from "../config.js";
 import { knowledgeDir, writeIndexes } from "../knowledge.js";
-import { cloneKnowledgeStore } from "../knowledge-repo.js";
+import { cloneStore, knowledgeStore, ledgerRepoProblem, ledgerStore } from "../knowledge-repo.js";
 import { agentNameCollisions, defaultModelFor, tierVariants } from "../models.js";
 import { parseProfileSource } from "../profiles.js";
 import {
@@ -62,6 +62,7 @@ export function install(workspaceInput: string, flags: Flags): void {
     models: previous?.models,
     concurrency: previous?.concurrency,
     knowledge: previous?.knowledge,
+    decisions: previous?.decisions,
     agents: previous?.agents,
   });
   // Fail before writing anything: a tier agent and a profile sharing a name
@@ -75,8 +76,13 @@ export function install(workspaceInput: string, flags: Flags): void {
   }
   ensureDir(resolve(workspace, ".harness", "policies"));
   ensureDir(resolve(workspace, ".harness", "agents", "profiles"));
+  const ledgerProblem = ledgerRepoProblem(workspace, config);
+  if (ledgerProblem) throw new Error(`Cannot install: ${ledgerProblem}.`);
+  // Reported at once: a later step may fail, and the ledger has switched by then.
+  const clonedLedger = cloneStore(workspace, ledgerStore(workspace, config));
+  if (clonedLedger) console.log(clonedLedger);
   ensureDir(resolve(workspace, ".harness", "decisions"));
-  const cloned = cloneKnowledgeStore(workspace, config);
+  const cloned = cloneStore(workspace, knowledgeStore(workspace, config));
   ensureDir(resolve(knowledgeDir(workspace, config), "notes"));
   ensureDir(resolve(workspace, ".agents", "skills"));
   ensureDir(resolve(workspace, ".codex", "agents"));

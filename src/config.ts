@@ -201,6 +201,7 @@ export function withInstallOptions(
     models?: HarnessConfig["models"];
     concurrency?: HarnessConfig["concurrency"];
     knowledge?: HarnessConfig["knowledge"];
+    decisions?: HarnessConfig["decisions"];
     agents?: HarnessConfig["agents"];
   },
 ): HarnessConfig {
@@ -217,6 +218,7 @@ export function withInstallOptions(
     models: options.models ?? config.models,
     concurrency: options.concurrency ?? config.concurrency,
     knowledge: options.knowledge ?? config.knowledge,
+    decisions: options.decisions ?? config.decisions,
     agents: withPreservedAgents(config.agents, options.agents),
     linear: {
       acceptedAssignees:

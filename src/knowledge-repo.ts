@@ -13,22 +13,95 @@ import {
 } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { dirname, relative, resolve, sep } from "node:path";
-import { knowledgeDir, writeIndexes } from "./knowledge.js";
+import { decisionsDir, knowledgeDir, writeIndexes } from "./knowledge.js";
 import { ensureExcluded, leavePrMode, prModeSync } from "./knowledge-pr.js";
 import { firstLine, git, GIT_ENV, gitOrThrow, IGNORED, NETWORK_TIMEOUT_MS } from "./knowledge-git.js";
 import type { HarnessConfig } from "./types.js";
 
 /**
- * Repo mode for the knowledge store: the store's folder is a clone of
- * `knowledge.repo`, and Mahler commits and pushes notes to `knowledge.branch`.
- * Without `repo`, the store is a plain local folder and none of this runs.
+ * Repo mode: a store's folder is a clone of its repo, and Mahler commits and
+ * pushes notes to its branch. The knowledge store uses `knowledge.repo`, and
+ * can publish through PRs instead. The decisions ledger can be backed up to
+ * `decisions.repo`, always publishing directly. Without a repo, a store is a
+ * plain local folder and none of this runs.
  */
+
+/** Install's clone gives up after this, so an unreachable repo can't hang it. */
+const CLONE_TIMEOUT_MS = 120_000;
 
 /** A lock held longer than this belongs to a crashed process. */
 const STALE_LOCK_MS = 10 * 60 * 1000;
 
 export function knowledgeBranch(config: HarnessConfig): string {
   return config.knowledge.branch ?? "main";
+}
+
+/** A store that can live in a git repo: the knowledge store or the decisions ledger. */
+export interface RepoStore {
+  /** The lock's name. */
+  name: "knowledge" | "decisions";
+  /** How messages name the store. */
+  label: string;
+  dir: string;
+  repo?: string;
+  branch: string;
+  /** Publish through PRs (knowledge only). */
+  pr: boolean;
+  /** Files a clone mustn't silently replace: notes, as opposed to the README. */
+  isNote: (file: string) => boolean;
+  /**
+   * A note that another machine already added under the same name is
+   * renamed rather than reported as a conflict: ledger notes are append-only,
+   * named by date and rule, and two machines can pick the same name.
+   */
+  renameClashes: boolean;
+}
+
+export function knowledgeStore(workspace: string, config: HarnessConfig): RepoStore {
+  return {
+    name: "knowledge",
+    label: "knowledge store",
+    dir: knowledgeDir(workspace, config),
+    repo: config.knowledge.repo,
+    branch: knowledgeBranch(config),
+    pr: prPublish(config),
+    isNote: (file) => /^(notes|archive)[\\/].*\.md$/.test(file),
+    renameClashes: false,
+  };
+}
+
+export function ledgerStore(workspace: string, config: HarnessConfig): RepoStore {
+  return {
+    name: "decisions",
+    label: "decisions ledger",
+    dir: decisionsDir(workspace),
+    repo: config.decisions?.repo,
+    branch: config.decisions?.branch ?? "main",
+    pr: false,
+    isNote: (file) => /^(archive[\\/])?[^\\/]+\.md$/.test(file) && file !== "README.md" && file !== "INDEX.md",
+    renameClashes: true,
+  };
+}
+
+/**
+ * Why the ledger can't share `knowledge.repo`'s branch: each store's sync
+ * would pull the other's files, and their READMEs conflict.
+ */
+export function ledgerRepoProblem(workspace: string, config: HarnessConfig): string | undefined {
+  const knowledge = config.knowledge.repo;
+  const decisions = config.decisions?.repo;
+  if (!knowledge || !decisions || !sameRepo(workspace, knowledge, decisions)) return undefined;
+  const branch = config.decisions?.branch ?? "main";
+  if (branch !== knowledgeBranch(config)) return undefined;
+  return `decisions.repo is knowledge.repo, on the same branch "${branch}"; give the ledger its own repo, or set decisions.branch to another branch`;
+}
+
+/** `x.md` → the first of `x-2.md`, `x-3.md`, … that isn't taken. */
+function freeName(file: string, taken: (candidate: string) => boolean): string {
+  const stem = file.replace(/\.md$/, "");
+  let candidate = file;
+  for (let n = 2; taken(candidate); n += 1) candidate = `${stem}-${n}.md`;
+  return candidate;
 }
 
 /**
@@ -53,18 +126,17 @@ function sameRepo(workspace: string, origin: string, repo: string): boolean {
 }
 
 /**
- * Install: when `knowledge.repo` is set and the store's folder isn't a git
- * clone yet, clone the repo and check out `knowledge.branch` (creating it when
- * the remote is empty). Notes already in a local store are copied into the
+ * Install: when the store has a repo and its folder isn't a git clone yet,
+ * clone the repo and check out the store's branch (creating it when the
+ * remote is empty). Notes already in a local store are copied into the
  * clone, to be published by the next sync, and the old folder is kept beside
  * it as `<path>.before-clone`. A file that differs between the two stops the
  * install with nothing changed. Returns what it did, or undefined when there
  * was nothing to do.
  */
-export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): string | undefined {
-  const { repo } = config.knowledge;
+export function cloneStore(workspace: string, store: RepoStore): string | undefined {
+  const { repo, dir, isNote } = store;
   if (!repo) return undefined;
-  const dir = knowledgeDir(workspace, config);
   if (existsSync(resolve(dir, ".git"))) return undefined;
   const temp = `${dir}.cloning`;
   rmSync(temp, { recursive: true, force: true });
@@ -73,18 +145,27 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
     cwd: workspace,
     encoding: "utf8",
     env: GIT_ENV,
+    timeout: CLONE_TIMEOUT_MS,
   });
   if (clone.status !== 0) {
     rmSync(temp, { recursive: true, force: true });
-    throw new Error(`Couldn't clone the knowledge repo ${repo}: ${(clone.stderr ?? "").trim()}`);
+    const code = (clone.error as NodeJS.ErrnoException | undefined)?.code;
+    const why =
+      code === "ETIMEDOUT"
+        ? `timed out after ${CLONE_TIMEOUT_MS / 1000} s`
+        : code === "ENOENT"
+          ? "git is not installed"
+          : (clone.stderr ?? "").trim();
+    throw new Error(`Couldn't clone the ${store.name} repo ${repo}: ${why}`);
   }
   try {
-    checkOutBranch(temp, knowledgeBranch(config));
+    checkOutBranch(temp, store.branch);
   } catch (error) {
     rmSync(temp, { recursive: true, force: true });
     throw error;
   }
   let carried = 0;
+  const renamed: string[] = [];
   let kept: string | undefined;
   if (existsSync(dir)) {
     const files = (readdirSync(dir, { recursive: true, withFileTypes: true }) as Dirent[])
@@ -99,7 +180,7 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
         existsSync(resolve(temp, file)) &&
         !readFileSync(resolve(temp, file)).equals(readFileSync(resolve(dir, file))),
     );
-    if (differ.length > 0) {
+    if (differ.length > 0 && !store.renameClashes) {
       rmSync(temp, { recursive: true, force: true });
       throw new Error(
         `Can't switch ${dir} to ${repo}: these files differ between the local store and the repo: ${differ.join(", ")}. Reconcile them, then rerun install.`,
@@ -110,6 +191,15 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
       copyFileSync(resolve(dir, file), resolve(temp, file));
       if (isNote(file)) carried += 1;
     }
+    // The ledger keeps both: the local note goes in beside the repo's under a free name.
+    if (store.renameClashes) {
+      for (const file of differ) {
+        const target = freeName(file, (candidate) => existsSync(resolve(temp, candidate)));
+        copyFileSync(resolve(dir, file), resolve(temp, target));
+        carried += 1;
+        renamed.push(`${file} as ${target}`);
+      }
+    }
     if (files.length > 0) {
       // Keep the old folder: the repo's copy won for files that aren't notes.
       kept = unusedPath(`${dir}.before-clone`);
@@ -119,21 +209,19 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
     }
   }
   renameSync(temp, dir);
-  if (prPublish(config)) ensureExcluded(dir);
+  if (store.pr) ensureExcluded(dir);
   else ensureGitignore(dir);
-  const lines = [`Cloned the knowledge store from ${repo} into ${dir}`];
+  const lines = [`Cloned the ${store.label} from ${repo} into ${dir}`];
   if (carried > 0) {
     lines.push(
       `Copied ${carried} local ${carried === 1 ? "note" : "notes"} into the clone; \`mahler knowledge sync\` publishes them.`,
     );
   }
+  if (renamed.length > 0) {
+    lines.push(`The repo already had notes with these names, so the local ones were copied in under new names: ${renamed.join(", ")}.`);
+  }
   if (kept) lines.push(`The old folder is at ${kept}; delete it once you've checked.`);
   return lines.join("\n");
-}
-
-/** Notes the repo tracks (pending notes are machine-local). */
-function isNote(file: string): boolean {
-  return /^(notes|archive)[\\/].*\.md$/.test(file);
 }
 
 function unusedPath(base: string): string {
@@ -178,14 +266,13 @@ export interface StoreState {
 }
 
 /** The store's clone, as far as local git knows (no fetch). */
-export function storeState(workspace: string, config: HarnessConfig): StoreState {
-  const { repo } = config.knowledge;
-  const dir = knowledgeDir(workspace, config);
+export function storeState(workspace: string, store: RepoStore): StoreState {
+  const { repo, dir } = store;
   if (!repo) return {};
   if (!existsSync(dir)) return { problem: `${dir} is missing; run \`mahler install\` to clone ${repo}` };
   if (!existsSync(resolve(dir, ".git"))) {
     return {
-      problem: `${dir} exists but isn't a clone of ${repo}: move it aside, run \`mahler install\` to clone, copy its notes back in, then run \`mahler knowledge sync\``,
+      problem: `${dir} exists but isn't a clone of ${repo}: run \`mahler install\`, which clones the repo, carries the notes over, and keeps the old folder beside it`,
     };
   }
   // The configured URL, not `remote get-url`, which applies insteadOf rewrites.
@@ -199,7 +286,7 @@ export function storeState(workspace: string, config: HarnessConfig): StoreState
     }
   }
   const branch = git(dir, ["symbolic-ref", "--short", "HEAD"]).stdout;
-  const expected = knowledgeBranch(config);
+  const expected = store.branch;
   if (branch !== expected) return { problem: `${dir} is on "${branch || "a detached HEAD"}", not "${expected}"`, branch };
   const counts = git(dir, ["rev-list", "--left-right", "--count", `HEAD...refs/remotes/origin/${expected}`]);
   const [ahead, behind] = counts.ok ? counts.stdout.split(/\s+/).map(Number) : [commitCount(dir), 0];
@@ -248,31 +335,62 @@ export function syncKnowledge(workspace: string, config: HarnessConfig, options:
     return { summary: "The knowledge store is a local folder (no knowledge.repo); indexes rebuilt.", published: true };
   }
   checkPublishMode(config);
-  const state = storeState(workspace, config);
-  if (state.problem) throw new Error(state.problem);
-  const dir = knowledgeDir(workspace, config);
-  const branch = knowledgeBranch(config);
-  const repo = config.knowledge.repo;
-  const { done, published } = withLock(
-    workspace,
-    "knowledge",
-    () => {
-      if (prPublish(config)) return prModeSync(dir, branch, repo, message, quick);
-      ensureGitignore(dir);
-      return directSync(dir, branch, repo, message);
-    },
-    lockWaitMs,
-  );
-  writeIndexes(workspace, config);
-  return { summary: `Knowledge sync: ${done.length > 0 ? done.join("; ") : "already up to date"}.`, published };
+  return syncStore(workspace, config, knowledgeStore(workspace, config), { ...options, message, lockWaitMs, quick }, "Knowledge sync");
 }
 
-/** Direct publish: commit, rebase onto the remote branch, push (one retry). */
-function directSync(dir: string, branch: string, repo: string, message: string): { done: string[]; published: boolean } {
+/**
+ * Back the decisions ledger up to `decisions.repo` (direct publish), or
+ * return undefined when it has no repo.
+ */
+export function syncLedger(workspace: string, config: HarnessConfig, options: SyncOptions = {}): SyncResult | undefined {
+  if (!config.decisions?.repo) return undefined;
+  const problem = ledgerRepoProblem(workspace, config);
+  if (problem) throw new Error(problem);
+  const { message = "decisions: update the ledger", lockWaitMs = 60_000 } = options;
+  return syncStore(workspace, config, ledgerStore(workspace, config), { message, lockWaitMs }, "Ledger sync");
+}
+
+function syncStore(
+  workspace: string,
+  config: HarnessConfig,
+  store: RepoStore,
+  options: Required<Pick<SyncOptions, "message" | "lockWaitMs">> & SyncOptions,
+  title: string,
+): SyncResult {
+  const state = storeState(workspace, store);
+  if (state.problem) throw new Error(state.problem);
+  const { dir, branch, repo } = store;
+  if (!repo) throw new Error(`The ${store.label} has no repo to sync with`);
+  const { done, published, renamed } = withLock<{ done: string[]; published: boolean; renamed?: Record<string, string> }>(
+    workspace,
+    store.name,
+    () => {
+      if (store.pr) return prModeSync(dir, branch, repo, options.message, options.quick ?? false);
+      ensureGitignore(dir);
+      return directSync(store, repo, options.message);
+    },
+    options.lockWaitMs,
+  );
+  writeIndexes(workspace, config);
+  return { summary: `${title}: ${done.length > 0 ? done.join("; ") : "already up to date"}.`, published, renamed };
+}
+
+/**
+ * Direct publish: commit, rebase onto the remote branch, push (one retry).
+ * For the knowledge store, first settle anything left from PR publish.
+ */
+function directSync(
+  store: RepoStore,
+  repo: string,
+  message: string,
+): { done: string[]; published: boolean; renamed: Record<string, string> } {
+  const { dir, branch } = store;
+  const renamed: Record<string, string> = {};
   // Left over from PR publish: settle its PRs, and publish what's still pending.
-  const left = leavePrMode(dir, branch);
+  const left: { done: string[]; blocked?: string } =
+    store.name === "knowledge" ? leavePrMode(dir, branch) : { done: [] };
   const done = left.done;
-  const unpublished = (why: string) => ({ done: [...done, why], published: false });
+  const unpublished = (why: string) => ({ done: [...done, why], published: false, renamed });
   if (left.blocked) return unpublished(left.blocked);
   // Ignoring a file the repo already tracks does nothing, so untrack it too.
   gitOrThrow(dir, ["rm", "-r", "--cached", "--quiet", "--ignore-unmatch", "--", ...IGNORED.map(ignoredPathspec)]);
@@ -290,6 +408,12 @@ function directSync(dir: string, branch: string, repo: string, message: string):
     if (git(dir, ["rev-parse", "--verify", "--quiet", remote]).ok) {
       const behind = Number(git(dir, ["rev-list", "--count", `HEAD..${remote}`]).stdout || 0);
       if (behind > 0) {
+        if (store.renameClashes) {
+          for (const [from, to] of Object.entries(renameClashes(store, remote, message))) {
+            renamed[from] = to;
+            done.push(`renamed ${from} (another machine had used the name) to ${to}`);
+          }
+        }
         const rebase = git(dir, ["rebase", "--quiet", remote]);
         if (!rebase.ok && !rebaseInProgress(dir)) {
           // It never started: a note was edited after this sync committed.
@@ -299,7 +423,7 @@ function directSync(dir: string, branch: string, repo: string, message: string):
           const conflicts = git(dir, ["diff", "--name-only", "--diff-filter=U"]).stdout.split("\n").filter(Boolean);
           git(dir, ["rebase", "--abort"]);
           throw new Error(
-            `Knowledge sync stopped: your changes conflict with the remote in ${conflicts.join(", ") || "the store"}. Your commit is kept locally in ${dir}; merge the notes by hand there (git pull --rebase), then run \`mahler knowledge sync\`.`,
+            `${store.name === "knowledge" ? "Knowledge" : "Ledger"} sync stopped: your changes conflict with the remote in ${conflicts.join(", ") || "the store"}. Your commit is kept locally in ${dir}; merge the notes by hand there (git pull --rebase), then run \`mahler knowledge sync\`.`,
           );
         }
         done.push(`pulled ${behind} ${behind === 1 ? "commit" : "commits"}`);
@@ -308,9 +432,9 @@ function directSync(dir: string, branch: string, repo: string, message: string):
     const ahead = git(dir, ["rev-parse", "--verify", "--quiet", remote]).ok
       ? Number(git(dir, ["rev-list", "--count", `${remote}..HEAD`]).stdout || 0)
       : commitCount(dir);
-    if (ahead === 0) return { done, published: true };
+    if (ahead === 0) return { done, published: true, renamed };
     const push = git(dir, ["push", "--quiet", "-u", "origin", `HEAD:refs/heads/${branch}`], NETWORK_TIMEOUT_MS);
-    if (push.ok) return { done: [...done, `pushed ${ahead} ${ahead === 1 ? "commit" : "commits"}`], published: true };
+    if (push.ok) return { done: [...done, `pushed ${ahead} ${ahead === 1 ? "commit" : "commits"}`], published: true, renamed };
     const rejected = /\[rejected\]|non-fast-forward|fetch first/i.test(push.stderr);
     if (!rejected) {
       return unpublished(`couldn't push to ${repo} (${firstLine(push.stderr)}); run \`mahler knowledge sync\` later to publish`);
@@ -321,8 +445,49 @@ function directSync(dir: string, branch: string, repo: string, message: string):
 
 export interface SyncResult {
   summary: string;
+  /** Ledger notes renamed because another machine had used the name: old path → new, relative to the store. */
+  renamed?: Record<string, string>;
   /** False when local commits couldn't reach the remote (offline, say). */
   published: boolean;
+}
+
+/**
+ * Rename local, unpushed notes whose names the remote already holds with
+ * other content, so the rebase doesn't stop on them. The local commits are
+ * squashed into one with the new names.
+ */
+function renameClashes(store: RepoStore, remote: string, message: string): Record<string, string> {
+  const { dir } = store;
+  const base = git(dir, ["merge-base", "HEAD", remote]);
+  // With rename detection on, an archive move isn't an add: archiving the
+  // same note on two machines is a real conflict, not a name clash.
+  const added = base.ok
+    ? git(dir, ["diff", "--name-only", "--find-renames", "--diff-filter=A", base.stdout, "HEAD"]).stdout
+    : git(dir, ["ls-tree", "-r", "--name-only", "HEAD"]).stdout;
+  const files = added.split("\n").filter((file) => file !== "");
+  const blob = (ref: string, file: string) => git(dir, ["rev-parse", "--verify", "--quiet", `${ref}:${file}`]);
+  const differs = (file: string) => {
+    const theirs = blob(remote, file);
+    return theirs.ok && theirs.stdout !== blob("HEAD", file).stdout;
+  };
+  // Only new notes, which sit at the top level; archive/ holds moved ones.
+  const clashes = files.filter((file) => store.isNote(file) && !/[\\/]/.test(file) && differs(file));
+  // No shared history: the README and .gitignore are both sides' own, and the remote's win, as at clone.
+  const theirs = base.ok ? [] : files.filter((file) => !store.isNote(file) && differs(file));
+  if (clashes.length === 0 && theirs.length === 0) return {};
+  if (base.ok) gitOrThrow(dir, ["reset", "--soft", "--quiet", base.stdout]);
+  else gitOrThrow(dir, ["update-ref", "-d", "HEAD"]);
+  if (theirs.length > 0) gitOrThrow(dir, ["checkout", remote, "--", ...theirs]);
+  const taken = (candidate: string) =>
+    [candidate, `archive/${candidate}`].some((path) => existsSync(resolve(dir, path)) || blob(remote, path).ok);
+  const renamed: Record<string, string> = {};
+  for (const file of clashes) {
+    const target = freeName(file, taken);
+    gitOrThrow(dir, ["mv", file, target]);
+    renamed[file] = target;
+  }
+  gitOrThrow(dir, ["commit", "--quiet", "-m", message]);
+  return renamed;
 }
 
 function rebaseInProgress(dir: string): boolean {

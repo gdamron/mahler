@@ -41,7 +41,8 @@ Removing a rule is usually a better result than adding one.
   - edit, merge, or retire knowledge notes, and `mahler knowledge verify
     <slug>` for ones you confirmed; then `mahler knowledge sync` once, to
     publish the hand edits when the store is a shared repo (with PR
-    publish, that opens one PR for the audit's edits)
+    publish, that opens one PR for the audit's edits) and to back up the
+    ledger's moves when it has a repo
   - edit `.harness/custom/` and the workspace instruction files, then
     `mahler install` to regenerate the native artifacts
 

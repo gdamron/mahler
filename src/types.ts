@@ -40,6 +40,8 @@ export interface HarnessConfig {
   concurrency: ConcurrencyConfig;
   /** Where the knowledge store lives; see policies/knowledge.md. */
   knowledge: KnowledgeConfig;
+  /** A repo to back up the decisions ledger to; without it, the ledger is a local folder. */
+  decisions?: DecisionsConfig;
   /** Each runtime's profile; a reinstall keeps `profile` and `role` and refreshes the skill and policy lists. */
   agents: Record<string, AgentProfile>;
 }
@@ -112,8 +114,16 @@ export interface KnowledgeConfig {
   repo?: string;
   /** The branch notes are published on (default "main"). */
   branch?: string;
-  /** How notes reach `branch`: "direct" pushes (the default); "pr" is not supported yet. */
+  /** How notes reach `branch`: "direct" pushes (the default); "pr" opens a PR for the human to merge. */
   publish?: "direct" | "pr";
+}
+
+/** The decisions ledger stays at `.harness/decisions`; a repo only backs it up. */
+export interface DecisionsConfig {
+  /** A git remote to back the ledger up to; not `knowledge.repo`'s branch. Always publishes directly. */
+  repo?: string;
+  /** The branch the ledger is pushed to (default "main"). */
+  branch?: string;
 }
 
 export interface ConcurrencyConfig {

@@ -29,7 +29,8 @@ import { repoForDir } from "../repos.js";
 import type { HarnessConfig } from "../types.js";
 import { slugify } from "../util.js";
 import { changedFiles } from "./check.js";
-import { prPublish, syncKnowledge } from "../knowledge-repo.js";
+import { prPublish, syncKnowledge, syncLedger } from "../knowledge-repo.js";
+import { publishLedger } from "./decide.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -121,7 +122,14 @@ function importLedgerNote(workspace: string, config: HarnessConfig, target: stri
     writeIndexes(workspace, config);
     console.log(`Archived the ledger note: ${archived}`);
   }
-  publish(workspace, config, `knowledge: import ${basename(file, ".md")}`, file);
+  try {
+    publish(workspace, config, `knowledge: import ${basename(file, ".md")}`, file);
+  } finally {
+    // A knowledge failure doesn't stop the ledger's backup.
+    if (archivedText !== undefined) {
+      publishLedger(workspace, config, `decisions: archive ${basename(source, ".md")}`, archived);
+    }
+  }
   if (!title || !description) {
     console.log(
       "Now rewrite the note for readers outside the issue: a title that states the fact as a claim, and a description that carries it (see .harness/policies/knowledge.md).",
@@ -233,9 +241,19 @@ export function knowledge(action: string, args: string[], flags: Flags): void {
       verify(workspace, config, required(args[0], "the note's slug is required"));
       return;
     case "sync": {
-      const result = syncKnowledge(workspace, config);
-      if (result.published) console.log(result.summary);
-      else console.warn(result.summary);
+      // Each store syncs on its own: a knowledge conflict doesn't stop the ledger's backup.
+      const errors: string[] = [];
+      for (const sync of [syncKnowledge, syncLedger]) {
+        try {
+          const result = sync(workspace, config);
+          if (!result) continue;
+          if (result.published) console.log(result.summary);
+          else console.warn(result.summary);
+        } catch (error) {
+          errors.push((error as Error).message);
+        }
+      }
+      if (errors.length > 0) throw new Error(errors.join("\n"));
       return;
     }
     case "import":

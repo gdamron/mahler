@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
 import { decisionsDir, knowledgeDir, knowledgeIndex, readLedger, readNotes } from "../knowledge.js";
-import { prPublish, storeState } from "../knowledge-repo.js";
+import { knowledgeStore, ledgerRepoProblem, ledgerStore, prPublish, storeState } from "../knowledge-repo.js";
 import { frontmatterField, pendingNotes, proposalStatus } from "../knowledge-pr.js";
 import { modelConfigProblems, tierVariants } from "../models.js";
 import { spotlightFinding } from "../spotlight.js";
@@ -90,6 +90,7 @@ export function doctor(workspaceInput: string): void {
         ".harness/decisions/ missing — created on install; agents append Tier-1 deviation notes here",
     });
   }
+  results.push(...ledgerRepoFindings(workspace, config));
   results.push(...knowledgeFindings(workspace, config));
 
   const installedSkills = new Set(installedSkillNames(workspace));
@@ -369,7 +370,7 @@ export function knowledgeFindings(workspace: string, config: HarnessConfig): Fin
   if (!repo) {
     findings.push({ level: "ok", message: `knowledge store: local folder ${dir}` });
   } else {
-    const state = storeState(workspace, config);
+    const state = storeState(workspace, knowledgeStore(workspace, config));
     if (state.problem) {
       findings.push({ level: "error", message: `knowledge store: ${state.problem}` });
       return findings;
@@ -401,6 +402,26 @@ export function knowledgeFindings(workspace: string, config: HarnessConfig): Fin
   const index = resolve(dir, "INDEX.md");
   if (existsSync(dir) && (!existsSync(index) || readFileSync(index, "utf8") !== knowledgeIndex(dir, readNotes(dir)))) {
     findings.push({ level: "info", message: "knowledge INDEX.md is out of date; run `mahler knowledge index`" });
+  }
+  return findings;
+}
+
+/** With `decisions.repo`: whether the ledger's clone is sound and backed up. */
+export function ledgerRepoFindings(workspace: string, config: HarnessConfig): Finding[] {
+  const store = ledgerStore(workspace, config);
+  if (!store.repo) return [];
+  const clash = ledgerRepoProblem(workspace, config);
+  if (clash) return [{ level: "error", message: `decisions ledger: ${clash}` }];
+  const state = storeState(workspace, store);
+  if (state.problem) return [{ level: "error", message: `decisions ledger: ${state.problem}` }];
+  const findings: Finding[] = [
+    { level: "ok", message: `decisions ledger: backed up to ${store.repo} on ${state.branch}` },
+  ];
+  if ((state.ahead ?? 0) > 0) {
+    findings.push({ level: "warn", message: `decisions ledger has ${state.ahead} ${state.ahead === 1 ? "commit" : "commits"} not backed up; run \`mahler knowledge sync\`` });
+  }
+  if (state.dirty) {
+    findings.push({ level: "info", message: "decisions ledger has uncommitted changes; the next sync backs them up" });
   }
   return findings;
 }

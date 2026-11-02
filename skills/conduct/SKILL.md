@@ -38,7 +38,7 @@ commit, handoff. Skip the rest; your parent owns them.
 - `mahler capacity --workspace <workspace>`
 - `mahler knowledge search`, `mahler learn`, and `mahler knowledge verify`
   (see the knowledge policy)
-- `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
+- `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`
 - git worktree, branch, status, diff, log, add, commit, and push commands for
   the issue's own branches
 - runtime-native sub-agent launch for slice conductors, testers, and reviewers

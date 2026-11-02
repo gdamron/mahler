@@ -29,7 +29,7 @@ description: Create an issue brief and worktrees from Linear issue metadata or a
 - `mahler issue <ISSUE> --agent <agent> --linear-file <issue.json>`
 - `mahler linear-template task` and
   `mahler task <slug> --agent <agent> --task-file <task.json>`
-- `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
+- `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`
 - git worktree commands for only the repos needed by the task
 - repo-local build, test, and inspection commands inside selected repo worktrees
 

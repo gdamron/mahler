@@ -94,7 +94,7 @@ mahler status --workspace /path/to/product-workspace
 mahler profile codex --workspace /path/to/product-workspace
 mahler can codex commit --workspace /path/to/product-workspace
 mahler handoff DEV-123 --workspace /path/to/product-workspace --agent codex
-mahler decide --rule scope --reason "expanded to fix adjacent bug" --issue FUG-123 --agent codex --workspace /path/to/product-workspace
+mahler decide --rule scope --description "Fixed an adjacent bug in scope" --reason "expanded to fix adjacent bug" --issue DEV-123 --agent codex --workspace /path/to/product-workspace
 mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue DEV-123 | --path <worktree>]
 mahler acceptance freeze --workspace /path/to/product-workspace --issue DEV-123 --repo <name> --commit <sha|base..sha> [--reason "<dispute decision>"]
 mahler acceptance freeze --workspace /path/to/product-workspace --project <slug> --repo <name> --commit <sha>
@@ -165,8 +165,8 @@ rather than piling up near-duplicates. Sessions don't read every note: each
 brief gets a `Relevant Knowledge` section matched on the issue's words and
 repos, conductors and reviewers run `mahler knowledge search --changed` to
 find notes about the files being changed, and `mahler knowledge search
-<terms>` covers the rest. `mahler knowledge verify` marks a note confirmed, so stale
-notes are visible.
+<terms>` covers the rest. `mahler knowledge verify` marks a note confirmed, so the
+audit can find notes nobody has checked in a long time.
 
 `mahler decide` appends a note to the decisions ledger
 (`.harness/decisions/<YYYY-MM-DD>-<slug>.md`): the cross-session record of
@@ -176,9 +176,12 @@ issue-local calls stay in `HANDOFF.md`, and facts about the code go in the
 knowledge store. Sessions read the generated `INDEX.md`, not every note. The
 ledger is append-only, and humans curate it, promoting recurring decisions
 into policy and moving stale notes to `.harness/decisions/archive/`. The
-composer's `audit` skill helps: now and then it reviews the ledger, overlays,
-instruction files, and config, and proposes what to archive, promote, update,
-or drop, for the human to approve.
+composer's `audit` skill helps: now and then it reviews the ledger, the
+knowledge store, overlays, instruction files, and config, and proposes what
+to archive, promote, update, or drop, for the human to approve. A ledger note
+that turns out to be a fact about the code moves to the knowledge store with
+`mahler knowledge import`. `mahler doctor` warns when the active ledger
+passes 20 notes.
 
 Install compiles canonical Mahler source into native agent artifacts:
 

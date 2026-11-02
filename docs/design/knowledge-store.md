@@ -165,10 +165,15 @@ sync.
   clears pending notes once merged, and rebuilds the indexes. It runs
   automatically in `mahler issue` and `mahler task`, and after `learn`.
 - `mahler knowledge verify <slug>`: sets `verified:` to today.
-- `mahler knowledge import <ledger-note>`: converts a ledger note into a
-  knowledge note draft. `rule` becomes the slug, `issue` becomes `sources`,
-  and the body is copied. The agent then writes the title and description. Used
-  by the audit during migration.
+- `mahler knowledge import <ledger-note> [--title t] [--description d]
+  [--tags a,b] [--repos r] [--paths glob,glob] [--slug s] [--archive]`:
+  converts a ledger note into a knowledge note. `rule` becomes the slug,
+  `issue` becomes `sources`, the body is copied, and the ledger date becomes
+  `created` and `verified`. The title and description default to the rule and
+  the ledger summary; the audit passes the rewritten ones the human approved.
+  `--archive` moves the ledger note to `archive/` with `imported-to: <slug>`,
+  and a note that has `imported-to` can't be imported again. Used by the
+  audit during migration.
 - `mahler doctor`: reports each store's mode, whether the clone exists and
   tracks its remote, whether the index is fresh, and how many pending notes
   have waited more than a week.

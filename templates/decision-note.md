@@ -5,7 +5,7 @@
 date: {{date}}
 issue: {{issue}}
 agent: {{agent}}
-rule: {{rule}}
+rule: {{rule}}{{description}}
 ---
 
 {{reason}}

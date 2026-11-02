@@ -15,6 +15,7 @@ export function decide(flags: Flags): void {
     stringFlag(flags, "reason"),
     "--reason is required (what you decided and why it improves outcome, safety, or efficiency)",
   );
+  const description = stringFlag(flags, "description")?.replace(/\s+/g, " ").trim();
   const issue = stringFlag(flags, "issue") ?? "unassigned";
   const agent = stringFlag(flags, "agent") ?? "unknown";
   const date = new Date().toISOString().slice(0, 10);
@@ -29,6 +30,7 @@ export function decide(flags: Flags): void {
       issue,
       agent,
       rule,
+      description: description ? `\ndescription: ${JSON.stringify(description)}` : "",
       reason: reason.trim(),
     }),
   );

@@ -15,6 +15,8 @@ any editor works. See `.harness/policies/knowledge.md` for the rules.
 - `mahler knowledge search <terms>`, or `--changed` from a worktree to find
   notes about the files the branch changes
 - `mahler knowledge verify <slug>`: the note still holds, as of today
+- `mahler knowledge import <ledger-note>`: turn a decisions ledger note into a
+  knowledge note (the audit uses it)
 
 ## Note Frontmatter
 

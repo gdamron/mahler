@@ -33,7 +33,7 @@ in project mode (see the verification policy).
 - repo-local build and test commands inside that worktree
 - `git status`, `git diff`, `git add`, `git commit` (via the commit skill)
 - `git push` for the tester branch only
-- `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
+- `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`
 
 ## Expected Inputs
 

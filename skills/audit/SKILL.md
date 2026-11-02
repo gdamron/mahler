@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Review the workspace's own workflow rules (the decisions ledger, custom overlays, instruction files, and config) and propose what to archive, promote, update, or drop, for the human to approve.
+description: Review the workspace's own workflow rules and records (the decisions ledger, the knowledge store, custom overlays, instruction files, and config) and propose what to archive, promote, update, or drop, for the human to approve.
 ---
 
 # Audit
@@ -16,8 +16,8 @@ Removing a rule is usually a better result than adding one.
 - "audit our policies", "review the decisions ledger", "clean up the rules"
 - a project or large piece of work has wrapped up
 - at session start, when the last audit is old (a month or so) or the active
-  ledger has grown long (a few dozen notes): suggest one to the human rather
-  than starting it unasked
+  ledger has grown long (`mahler doctor` warns past 20 notes): suggest one to
+  the human rather than starting it unasked
 
 ## Required Policies
 
@@ -29,22 +29,51 @@ Removing a rule is usually a better result than adding one.
   Mahler package's own `policies/` and `skills/` (beside its `dist/`:
   `$(dirname "$(realpath "$(command -v mahler)")")/../..`)
 - `mahler doctor --workspace <workspace>`
+- `mahler knowledge search <terms>` (or `--paths <repo>/<file>`) to find
+  duplicates and related notes
 - forge PR inspection (`gh pr list`, `gh pr view`, `gh pr diff`) to sample
   merged work
-- after the human approves: move ledger notes to `.harness/decisions/archive/`,
-  edit `.harness/custom/` and the workspace instruction files, then
-  `mahler install` to regenerate the native artifacts
+- after the human approves:
+  - `mahler knowledge import <ledger-note> --title "<claim>" --description
+    "<sentences>" [--tags a,b] [--repos r] [--paths glob,glob] --archive` to
+    turn a ledger note into knowledge and archive it
+  - move other ledger notes to `.harness/decisions/archive/`
+  - edit, merge, or retire knowledge notes, and `mahler knowledge verify
+    <slug>` for ones you confirmed
+  - edit `.harness/custom/` and the workspace instruction files, then
+    `mahler install` to regenerate the native artifacts
 
 ## What to Look At
 
 Use judgment about depth: a quick pass over a small workspace is fine.
 
-- **Decisions ledger** (`.harness/decisions/`, not `archive/`):
-  - notes already folded into a policy, an overlay, or an instruction file
-  - notes a later note supersedes
-  - notes that contradict each other
-  - recurring themes worth promoting into a policy overlay or instruction file
-  - notes about work that has since finished
+- **Decisions ledger** (`.harness/decisions/`, not `archive/`). The ledger is
+  for deviations from Mahler's rules; facts about the code, tools, or project
+  belong in the knowledge store. Give each active note one outcome:
+  - **Knowledge:** a fact about the world ("Y behaves like Z"), often a
+    gotcha with its topic in the `rule` field. Import it, rewritten for
+    readers outside the issue: a claim title, a description that carries the
+    fact, and tags, repos, and paths. Check `mahler knowledge search` first;
+    if a note already covers it, propose adding anything new to that note
+    (and the issue to its `sources`), then archiving the ledger note.
+  - **Policy or overlay change:** the norm was wrong for this workspace, or a
+    recurring theme across notes is really a rule.
+  - **Repo docs:** design rationale that belongs next to the code.
+  - **Preference:** how this human wants work done; an overlay or
+    instruction-file rule.
+  - **Archive:** a one-off with nothing left to learn, a note already folded
+    in elsewhere, or one a later note supersedes.
+  - **Keep:** a precedent still worth showing sessions.
+  Flag notes that contradict each other.
+- **Knowledge store** (`knowledge.path` in config, default
+  `.harness/knowledge/`; read its `INDEX.md` first):
+  - duplicates to merge into one note
+  - notes that contradict each other, or the code
+  - notes whose repos no longer exist, or whose `paths` globs match no file
+  - notes whose `verified:` date is old or missing in areas that change
+    often: check them against the code, then verify, correct, or retire them
+  - titles that name a topic instead of stating a claim, and descriptions too
+    thin to act on
 - **Overlays** (`.harness/custom/`): compare each overlay that replaces a
   Mahler default with the current default. Look for:
   - upstream changes the overlay is missing
@@ -75,8 +104,11 @@ Use judgment about depth: a quick pass over a small workspace is fine.
 
 ## Output
 
-Group proposals by action (archive, promote, update, drop, keep), each with a
-one-line reason and the files involved. For a full audit, write them to
+Group proposals by action, each with a one-line reason and the files
+involved. Ledger notes use the outcomes above (knowledge, policy or overlay,
+repo docs, preference, archive, keep); for a knowledge outcome, include the
+proposed title, description, and scope so the human approves the note as it
+will read. Other proposals group by archive, promote, update, drop, or keep. For a full audit, write them to
 `.harness/audits/<YYYY-MM-DD>.md`; for a quick pass, the list in chat plus a
 short dated note there is enough. Present the proposals to the human and ask
 which to apply. Apply only those: the ledger stays append-only for agents, so moving a

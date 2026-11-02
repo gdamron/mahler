@@ -213,13 +213,24 @@ Both stores use the same shape and backend code:
   a non-fast-forward it pulls with rebase and retries once. New notes are new
   files, so this rarely conflicts. A conflict on an edited note stops and is
   reported.
-- `publish: "pr"`: `learn` commits in a temporary worktree on
-  `knowledge/<agent>-<slug>`, pushes, and opens a PR with the note and its
-  source issue. It also copies the note to `pending/`, so sessions on this
-  machine find it before the PR merges. The human reviews and merges
-  knowledge PRs; no agent merges them, whatever the merge policy allows for
-  code, because the store is shared between agents and the human. `sync` drops a pending note once `branch` contains it, or once
-  its PR is closed unmerged.
+- `publish: "pr"`: the clone only fast-forwards; every change goes up as a
+  PR, opened with `gh` from a temporary worktree based on the remote
+  `branch`, which must already exist. `learn` and `import` write the note to
+  `pending/` instead of `notes/`, so sessions on this machine find it before
+  the PR merges, and open a PR for it on `knowledge/<slug>-<random>` with the
+  note's description, tags, and sources. (The random suffix, not the agent's
+  name, keeps two machines' branches apart; `learn` doesn't know the agent.)
+  The pending copy records the PR in `pr:` and `pr-branch:`, which the
+  published note leaves out. Edits to notes already on `branch` (`verify`,
+  hand edits, an audit) stay in the working tree, and each sync proposes the
+  ones not yet proposed as one PR, recorded in `pending/proposals.json` by
+  git blob id. The human reviews and merges knowledge PRs; no agent merges
+  them, whatever the merge policy allows for code, because the store is
+  shared between agents and the human. `sync` drops a pending note once
+  `branch` contains it, or once its PR merged (perhaps renamed) or closed
+  unmerged; for a batch of edits, it puts the files back to the clone's
+  version (unless edited again since) and then pulls. A PR that failed to
+  open (offline, say) is retried on the same branch by the next sync.
 - `decisions.repo`: a private backup of the ledger, which can live on a
   different remote from the knowledge repo. The ledger always publishes directly.
 - Writes take a lock under `.harness/tmp/locks/` so parallel agents on one

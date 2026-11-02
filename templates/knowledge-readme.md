@@ -16,6 +16,16 @@ it writes a brief. After editing notes by hand, run `mahler knowledge sync`.
 `INDEX.md` is gitignored, since each clone builds its own, and so are
 Obsidian's settings (`.obsidian/`, `.trash/`) and `.DS_Store`.
 
+With `knowledge.publish: "pr"`, changes go up as pull requests (through the
+GitHub CLI, `gh`) for a human to merge, and this folder only ever pulls:
+
+- A new note waits in `pending/<slug>.md`, with its PR's URL in `pr:`. It
+  leaves `pending/` once the PR merges, or once it closes unmerged.
+- Edits to notes already merged (including `mahler knowledge verify` and
+  hand edits) stay as uncommitted changes here; the next sync proposes them
+  as one PR, recorded in `pending/proposals.json`. A closed PR puts those
+  notes back as they are on the branch.
+
 ## Commands
 
 - `mahler learn --title "<claim>" --description "<sentences>" --tags a,b [--repos r] [--paths glob,glob] [--body-file f]`

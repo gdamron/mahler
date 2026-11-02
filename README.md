@@ -174,7 +174,10 @@ people working in the same workspace, set `knowledge.repo` (and optionally
 which clones the repo into the store folder and carries over any local notes.
 From then on `learn`, `verify`, and `import` commit and push, briefs pull
 first, and `mahler knowledge sync` does both on demand. The generated
-`INDEX.md` stays out of the repo.
+`INDEX.md` stays out of the repo. With `knowledge.publish` set to `"pr"`,
+changes go up as pull requests for a human to merge instead: each new note
+gets its own PR and waits in `pending/` (still searchable on that machine),
+and edits to existing notes go up together, one PR per sync.
 
 `mahler decide` appends a note to the decisions ledger
 (`.harness/decisions/<YYYY-MM-DD>-<slug>.md`): the cross-session record of

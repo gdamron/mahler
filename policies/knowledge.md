@@ -58,6 +58,13 @@ reports a conflict, your commit is kept locally: resolve it in the store
 folder, or raise it with the human. A sync that couldn't reach the remote
 only warns; the next sync publishes.
 
+With `knowledge.publish: "pr"`, nothing lands until the human merges it. A
+new note waits in `pending/` (search and briefs on this machine still find
+it) with a PR of its own; edits to existing notes, verified dates included,
+go up together as one PR at the next sync. Never merge a knowledge PR
+yourself, whatever the merge policy allows for code. A PR the human closes
+drops its change from this machine too.
+
 Conductors and composers run `mahler learn`. Slice conductors, testers, and
 reviewers put proposed notes (title, description, scope) in their report, and
 their parent records them.

@@ -40,6 +40,7 @@ commit, handoff. Skip the rest; your parent owns them.
 - git worktree, branch, status, diff, log, add, commit, and push commands for
   the issue's own branches
 - runtime-native sub-agent launch for slice conductors, testers, and reviewers
+- `gh stack link` and `gh stack view` for stacked PRs (no `gh stack merge`)
 - configured GitHub or forge command for PR creation (via the pr skill)
 
 ## Expected Inputs
@@ -59,8 +60,8 @@ commit, handoff. Skip the rest; your parent owns them.
    these holds:
    - the issue spans repos or splits into independent parts worth running in
      parallel;
-   - the change would exceed the commit policy's size guidance and should land
-     as stacked PRs;
+   - the change holds more than one deliverable, or exceeds the pr policy's
+     size guidance, and should land as a stack of PRs;
    - a part suits a much cheaper tier than you (see the delegate skill), or
      would flood your context with exploration you don't need to keep.
 
@@ -122,8 +123,10 @@ commit, handoff. Skip the rest; your parent owns them.
    acceptance test changed. When the issue's project has an acceptance suite,
    run `mahler acceptance run --project <slug> --issue <ISSUE>`. Walk the
    Definition of Done checklist.
-9. **Open PRs** with the pr skill: one PR per slice branch. A stacked PR
-   targets its predecessor's branch and says so in its description.
+9. **Open PRs** with the pr skill: one PR per slice branch, each with proof
+   that it works. A stacked PR targets its predecessor's branch and says so
+   in its description; link dependent PRs into a GitHub stack with
+   `gh stack link` so they merge in one step (see the pr policy).
 10. **Record verification.** For each PR, write the verification record from
     the verification policy into `HANDOFF.md` and the PR description, with
     the merge routing (labels and any human-review paths `mahler check`

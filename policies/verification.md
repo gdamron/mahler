@@ -19,6 +19,8 @@ level includes everything in the levels before it.
   passes for this change: `mahler acceptance run --project <slug> --issue
 <ISSUE>`.
 - The verification record is in `HANDOFF.md` and the PR description.
+- The PR shows proof the change works (see the pr policy). It is required at
+  medium and high risk when the change has observable behavior.
 
 ## Low Risk
 
@@ -153,6 +155,7 @@ and the PR description carries it:
 - Tester results: <n> pass; <failures and how each was classified>
 - Project suite: <pass | fail | none>
 - Reviewer: <tier>; findings handled
+- Proof: <what shows it working, and where: PR body, PR comment, Linear comment>
 - Disputes: <none | decision>
 - Rollout (high risk): <plan>
 ```

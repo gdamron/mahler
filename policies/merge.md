@@ -51,12 +51,31 @@ Every agent merge requires all of these, regardless of labels:
   acceptance tests.
 - No dispute is open.
 - The forge reports the PR mergeable with no conflicts.
-- For a stacked PR, its predecessor has merged and the PR now targets the base
-  branch.
+- For a stack, every PR up to the one being merged meets these items (see
+  Stacks below).
 - The Definition of Done is satisfied and `HANDOFF.md` is current.
 
 If the forge rejects the merge (branch protection, required human approval),
 that is a Tier 3 guardrail doing its job: hand the PR to the human.
+
+## Stacks
+
+A GitHub stack (see the pr policy) merges in one all-or-nothing step, from the
+bottom up to the PR you name:
+
+```sh
+gh stack merge <stack-number | pr-number> --<method> --yes
+```
+
+- Apply the routing rules to each PR in the stack. If one goes to the human,
+  merge only the PRs below it, and hand the rest of the stack to the human.
+- Always pass the merge method and `--yes`; without them the command prompts
+  or reuses the last method.
+- Stack merges never bypass branch protection. If the forge rejects one,
+  nothing merged; handle it as any rejected merge.
+- Without the `gh stack` extension, or for stacked PRs that were never linked,
+  merge one PR at a time, bottom first: each merges only after its
+  predecessor has merged and it has been retargeted to the base branch.
 
 ## Verification Record
 
@@ -80,7 +99,8 @@ against it:
   PRs are merged, remove its worktrees with `mahler cleanup <ISSUE>`; it keeps
   any worktree with uncommitted changes and reports it. When the human merges,
   the next composer session (or the human) runs the cleanup.
-- Retarget or rebase any stacked PRs that depended on it.
+- A stack merge needs no retargeting. After a one-at-a-time merge, retarget
+  or rebase the stacked PRs that depended on it.
 - Let the forge's issue-tracker integration move the issue. If it doesn't, the
   composer may update the issue state and record that it did.
 - Record the decision (PR, risk, routing, who merged) in the

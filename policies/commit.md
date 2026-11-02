@@ -145,13 +145,10 @@ change easier to review, revert, and understand in history. Small cleanups
 
 ### Size Your Changes
 
-Target ~100 lines per commit/PR. Changes over ~1000 lines should be split.
-
-```text
-~100 lines  → Easy to review, easy to revert
-~300 lines  → Acceptable for a single logical change
-~1000 lines → Split into smaller changes
-```
+A commit is one logical step that leaves the tests passing, so it can be
+reverted or bisected on its own. Small commits are save points, not a review
+courtesy. PR size follows the pr policy: one deliverable per PR, with stacks
+for dependent parts.
 
 ## Verification
 

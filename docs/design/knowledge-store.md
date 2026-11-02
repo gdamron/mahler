@@ -236,16 +236,24 @@ Both stores use the same shape and backend code:
   `sync` settles a PR when the remote holds its content exactly as last
   pushed, or when `gh` says it merged or closed. A different note with the
   same slug from another machine doesn't count as a merge.
-  - **Merged:** Mahler compares local files with the PR's head commit as it
-    merged. Matching files go back to the clone's version and arrive with the
-    pull. A file edited here since keeps the edit, three-way merged into the
-    merged version and proposed afresh. When that merge conflicts, the file
-    is left for a hand merge, which doctor reports. A merged pending note
-    waits for the pull that brings it.
-  - **Closed:** files proposed unchanged are dropped. Ones changed since are
-    proposed again.
-  - **Blocked pull:** no edits are proposed, since the working tree's base
-    is stale.
+  - **Merged:** a local edit made after the push that merged starts from
+    where Mahler's last push and the PR's merged head meet. Files with no
+    such edit go back to the clone's version and arrive with the pull. An
+    edited file is three-way merged into the merged version, keeping any
+    reviewer's changes, and proposed afresh. Folded edits are recorded in
+    `pending/prs.json` before any file is touched, so an interrupted sync
+    can't lose them. A merged pending note waits for the pull that brings
+    it; one whose later edit conflicts stays in `pending/` for a hand
+    merge, which doctor reports.
+  - **Closed:** files unchanged since their last push are dropped. Ones
+    changed since are proposed again.
+  - **Pull:** local edits overlapping incoming changes are folded into them
+    the same way. Only a real conflict blocks the pull. While it's blocked
+    no edits are proposed, since the working tree's base is stale.
+  - **The forge:** it's asked before the fetch, so a PR it calls merged is
+    already in the fetched history.
+  - **Pushes:** Mahler records the commit it's pushing first, so a push
+    whose reply was lost is still recognised as its own.
 
   Before opening a PR, sync looks for one already open from the same
   branch, so a `gh pr create` whose reply was lost isn't repeated. PR mode
@@ -256,7 +264,11 @@ Both stores use the same shape and backend code:
   - pending notes whose PR is still open, or was never opened, move into
     `notes/` for the next push, and sync names the PRs to close;
   - notes whose PR closed are dropped;
-  - notes whose PR merged arrive with the pull.
+  - notes whose PR merged arrive with the pull;
+  - an open batch's edits are pushed directly (sync names the PR to close),
+    and a merged or closed batch is settled as above;
+  - when `gh` can't say what happened to the batch, nothing is published
+    until it can.
 - `decisions.repo`: a private backup of the ledger, which can live on a
   different remote from the knowledge repo. The ledger always publishes directly.
 - Writes take a lock under `.harness/tmp/locks/` so parallel agents on one

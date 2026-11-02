@@ -64,5 +64,7 @@ their parent records them.
 - **Retire** a note that is no longer true: set `status: retired`, add
   `superseded-by: <slug>` when another note replaces it, and move it to
   `archive/`.
-- When you notice duplicates, contradictions, or notes whose repos or paths
-  no longer exist, raise them with the human rather than deleting notes.
+- The audit skill reviews the store with the human: duplicates to merge,
+  contradictions, notes whose repos or paths no longer exist, and notes not
+  verified in a long time. Between audits, raise these with the human rather
+  than deleting notes.

@@ -19,7 +19,7 @@ description: Summarize current issue workspace state, blockers, tests, and next 
 ## Allowed Commands
 
 - `mahler handoff <ISSUE>`
-- `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`
+- `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`
 - `mahler learn --title "<claim>" --description "<sentences>" ...` (see the
   knowledge policy)
 - git status and diff summary commands in the issue workspace

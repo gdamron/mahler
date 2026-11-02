@@ -32,8 +32,10 @@ is the record:
    `HANDOFF.md` — what you decided, why, the risk, and any follow-up.
 2. _Only when the reason generalizes beyond this issue_ — a decision a future,
    unrelated session should know — also append it to the cross-session ledger
-   with `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent
-<agent>` (writes `.harness/decisions/<date>-<slug>.md`).
+   with `mahler decide --rule <rule> --description "<one line>" --reason
+   "<why>" --issue <ISSUE> --agent <agent>` (writes
+   `.harness/decisions/<date>-<slug>.md`). The description is the line
+   sessions see in the ledger's `INDEX.md`, so make it stand on its own.
 
 Keep the ledger lean. `HANDOFF.md` is per-issue and a later session never reads
 a _prior_ issue's handoff, so the ledger carries forward only deviations whose

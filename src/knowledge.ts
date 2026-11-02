@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { matchesGlob, relative, resolve } from "node:path";
+import { basename, matchesGlob, relative, resolve } from "node:path";
 import type { HarnessConfig, LinearIssue, RepoConfig } from "./types.js";
 import { writeFileEnsured } from "./util.js";
 
@@ -44,6 +44,10 @@ export interface NewNote {
   sources: string[];
   body: string;
   date: string;
+  /** Defaults to `date`; an import keeps the ledger note's date. */
+  created?: string;
+  /** Defaults to `date`. */
+  verified?: string;
 }
 
 export function knowledgeDir(workspace: string, config: HarnessConfig): string {
@@ -191,9 +195,9 @@ export function formatNote(note: NewNote): string {
     `paths: ${yamlList(note.paths)}`,
     "status: active",
     `sources: ${yamlList(note.sources)}`,
-    `created: ${note.date}`,
+    `created: ${note.created ?? note.date}`,
     `updated: ${note.date}`,
-    `verified: ${note.date}`,
+    `verified: ${note.verified ?? note.date}`,
     "---",
     "",
   ];
@@ -253,33 +257,41 @@ export function knowledgeIndex(dir: string, notes: KnowledgeNote[]): string {
   ].join("\n");
 }
 
-interface LedgerEntry {
+export interface LedgerEntry {
   file: string;
   rule: string;
   issue: string;
   date: string;
+  /** The `description` line, or the body's first sentence for older notes. */
   summary: string;
+  body: string;
+  /** The knowledge note this entry was imported to, if any. */
+  importedTo?: string;
 }
 
-function readLedger(dir: string): LedgerEntry[] {
+/** Read one decisions ledger note. */
+export function readLedgerNote(file: string): LedgerEntry {
+  const { fields, body } = splitFrontmatter(readFileSync(file, "utf8"));
+  const text = (key: string) => {
+    const value = fields[key];
+    return Array.isArray(value) ? value.join(", ") : value ?? "";
+  };
+  return {
+    file,
+    rule: text("rule") || basename(file, ".md"),
+    issue: text("issue"),
+    date: text("date"),
+    summary: text("description") || firstSentence(body),
+    body: body.trim(),
+    importedTo: text("imported-to") || undefined,
+  };
+}
+
+export function readLedger(dir: string): LedgerEntry[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && !["README.md", "INDEX.md"].includes(entry.name))
-    .map((entry) => {
-      const file = resolve(dir, entry.name);
-      const { fields, body } = splitFrontmatter(readFileSync(file, "utf8"));
-      const text = (key: string) => {
-        const value = fields[key];
-        return Array.isArray(value) ? value.join(", ") : value ?? "";
-      };
-      return {
-        file,
-        rule: text("rule") || entry.name.slice(0, -3),
-        issue: text("issue"),
-        date: text("date"),
-        summary: text("description") || firstSentence(body),
-      };
-    })
+    .map((entry) => readLedgerNote(resolve(dir, entry.name)))
     .sort((a, b) => a.file.localeCompare(b.file));
 }
 

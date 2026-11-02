@@ -11,7 +11,7 @@ session and never read a prior issue's `HANDOFF.md`; this ledger is the durable
   `INDEX.md` (one line per note) after each `mahler decide` and on install.
 - Frontmatter: `date`, `issue`, `agent`, `rule`. Body: the reason — what was
   decided, why it improves outcome/safety/efficiency, the risk, and any follow-up.
-- Write entries with `mahler decide --rule <rule> --reason "<why>" --issue <ISSUE> --agent <agent>`.
+- Write entries with `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`.
 - Reference each note from the issue's `HANDOFF.md` under "Workflow Deviations".
 
 ## Keep it lean

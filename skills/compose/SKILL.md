@@ -66,9 +66,9 @@ itself: one issue never needs a composer layer.
    same files go in different waves. An issue that holds several deliverables,
    each able to merge on its own, is often better split into several issues
    now than discovered as one long stack later.
-3. **Specify.** Every issue you write gets a risk label with its reason and
-   acceptance criteria a tester can check without the code (see the risk
-   policy's Writing Issues). When an issue is underspecified, or issues share
+3. **Specify.** Write every new issue with the write-issue skill: a risk
+   label with its reason, and acceptance criteria a tester can check without
+   the code. When an issue is underspecified, or issues share
    an interface, add a section under `Specifications` in `COMPOSITION.md`
    (clarified acceptance criteria, contracts between issues, non-goals) and
    point the conductor brief at it. Use the interview skill with the human
@@ -117,7 +117,8 @@ itself: one issue never needs a composer layer.
      outgrown its estimate: decide yourself what matters (see the review
      policy) rather than passing every finding
      back as more work. Batch the set-aside findings for the human to triage
-     before any of them becomes a new issue.
+     before any of them becomes a new issue, then write the approved ones with
+     the write-issue skill.
 7. **Merge and advance waves.** When a conductor reports PRs ready to
    merge, use the merge skill: labels and paths first, then the risk level's
    verification, then readiness. Merge what the merge policy allows

@@ -16,7 +16,8 @@ import {
   sessionMarkdown,
   taskMarkdown,
 } from "../render.js";
-import type { LinearIssue } from "../types.js";
+import { issueRisk } from "../risk.js";
+import type { LinearIssue, RiskConfig } from "../types.js";
 import {
   ensureDir,
   listDirectories,
@@ -107,6 +108,7 @@ function writeBrief(
   writeFileEnsured(resolve(paths.meta, "HANDOFF.md"), handoffMarkdown(issue));
   writeJson(resolve(paths.meta, jsonName), issue);
   console.log(`${issue.source === "local" ? "Task" : "Issue"} brief ready: ${paths.meta}`);
+  for (const gap of briefGaps(issue, config.risk)) console.log(`warn: ${gap}`);
   console.log(`Recommended worktree root: ${paths.worktreeRoot}`);
   console.log("Configured repos:");
   for (const repo of config.repos) {
@@ -123,6 +125,18 @@ function writeBrief(
   console.log(
     `Suggested launch after creating a repo worktree:\n${launchCommand(agent, resolve(paths.worktreeRoot, "repos", "<repo>"), paths.meta)}`,
   );
+}
+
+/** What a brief lacks that the tester and verification depend on (see the write-issue skill). */
+export function briefGaps(issue: LinearIssue, risk: RiskConfig): string[] {
+  const gaps: string[] = [];
+  if ((issue.acceptanceCriteria ?? []).length === 0) {
+    gaps.push("no acceptance criteria: add observable criteria before work starts (write-issue skill)");
+  }
+  if (!issueRisk(issue, risk)) {
+    gaps.push("no risk level: classify it with .harness/policies/risk.md and add the label");
+  }
+  return gaps;
 }
 
 export function createProject(projectName: string, flags: Flags): void {

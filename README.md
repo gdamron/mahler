@@ -61,7 +61,13 @@ other roles pick one.
   default unless their brief explicitly grants scoped edit authority.
 - Tasks are the atomic unit for code changes, commits, and PRs: a Linear
   issue, or a local task (`mahler task`) agreed in conversation when Linear
-  would be more ceremony than the work needs.
+  would be more ceremony than the work needs. Agents write them with the
+  `write-issue` skill, whose acceptance criteria a tester can check without
+  seeing the code.
+- A PR is one deliverable that can be reverted on its own, with a short
+  description, its verification record, and proof that it works (attached
+  with `gh --attach`). Dependent PRs form a GitHub stack (`gh stack`) that
+  merges in one step.
 - Agents create dedicated git worktrees only for the repos needed by a task,
   preferably under `workspaces/issues/<ISSUE>/repos/`.
 - Policies live in canonical Mahler modules and are rendered into

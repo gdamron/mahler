@@ -30,8 +30,15 @@ export function gh(dir: string, args: string[]): GitResult {
   return run("gh", dir, args, NETWORK_TIMEOUT_MS);
 }
 
-function run(command: string, dir: string, args: string[], timeout?: number): GitResult {
-  const result = spawnSync(command, args, { cwd: dir, encoding: "utf8", env: GIT_ENV, timeout });
+/** The blob id git would give `text`, as committed in `dir`'s repo. */
+export function blobIdOf(dir: string, text: string): string {
+  const result = run("git", dir, ["hash-object", "--stdin"], undefined, text);
+  if (!result.ok) throw new Error(`git hash-object failed in ${dir}: ${result.stderr}`);
+  return result.stdout;
+}
+
+function run(command: string, dir: string, args: string[], timeout?: number, input?: string): GitResult {
+  const result = spawnSync(command, args, { cwd: dir, encoding: "utf8", env: GIT_ENV, timeout, input });
   const code = (result.error as NodeJS.ErrnoException | undefined)?.code;
   const failure =
     code === "ETIMEDOUT" ? `timed out after ${timeout} ms` : code === "ENOENT" ? `${command} is not installed` : undefined;

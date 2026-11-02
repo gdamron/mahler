@@ -221,16 +221,25 @@ Both stores use the same shape and backend code:
   note's description, tags, and sources. (The random suffix, not the agent's
   name, keeps two machines' branches apart; `learn` doesn't know the agent.)
   The pending copy records the PR in `pr:` and `pr-branch:`, which the
-  published note leaves out. Edits to notes already on `branch` (`verify`,
-  hand edits, an audit) stay in the working tree, and each sync proposes the
-  ones not yet proposed as one PR, recorded in `pending/proposals.json` by
-  git blob id. The human reviews and merges knowledge PRs; no agent merges
-  them, whatever the merge policy allows for code, because the store is
-  shared between agents and the human. `sync` drops a pending note once
-  `branch` contains it, or once its PR merged (perhaps renamed) or closed
-  unmerged; for a batch of edits, it puts the files back to the clone's
-  version (unless edited again since) and then pulls. A PR that failed to
-  open (offline, say) is retried on the same branch by the next sync.
+  published note leaves out; editing the pending note updates its PR. Edits
+  to notes already on `branch` (`verify`, hand edits, an audit) stay in the
+  working tree and go up as one open batch PR, which each sync force-pushes
+  to match the current edits, so a file never sits in two competing PRs.
+  `pending/edits.json` records the batch by git blob id. The human reviews
+  and merges knowledge PRs; no agent merges them, whatever the merge policy
+  allows for code, because the store is shared between agents and the
+  human. `sync` drops a pending note when the remote holds it exactly as
+  proposed, or when `gh` says its PR merged (once the pull has brought the
+  note) or closed unmerged; a different note with the same slug from
+  another machine doesn't count. For the batch, it puts the files back to
+  the clone's version (unless edited again since), remembers a closed
+  batch's changes so they aren't proposed again, and then pulls. Before
+  opening a PR, sync looks for one already open from the same branch, so a
+  `gh pr create` whose reply was lost isn't repeated. PR mode keeps
+  machine-local files out through `.git/info/exclude`, not `.gitignore`,
+  which would itself need a PR. Briefs only pull and settle what git can
+  see; they open no PRs. Switching back to `direct` moves pending notes into
+  `notes/` for the next push.
 - `decisions.repo`: a private backup of the ledger, which can live on a
   different remote from the knowledge repo. The ledger always publishes directly.
 - Writes take a lock under `.harness/tmp/locks/` so parallel agents on one

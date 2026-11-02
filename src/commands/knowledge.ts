@@ -66,7 +66,7 @@ function publish(workspace: string, config: HarnessConfig, message: string, file
   if (!config.knowledge.repo) return;
   let result;
   try {
-    result = syncKnowledge(workspace, config, message);
+    result = syncKnowledge(workspace, config, { message });
   } catch (error) {
     throw new Error(`${file} is saved locally, but publishing it failed: ${(error as Error).message}`);
   }

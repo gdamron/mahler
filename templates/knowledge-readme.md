@@ -21,10 +21,12 @@ GitHub CLI, `gh`) for a human to merge, and this folder only ever pulls:
 
 - A new note waits in `pending/<slug>.md`, with its PR's URL in `pr:`. It
   leaves `pending/` once the PR merges, or once it closes unmerged.
+  Editing the pending note updates its PR at the next sync.
 - Edits to notes already merged (including `mahler knowledge verify` and
-  hand edits) stay as uncommitted changes here; the next sync proposes them
-  as one PR, recorded in `pending/proposals.json`. A closed PR puts those
-  notes back as they are on the branch.
+  hand edits) stay as uncommitted changes here; each sync keeps one open PR
+  in step with them, recorded in `pending/edits.json`. A closed PR puts
+  those files back as they are on the branch.
+- Briefs only pull. Run `mahler knowledge sync` after editing by hand.
 
 ## Commands
 

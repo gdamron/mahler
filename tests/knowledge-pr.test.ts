@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { env, git, learn, noteFile, remote, run, setRepo, store, workspace } from "./knowledge-fixtures.js";
 
@@ -17,8 +17,10 @@ interface FakePr {
 
 /**
  * A stand-in for the GitHub CLI: `pr create` records the PR in a JSON file
- * and prints its URL, `pr view <url> --json state` prints its state.
- * FAKE_GH_FAIL makes `pr create` fail, as it would offline.
+ * and prints its URL, `pr view <url> --json state` prints its state, and
+ * `pr list --head <branch>` lists PRs from a branch. FAKE_GH_FAIL makes
+ * `pr create` fail, as it would offline; FAKE_GH_LOSE makes it create the PR
+ * and then fail, as when the reply is lost.
  */
 function forge(): { env: Record<string, string>; prs: () => FakePr[]; setState: (url: string, state: string) => void } {
   const bin = mkdtempSync(resolve(tmpdir(), "mahler-gh-"));
@@ -36,7 +38,14 @@ if (args[0] === "pr" && args[1] === "create") {
   const url = "https://forge.example/pr/" + (prs.length + 1);
   prs.push({ url, base: flag("--base"), head: flag("--head"), title: flag("--title"), body: flag("--body"), state: "OPEN" });
   fs.writeFileSync(file, JSON.stringify(prs));
+  if (process.env.FAKE_GH_LOSE) { console.error("timed out reading the response"); process.exit(1); }
   console.log(url);
+} else if (args[0] === "pr" && args[1] === "list") {
+  for (const pr of prs.filter((candidate) => candidate.head === flag("--head")).reverse()) console.log(pr.url + " " + pr.state);
+} else if (args[0] === "pr" && args[1] === "edit") {
+  const pr = prs.find((candidate) => candidate.url === args[2]);
+  Object.assign(pr, { title: flag("--title"), body: flag("--body") });
+  fs.writeFileSync(file, JSON.stringify(prs));
 } else if (args[0] === "pr" && args[1] === "view") {
   const pr = prs.find((candidate) => candidate.url === args[2]);
   if (!pr) { console.error("no such PR"); process.exit(1); }
@@ -191,7 +200,7 @@ test("doctor reports PR publish, pending reviews, and notes waiting too long", (
   const file = pending(ws, "waiting-a-while");
   writeFileSync(file, readFileSync(file, "utf8").replace(/^created: .*$/m, "created: 2020-01-01"));
   const doctor = run(["doctor", ws], gh.env).stdout;
-  assert.match(doctor, /knowledge PRs awaiting review: 1 pending note, 0 batches of edits/);
+  assert.match(doctor, /knowledge PRs awaiting review: 1 pending note\n/);
   assert.match(doctor, /1 pending knowledge note has waited more than 7 days for review/);
 });
 
@@ -204,4 +213,125 @@ test("PR publish needs the target branch on the remote", () => {
   assert.notEqual(refused.status, 0);
   assert.match(refused.stderr, /saved locally, but publishing it failed: PR publish needs a "main" branch on .* for PRs to target/);
   assert.ok(existsSync(pending(ws, "first-note")));
+});
+
+/** Commit a file straight to the remote's main, as someone else's merged change. */
+function pushToMain(shared: string, path: string, text: string): void {
+  const clone = resolve(mkdtempSync(resolve(tmpdir(), "mahler-other-")), "repo");
+  spawnSync("git", ["clone", "-q", shared, clone], { env });
+  mkdirSync(dirname(resolve(clone, path)), { recursive: true });
+  writeFileSync(resolve(clone, path), text);
+  git(clone, ["add", path]);
+  git(clone, ["commit", "-q", "-m", `change ${path}`]);
+  git(clone, ["push", "-q", "origin", "HEAD:main"]);
+}
+
+test("editing a pending note updates its PR", () => {
+  const { shared, ws, gh } = prWorkspace();
+  assert.equal(learn(ws, "Retries need jitter", gh.env).status, 0);
+  const file = pending(ws, "retries-need-jitter");
+  writeFileSync(file, readFileSync(file, "utf8").replace("Retries need jitter.", "Add jitter to retry delays."));
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /updated https:\/\/forge\.example\/pr\/1 for retries-need-jitter/);
+  assert.match(git(shared, ["show", `${gh.prs()[0].head}:notes/retries-need-jitter.md`]), /Add jitter to retry delays\./);
+  assert.equal(gh.prs().length, 1);
+  assert.match(sync(ws, gh).stdout, /already up to date/);
+});
+
+test("another machine's note with the same slug doesn't drop an open pending note", () => {
+  const { shared, ws, gh } = prWorkspace();
+  assert.equal(learn(ws, "Shared slug", gh.env).status, 0);
+  pushToMain(shared, "notes/shared-slug.md", "---\ntitle: Shared slug\ndescription: Someone else's.\n---\n");
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.doesNotMatch(synced.stdout, /merged/);
+  assert.ok(existsSync(pending(ws, "shared-slug")), "kept while its PR is open");
+});
+
+test("a blocked pull keeps a merged pending note until the note arrives", () => {
+  const { shared, ws, gh } = prWorkspace();
+  assert.equal(learn(ws, "Arrives later", gh.env).status, 0);
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nMy edit.\n");
+  assert.match(sync(ws, gh).stdout, /proposed 1 edit in https:\/\/forge\.example\/pr\/2/);
+  pushToMain(shared, "notes/seed-note.md", "---\ntitle: Seed note\n---\nTheir edit.\n");
+  squashMerge(shared, gh.prs()[0]);
+  gh.setState(gh.prs()[0].url, "MERGED");
+
+  const blocked = sync(ws, gh);
+  assert.equal(blocked.status, 0, blocked.stderr);
+  assert.match(blocked.stderr, /couldn't pull: local edits to notes\/seed-note\.md overlap changes on main/);
+  assert.ok(existsSync(pending(ws, "arrives-later")), "still searchable while the pull is blocked");
+  assert.equal(gh.prs().length, 2, "a merged note isn't proposed again");
+
+  git(store(ws), ["checkout", "--", "notes/seed-note.md"]);
+  const unblocked = sync(ws, gh);
+  assert.match(unblocked.stdout, /pulled 2 commits; 1 pending note merged/);
+  assert.ok(existsSync(noteFile(ws, "arrives-later")));
+});
+
+test("edits update one open batch PR instead of stacking new ones", () => {
+  const { shared, ws, gh } = prWorkspace();
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nFirst edit.\n");
+  assert.match(sync(ws, gh).stdout, /proposed 1 edit in https:\/\/forge\.example\/pr\/1/);
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nSecond edit.\n");
+  writeFileSync(noteFile(ws, "new-by-hand"), "---\ntitle: New by hand\n---\n");
+  assert.match(sync(ws, gh).stdout, /updated https:\/\/forge\.example\/pr\/1 with 2 edits/);
+  assert.equal(gh.prs().length, 1);
+  assert.equal(gh.prs()[0].title, "Knowledge: update 2 files");
+  assert.match(git(shared, ["show", `${gh.prs()[0].head}:notes/seed-note.md`]), /Second edit\./);
+});
+
+test("PR publish keeps machine-local files out of PRs, and doesn't repeat a closed change", () => {
+  const shared = remote();
+  const seed = resolve(mkdtempSync(resolve(tmpdir(), "mahler-seed-")), "repo");
+  spawnSync("git", ["clone", "-q", shared, seed], { env });
+  writeFileSync(resolve(seed, "README.md"), "# Team knowledge\n");
+  git(seed, ["add", "-A"]);
+  git(seed, ["commit", "-q", "-m", "seed"]);
+  git(seed, ["push", "-q", "origin", "HEAD:main"]);
+  const gh = forge();
+  const ws = workspace();
+  assert.equal(setRepo(ws, { repo: shared, publish: "pr" }, gh.env).status, 0);
+  assert.match(sync(ws, gh).stdout, /already up to date/);
+  assert.equal(gh.prs().length, 0, "no PR for .gitignore or the index");
+  assert.equal(git(store(ws), ["status", "--porcelain"]), "");
+
+  writeFileSync(noteFile(ws, "by-hand"), "---\ntitle: By hand\n---\n");
+  assert.match(sync(ws, gh).stdout, /proposed 1 edit/);
+  gh.setState(gh.prs()[0].url, "CLOSED");
+  assert.match(sync(ws, gh).stdout, /dropped the edits/);
+  assert.ok(!existsSync(noteFile(ws, "by-hand")));
+  writeFileSync(noteFile(ws, "by-hand"), "---\ntitle: By hand\n---\n");
+  assert.match(sync(ws, gh).stdout, /already up to date/, "the same closed change isn't proposed again");
+  assert.equal(gh.prs().length, 1);
+});
+
+test("switching back to direct publish pushes pending notes", () => {
+  const { shared, ws, gh } = prWorkspace();
+  assert.equal(learn(ws, "Was pending", gh.env).status, 0);
+  assert.equal(setRepo(ws, { publish: "direct" }, gh.env).status, 0);
+  const synced = sync(ws, gh);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /moved 1 pending note into notes\/ \(close its PR on the forge\)/);
+  assert.ok(!existsSync(pending(ws, "was-pending")));
+  const published = git(shared, ["show", "main:notes/was-pending.md"]);
+  assert.doesNotMatch(published, /^pr(-branch)?:/m);
+});
+
+test("a PR created without Mahler hearing back is found, not opened twice", () => {
+  const { ws, gh } = prWorkspace();
+  const lost = learn(ws, "Lost reply", { ...gh.env, FAKE_GH_LOSE: "1" });
+  assert.equal(lost.status, 0, lost.stderr);
+  assert.match(lost.stderr, /couldn't open a PR for lost-reply/);
+  assert.match(sync(ws, gh).stdout, /opened https:\/\/forge\.example\/pr\/1 for lost-reply/);
+  assert.equal(gh.prs().length, 1);
+});
+
+test("a brief pulls without opening PRs", () => {
+  const { ws, gh } = prWorkspace();
+  writeFileSync(noteFile(ws, "seed-note"), "---\ntitle: Seed note\n---\nAn edit.\n");
+  const brief = run(["task", "brief-check", "--workspace", ws, "--agent", "claude", "--title", "Check the brief"], gh.env);
+  assert.equal(brief.status, 0, brief.stderr);
+  assert.equal(gh.prs().length, 0);
 });

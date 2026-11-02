@@ -14,7 +14,7 @@ import {
 import { randomBytes } from "node:crypto";
 import { dirname, relative, resolve, sep } from "node:path";
 import { knowledgeDir, writeIndexes } from "./knowledge.js";
-import { prModeSync } from "./knowledge-pr.js";
+import { adoptPendingNotes, ensureExcluded, prModeSync } from "./knowledge-pr.js";
 import { firstLine, git, GIT_ENV, gitOrThrow, IGNORED, NETWORK_TIMEOUT_MS } from "./knowledge-git.js";
 import type { HarnessConfig } from "./types.js";
 
@@ -119,7 +119,8 @@ export function cloneKnowledgeStore(workspace: string, config: HarnessConfig): s
     }
   }
   renameSync(temp, dir);
-  ensureGitignore(dir);
+  if (prPublish(config)) ensureExcluded(dir);
+  else ensureGitignore(dir);
   const lines = [`Cloned the knowledge store from ${repo} into ${dir}`];
   if (carried > 0) {
     lines.push(
@@ -232,12 +233,16 @@ export function prPublish(config: HarnessConfig): boolean {
  * rebase aborted and the local commit kept. In local mode, it only rebuilds
  * the indexes.
  */
-export function syncKnowledge(
-  workspace: string,
-  config: HarnessConfig,
-  message = "knowledge: update notes",
-  lockWaitMs = 60_000,
-): SyncResult {
+export interface SyncOptions {
+  /** The commit message for local changes (direct publish). */
+  message?: string;
+  lockWaitMs?: number;
+  /** Pull only: open no PRs and don't ask the forge (for briefs). */
+  quick?: boolean;
+}
+
+export function syncKnowledge(workspace: string, config: HarnessConfig, options: SyncOptions = {}): SyncResult {
+  const { message = "knowledge: update notes", lockWaitMs = 60_000, quick = false } = options;
   if (!config.knowledge.repo) {
     writeIndexes(workspace, config);
     return { summary: "The knowledge store is a local folder (no knowledge.repo); indexes rebuilt.", published: true };
@@ -252,8 +257,9 @@ export function syncKnowledge(
     workspace,
     "knowledge",
     () => {
+      if (prPublish(config)) return prModeSync(dir, branch, repo, message, quick);
       ensureGitignore(dir);
-      return prPublish(config) ? prModeSync(dir, branch, repo, message) : directSync(dir, branch, repo, message);
+      return directSync(dir, branch, repo, message);
     },
     lockWaitMs,
   );
@@ -263,7 +269,8 @@ export function syncKnowledge(
 
 /** Direct publish: commit, rebase onto the remote branch, push (one retry). */
 function directSync(dir: string, branch: string, repo: string, message: string): { done: string[]; published: boolean } {
-  const done: string[] = [];
+  // Left over from PR publish: publish pending notes like any other change.
+  const done: string[] = adoptPendingNotes(dir);
   const unpublished = (why: string) => ({ done: [...done, why], published: false });
   // Ignoring a file the repo already tracks does nothing, so untrack it too.
   gitOrThrow(dir, ["rm", "-r", "--cached", "--quiet", "--ignore-unmatch", "--", ...IGNORED.map(ignoredPathspec)]);

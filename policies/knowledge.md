@@ -21,8 +21,9 @@ session doesn't rediscover it. It lives at `knowledge.path` in
 - At session start, read the brief's `Relevant Knowledge` section. It is a
   first pass, matched on the issue's words and repos.
 - After planning, once you know which files you'll change, run
-  `mahler knowledge search --changed` from the worktree (or `--paths <files>`)
-  and read the notes it finds.
+  `mahler knowledge search --changed` from the worktree (or `--paths` with
+  repo-relative files and `--repo`, or `<repo>/<file>` paths) and read the
+  notes it finds.
 - Before working in an unfamiliar area, run `mahler knowledge search <terms>`.
 - A reviewer runs `mahler knowledge search --changed` on the diff. A change
   that walks into a trap a note describes is a finding.
@@ -46,8 +47,8 @@ code or its docs already say plainly.
 5. **The body stands alone.** Write it for someone who never saw the issue:
    no "as above", no issue-only context. Put issue IDs in `sources`.
 6. **Scope it.** `--tags` for the areas it touches, `--repos` when it is true
-   of only some repos, and `--paths` with globs for the files it is about, so
-   path searches find it.
+   of only some repos, and `--paths` with globs for the files it is about,
+   relative to the repo (`src/storage/**`), so path searches find it.
 7. **No secrets, credentials, or customer data.** The store may be shared.
 
 Conductors and composers run `mahler learn`. Slice conductors, testers, and
@@ -63,6 +64,5 @@ their parent records them.
 - **Retire** a note that is no longer true: set `status: retired`, add
   `superseded-by: <slug>` when another note replaces it, and move it to
   `archive/`.
-- The audit skill reviews the store with the human: duplicates to merge,
-  contradictions, notes whose repos or paths no longer exist, and notes not
-  verified in a long time.
+- When you notice duplicates, contradictions, or notes whose repos or paths
+  no longer exist, raise them with the human rather than deleting notes.

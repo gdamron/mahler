@@ -79,8 +79,9 @@ commit, handoff. Skip the rest; your parent owns them.
    (PRs, changed lines). The estimate is not a limit. It is what lets you, and
    your parent, notice when the work has grown into something else.
    Once you know which files the work will change, run `mahler knowledge
-   search --paths <files>` and read the notes it finds; pass the relevant ones
-   on in slice briefs.
+   search --paths <repo>/<file>,...` (paths inside each repo, prefixed with
+   the repo's name, or `--repo <repo>` with plain paths) and read the notes it
+   finds; pass the relevant ones on in slice briefs.
 3. **Tests first (high risk).** Before anyone implements, launch a tester
    (pick its tier with the delegate skill: a different model from the
    implementer) to write acceptance tests from the spec in its own worktree

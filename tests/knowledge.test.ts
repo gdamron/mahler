@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { spawnSync } from "node:child_process";
-import { parseNote, relevantNotes, searchNotes } from "../src/knowledge.js";
+import { spawn, spawnSync } from "node:child_process";
+import { indexLine, parseNote, relevantNotes, searchNotes, setFrontmatterField, splitGlobs } from "../src/knowledge.js";
 
 const cliPath = resolve("dist/src/cli.js");
 
@@ -82,7 +82,7 @@ test("learn points at similar notes", () => {
   learn(workspace, ["--title", "Storage list() matches by prefix", "--description", "Filter storage results for the exact name.", "--tags", "storage"]);
   const second = learn(workspace, ["--title", "Storage list() caps results at 100", "--description", "Pass an explicit storage limit.", "--tags", "storage"]);
   assert.equal(second.status, 0, second.stderr);
-  assert.match(second.stdout, /Similar notes[^\n]*\n- \[Storage list\(\) matches by prefix\]/);
+  assert.match(second.stdout, /Similar notes[^\n]*\n- Storage list\(\) matches by prefix \(`\/[^`]*\/notes\/storage-list-matches-by-prefix\.md`\)/);
 });
 
 test("search ranks title and tag matches first and filters by repo", () => {
@@ -100,6 +100,41 @@ test("search ranks title and tag matches first and filters by repo", () => {
   const usage = run(["knowledge", "search", "--workspace", workspace]);
   assert.notEqual(usage.status, 0);
   assert.match(usage.stderr, /give search terms, --paths/);
+});
+
+test("--paths are repo-relative, and name their repo when there are several", () => {
+  const workspace = workspaceWith(["app", "api"]);
+  learn(workspace, ["--title", "App storage trap", "--description", "d", "--repos", "app", "--paths", "src/**"]);
+  learn(workspace, ["--title", "Api storage trap", "--description", "d", "--repos", "api", "--paths", "src/{auth,db}/**"]);
+  const ambiguous = run(["knowledge", "search", "--paths", "src/auth/x.ts", "--workspace", workspace]);
+  assert.notEqual(ambiguous.status, 0);
+  assert.match(ambiguous.stderr, /can't tell which repo "src\/auth\/x\.ts" is in/);
+  const prefixed = run(["knowledge", "search", "--paths", "api/src/auth/x.ts", "--workspace", workspace]);
+  assert.equal(prefixed.status, 0, prefixed.stderr);
+  assert.match(prefixed.stdout, /Api storage trap[^\n]*\n  matches: api\/src\/auth\/x\.ts/);
+  assert.doesNotMatch(prefixed.stdout, /App storage trap/);
+  const flagged = run(["knowledge", "search", "--paths", "src/db/y.ts", "--repo", "app", "--workspace", workspace]);
+  assert.match(flagged.stdout, /App storage trap/);
+  assert.doesNotMatch(flagged.stdout, /Api storage trap/);
+});
+
+test("parallel learns of one slug keep exactly one note", async () => {
+  // Sessions learning the same slug at once can all pass the exists check;
+  // only one write may land, and the rest must fail rather than replace it.
+  const workspace = workspaceWith(["app"]);
+  const codes = await Promise.all(
+    [0, 1, 2, 3, 4, 5].map(
+      (n) =>
+        new Promise<number | null>((done) =>
+          spawn("node", [cliPath, "learn", "--workspace", workspace, "--title", "Same fact", "--description", `writer ${n}`], {
+            stdio: "ignore",
+          }).on("close", done),
+        ),
+    ),
+  );
+  assert.equal(codes.filter((code) => code === 0).length, 1);
+  const text = readFileSync(resolve(workspace, ".harness/knowledge/notes/same-fact.md"), "utf8");
+  assert.equal(text.match(/description: "writer \d"/g)?.length, 1);
 });
 
 test("search finds notes by changed files, given or from the branch", () => {
@@ -162,6 +197,26 @@ test("notes edited in Obsidian parse: block lists and quoted values", () => {
   assert.deepEqual(note.paths, ["src/**"]);
   assert.equal(note.description, "Body sentence one.");
   assert.deepEqual(searchNotes([note], ["the", "of"]), []);
+
+  const unindented = parseNote("---\ntitle:\ntags:\n- auth\nrepos:\n- api\npaths:\n- src/auth/**\nsources: [DEV-1] # from review\n---\nKept one commit, e.g. for atomic revert. More.\n", "my-slug");
+  assert.equal(unindented.title, "my-slug");
+  assert.deepEqual(unindented.tags, ["auth"]);
+  assert.deepEqual(unindented.repos, ["api"]);
+  assert.deepEqual(unindented.paths, ["src/auth/**"]);
+  assert.deepEqual(unindented.sources, ["DEV-1"]);
+  assert.equal(unindented.description, "Kept one commit, e.g. for atomic revert.");
+});
+
+test("index lines link notes whose names have spaces", () => {
+  const note = { ...parseNote("---\ntitle: T\ndescription: D\n---\n", "Token expiry"), file: "/w/k/notes/Token expiry.md" };
+  assert.equal(indexLine(note, "/w/k"), "- [T](notes/Token%20expiry.md): D");
+  assert.equal(indexLine(note, "/w", true), "- T (`k/notes/Token expiry.md`): D");
+});
+
+test("globs keep commas inside braces, and CRLF notes stay CRLF", () => {
+  assert.deepEqual(splitGlobs("src/{auth,db}/**, docs/*.md"), ["src/{auth,db}/**", "docs/*.md"]);
+  const crlf = setFrontmatterField("---\r\ntitle: T\r\nverified: 2020-01-01\r\n---\r\nBody\r\n", "verified", "2026-11-02");
+  assert.equal(crlf, "---\r\ntitle: T\r\nverified: 2026-11-02\r\n---\r\nBody\r\n");
 });
 
 test("a brief lists tag matches first, then repo and workspace-wide notes", () => {
@@ -169,13 +224,16 @@ test("a brief lists tag matches first, then repo and workspace-wide notes", () =
     parseNote("---\ntitle: Other repo only\ndescription: d\nrepos: [api]\nupdated: 2026-01-01\n---\n", "a"),
     parseNote("---\ntitle: Same repo\ndescription: d\nrepos: [app]\nverified: 2026-02-01\n---\n", "b"),
     parseNote("---\ntitle: Whole workspace\ndescription: d\nverified: 2026-03-01\n---\n", "c"),
-    parseNote("---\ntitle: Storage trap\ndescription: d\ntags: [storage]\nrepos: [api]\n---\n", "d"),
+    parseNote("---\ntitle: Storage trap\ndescription: d\ntags: [storage]\nrepos: [app]\n---\n", "d"),
+    parseNote("---\ntitle: Storage trap in api\ndescription: d\ntags: [storage]\nrepos: [api]\n---\n", "e"),
   ];
   const repos = ["app", "api"].map((name) => ({ name, path: name, baseBranch: "main" }));
   const issue = { identifier: "DEV-1", title: "Archive drafts in app", description: "Before overwriting stored objects in storage." };
   const relevant = relevantNotes(notes, issue, repos);
   assert.deepEqual(relevant.notes.map((note) => note.title), ["Storage trap", "Whole workspace", "Same repo"]);
   assert.equal(relevantNotes(notes, issue, repos, 1).matched, 3);
+  const unknownRepo = relevantNotes(notes, { ...issue, title: "Archive drafts" }, repos);
+  assert.deepEqual(unknownRepo.notes.map((note) => note.title), ["Storage trap", "Storage trap in api", "Whole workspace"]);
 });
 
 test("issue briefs carry Relevant Knowledge and point at the ledger index", () => {
@@ -188,7 +246,7 @@ test("issue briefs carry Relevant Knowledge and point at the ledger index", () =
   learn(workspace, ["--title", "Storage trap", "--description", "Watch out.", "--tags", "storage"]);
   run(["issue", "DEV-2", "--workspace", workspace, "--agent", "claude", "--title", "Fix storage writes"]);
   const session = readFileSync(resolve(workspace, ".harness/issues/DEV-2/AGENT_SESSION.md"), "utf8");
-  assert.match(session, /## Relevant Knowledge\n\nNotes whose tags appear[^\n]*\n\n- \[Storage trap\]\(\.harness\/knowledge\/notes\/storage-trap\.md\): Watch out\. #storage/);
+  assert.match(session, /## Relevant Knowledge\n\nNotes whose tags appear[^\n]*\n\n- Storage trap \(`\.harness\/knowledge\/notes\/storage-trap\.md`\): Watch out\. #storage/);
   assert.match(session, /read Relevant Knowledge above and `\.harness\/decisions\/INDEX\.md`/);
   assert.doesNotMatch(session, /read the active `\.harness\/decisions\/` ledger/);
   for (const file of ["CLAUDE.md", "AGENTS.md", "WORKFLOW.md"]) {

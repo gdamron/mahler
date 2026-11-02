@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import {
@@ -19,11 +19,12 @@ import {
   readNotes,
   searchNotes,
   setFrontmatterField,
+  splitGlobs,
   writeIndexes,
 } from "../knowledge.js";
 import { repoForDir } from "../repos.js";
 import type { HarnessConfig } from "../types.js";
-import { slugify, writeFileEnsured } from "../util.js";
+import { slugify } from "../util.js";
 import { changedFiles } from "./check.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -53,44 +54,51 @@ export function learn(flags: Flags): void {
   const dir = knowledgeDir(workspace, config);
   for (const folder of ["notes", "pending", "archive"]) {
     const existing = resolve(dir, folder, `${slug}.md`);
-    if (existsSync(existing)) {
-      const note = readNotes(dir).find((candidate) => candidate.file === existing);
-      throw new Error(
-        [
-          `A note already uses the slug "${slug}": ${existing}`,
-          note ? `  ${note.description}` : "",
-          folder === "archive"
-            ? "It is retired. Pass --slug for a new note, and link the old one if it helps."
-            : "If it covers the same fact, update that note instead (set `updated:` to today). Otherwise pass --slug.",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      );
-    }
+    if (existsSync(existing)) slugTaken(dir, slug, existing, folder === "archive");
   }
   const others = readNotes(dir);
   const file = resolve(dir, "notes", `${slug}.md`);
-  writeFileEnsured(
-    file,
-    formatNote({
-      slug,
-      title,
-      description,
-      tags: listFlag(flags, "tags").map(slugify).filter(Boolean),
-      repos,
-      paths: listFlag(flags, "paths"),
-      sources: listFlag(flags, "source"),
-      body,
-      date: today(),
-    }),
-  );
+  const content = formatNote({
+    slug,
+    title,
+    description,
+    tags: listFlag(flags, "tags").map(slugify).filter(Boolean),
+    repos,
+    paths: splitGlobs(stringFlag(flags, "paths") ?? ""),
+    sources: listFlag(flags, "source"),
+    body,
+    date: today(),
+  });
+  mkdirSync(resolve(dir, "notes"), { recursive: true });
+  try {
+    // "wx" fails if another session wrote the same slug since the check above.
+    writeFileSync(file, content, { flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") slugTaken(dir, slug, file, false);
+    throw error;
+  }
   writeIndexes(workspace, config);
   console.log(`Recorded knowledge: ${file}`);
   const similar = searchNotes(others, [title, description], undefined, 6).slice(0, 3);
   if (similar.length > 0) {
     console.log("Similar notes (merge into one of these if they cover the same fact):");
-    for (const note of similar) console.log(indexLine(note, workspace));
+    for (const note of similar) console.log(indexLine(note, undefined, true));
   }
+}
+
+function slugTaken(dir: string, slug: string, existing: string, retired: boolean): never {
+  const note = readNotes(dir).find((candidate) => candidate.file === existing);
+  throw new Error(
+    [
+      `A note already uses the slug "${slug}": ${existing}`,
+      note ? `  ${note.description}` : "",
+      retired
+        ? "It is retired. Pass --slug for a new note, and link the old one if it helps."
+        : "If it covers the same fact, update that note instead (set `updated:` to today). Otherwise pass --slug.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
 }
 
 /** `mahler knowledge index|search|verify`. */
@@ -138,25 +146,50 @@ function search(workspace: string, config: HarnessConfig, terms: string[], flags
   if (terms.length === 0 && files.length === 0 && flags.changed !== true) {
     throw new UsageError("give search terms, --paths <file,...>, or --changed");
   }
+  const changes = files.map((file) => changedFile(config, file, repo, flags.changed === true));
   const notes = readNotes(knowledgeDir(workspace, config));
-  const byPath = files.length > 0 ? notesForFiles(notes, files, repo) : [];
-  const byTerm = searchNotes(notes, terms, repo).filter((note) => !byPath.includes(note));
+  const matches = new Map<KnowledgeNote, string[]>();
+  for (const note of notes) {
+    const hit = changes.filter((change) => notesForFiles([note], [change.path], change.repo).length > 0);
+    if (hit.length > 0) matches.set(note, hit.map((change) => change.file));
+  }
+  const byPath = [...matches.keys()];
+  const byTerm = searchNotes(notes, terms, repo).filter((note) => !matches.has(note));
   const results = [...byPath, ...byTerm].slice(0, limit);
   if (results.length === 0) {
     console.log(notes.length === 0 ? "The knowledge store has no notes yet." : "No notes match.");
     return;
   }
   for (const note of results) {
-    console.log(indexLine(note, workspace));
-    if (byPath.includes(note)) console.log(`  matches: ${matchedFiles(note, files).join(", ")}`);
+    console.log(indexLine(note, undefined, true));
+    const hit = matches.get(note);
+    if (hit) console.log(`  matches: ${(hit.length > 3 ? [...hit.slice(0, 3), `and ${hit.length - 3} more`] : hit).join(", ")}`);
   }
   const more = byPath.length + byTerm.length - results.length;
   if (more > 0) console.log(`(${more} more; raise --limit to see them)`);
 }
 
-function matchedFiles(note: KnowledgeNote, files: string[]): string[] {
-  const matched = files.filter((file) => notesForFiles([note], [file]).length > 0);
-  return matched.length > 3 ? [...matched.slice(0, 3), `and ${matched.length - 3} more`] : matched;
+/**
+ * A `--paths` file and the repo it belongs to. Paths are relative to their
+ * repo; without `--repo`, a leading `<repo>/` names the repo, and a single
+ * configured repo needs no prefix.
+ */
+function changedFile(
+  config: HarnessConfig,
+  file: string,
+  repo: string | undefined,
+  fromBranch: boolean,
+): { file: string; path: string; repo: string | undefined } {
+  if (repo || fromBranch) return { file, path: file, repo };
+  const names = config.repos.map((candidate) => candidate.name);
+  const prefixed = names.find((name) => file.startsWith(`${name}/`));
+  if (prefixed) return { file, path: file.slice(prefixed.length + 1), repo: prefixed };
+  if (names.length > 1) {
+    throw new UsageError(
+      `can't tell which repo "${file}" is in: pass --repo, or prefix the path with the repo name (${names.join(", ")})`,
+    );
+  }
+  return { file, path: file, repo: names[0] };
 }
 
 function verify(workspace: string, config: HarnessConfig, slug: string): void {

@@ -165,8 +165,8 @@ rather than piling up near-duplicates. Sessions don't read every note: each
 brief gets a `Relevant Knowledge` section matched on the issue's words and
 repos, conductors and reviewers run `mahler knowledge search --changed` to
 find notes about the files being changed, and `mahler knowledge search
-<terms>` covers the rest. `mahler knowledge verify` marks a note confirmed, so
-the audit can find ones nobody has checked in a long time.
+<terms>` covers the rest. `mahler knowledge verify` marks a note confirmed, so stale
+notes are visible.
 
 `mahler decide` appends a note to the decisions ledger
 (`.harness/decisions/<YYYY-MM-DD>-<slug>.md`): the cross-session record of

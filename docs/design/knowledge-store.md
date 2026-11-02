@@ -124,13 +124,14 @@ sync.
    Knowledge` section into `AGENT_SESSION.md`. Mahler knows only the issue's
    text, labels, and repos then, so this is a first pass. Notes whose tags
    appear in the issue's title, description, or labels come first. Notes
-   that only match the issue's repos fill the rest, up to about 30 lines. The
-   section says how many notes matched in all.
+   that only match the issue's repos, or apply to the whole workspace, fill
+   the rest, up to about 30 lines. A note scoped to other repos is left out
+   even when its tags match. The section says how many notes matched in all.
 2. **At session start:** read that section and the ledger's `INDEX.md`. The
    ledger index stays short once the knowledge is moved out. Sessions no
    longer read every note.
 3. **After planning:** once the conductor knows which files it will change,
-   it runs `mahler knowledge search --paths <files>` (or `--changed` once
+   it runs `mahler knowledge search --paths <repo>/<file>,...` (or `--changed` once
    work is under way) and reads the matches.
    Paths have no synonyms, so this finds notes that the brief's word matching
    missed.
@@ -159,7 +160,8 @@ sync.
   includes `pending/`. With `--paths <file,...>`, or `--changed` from a
   worktree (the files its branch changed since leaving its base, as `mahler
   check` computes them), it returns the notes whose `paths` globs match
-  those files, in the matching repo. No dependencies. This is where a hybrid backend would
+  those files, in the matching repo. Paths are relative to their repo; a
+  `<repo>/` prefix or `--repo` says which repo. No dependencies. This is where a hybrid backend would
   plug in.
 - `mahler knowledge index`: rebuilds `INDEX.md` for both stores.
 - `mahler knowledge sync`: in repo mode, pulls, publishes anything unpushed,

@@ -86,7 +86,8 @@ export function parseNote(text: string, slug: string, file = "", pending = false
   };
   const scalar = (key: string): string | undefined => {
     const value = fields[key];
-    return Array.isArray(value) ? value.join(", ") : value || undefined;
+    const text = Array.isArray(value) ? value.join(", ") : value;
+    return text || undefined;
   };
   return {
     slug,
@@ -112,10 +113,10 @@ function splitFrontmatter(text: string): { fields: Record<string, string | strin
   const fields: Record<string, string | string[]> = {};
   let listKey: string | undefined;
   for (const line of match[1].split(/\r?\n/)) {
-    const item = /^\s+-\s*(.*)$/.exec(line);
+    const item = /^\s*-(?:\s+(.*))?$/.exec(line);
     if (item && listKey) {
       const current = fields[listKey];
-      fields[listKey] = [...(Array.isArray(current) ? current : []), unquote(item[1].trim())];
+      fields[listKey] = [...(Array.isArray(current) ? current : []), unquote((item[1] ?? "").trim())].filter(Boolean);
       continue;
     }
     const pair = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(line);
@@ -126,8 +127,8 @@ function splitFrontmatter(text: string): { fields: Record<string, string | strin
     if (value === "") {
       listKey = key;
       fields[key] = [];
-    } else if (value.startsWith("[") && value.endsWith("]")) {
-      fields[key] = splitFlowList(value.slice(1, -1));
+    } else if (/^\[.*\](\s+#.*)?$/.test(value)) {
+      fields[key] = splitFlowList(value.slice(1, value.lastIndexOf("]")));
     } else {
       fields[key] = unquote(value);
     }
@@ -203,24 +204,32 @@ export function formatNote(note: NewNote): string {
 export function setFrontmatterField(text: string, key: string, value: string): string {
   const match = /^((?:<!--[\s\S]*?-->\s*)?---\r?\n)([\s\S]*?)(\r?\n---)/.exec(text);
   if (!match) throw new Error("note has no frontmatter");
+  const eol = match[1].endsWith("\r\n") ? "\r\n" : "\n";
   const lines = match[2].split(/\r?\n/);
   const at = lines.findIndex((line) => line.startsWith(`${key}:`));
   if (at >= 0) lines[at] = `${key}: ${value}`;
   else lines.push(`${key}: ${value}`);
-  return `${match[1]}${lines.join("\n")}${text.slice(match[1].length + match[2].length)}`;
+  return `${match[1]}${lines.join(eol)}${text.slice(match[1].length + match[2].length)}`;
 }
 
 // ---------------------------------------------------------------------------
 // Index
 // ---------------------------------------------------------------------------
 
-/** One index line: the title linked to the note, its description, and its tags. */
-export function indexLine(note: KnowledgeNote, from: string): string {
-  const link = relative(from, note.file).split("\\").join("/");
+/**
+ * One index line: the note, its description, and its tags. With `from`, the
+ * title links to the note relative to that folder (for INDEX.md files). With
+ * `plain`, the note's path follows the title as code, relative to `from` or
+ * absolute without it (for briefs and terminal output, where a relative link
+ * would resolve against the wrong folder).
+ */
+export function indexLine(note: KnowledgeNote, from?: string, plain = false): string {
+  const path = (from === undefined ? note.file : relative(from, note.file)).split("\\").join("/");
+  const head = plain ? `${note.title} (\`${path}\`)` : `[${note.title}](${encodeURI(path)})`;
   const tags = note.tags.map((tag) => ` #${tag}`).join("");
   const repos = note.repos.length > 0 ? ` (repos: ${note.repos.join(", ")})` : "";
   const pending = note.pending ? " (pending review)" : "";
-  return `- [${note.title}](${link}): ${note.description}${tags}${repos}${pending}`;
+  return `- ${head}: ${note.description}${tags}${repos}${pending}`;
 }
 
 /** INDEX.md for the knowledge store: every note once, grouped by its first tag. */
@@ -379,7 +388,9 @@ export interface Relevant {
  * repos at brief time, so this is a first pass: notes whose tags appear in
  * the issue come first (most tags matched, then most recently verified), and
  * notes that only match the issue's repos, or are workspace-wide, fill the
- * rest up to `limit`.
+ * rest up to `limit`. A note scoped to other repos than the issue's is left
+ * out even when its tags match; when the issue's repos are unknown, tag
+ * matches from any repo are kept.
  */
 export function relevantNotes(
   notes: KnowledgeNote[],
@@ -394,7 +405,10 @@ export function relevantNotes(
   };
   const issueRepos =
     repos.length === 1 ? [repos[0].name] : repos.map((repo) => repo.name).filter(mentions);
+  const forIssue = (note: KnowledgeNote) =>
+    note.repos.length === 0 || issueRepos.length === 0 || note.repos.some((repo) => issueRepos.includes(repo));
   const tagged = notes
+    .filter(forIssue)
     .map((note) => ({ note, hits: note.tags.filter(mentions).length }))
     .filter(({ hits }) => hits > 0)
     .sort((a, b) => b.hits - a.hits || freshness(b.note).localeCompare(freshness(a.note)))
@@ -429,7 +443,7 @@ export function relevantKnowledgeMarkdown(
   return [
     `Notes whose tags appear in this issue come first, then notes for its repos or the whole workspace (${shown}; ${total} in the store). Open a note before relying on it. ${how}`,
     "",
-    ...relevant.notes.map((note) => indexLine(note, workspace)),
+    ...relevant.notes.map((note) => indexLine(note, workspace, true)),
   ].join("\n");
 }
 
@@ -439,6 +453,29 @@ function firstSentence(body: string): string {
     .replace(/^#.*$/gm, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const sentence = /^(.+?[.!?])(\s|$)/.exec(text)?.[1] ?? text;
+  // End at the first sentence break that isn't an abbreviation like "e.g.".
+  const end = [...text.matchAll(/[.!?](?=\s|$)/g)].find(
+    (match) => !/(?:^|[\s(])(?:e\.g|i\.e|vs|[A-Za-z])\.$/i.test(text.slice(0, match.index + 1)),
+  );
+  const sentence = end ? text.slice(0, end.index + 1) : text;
   return sentence.length > 200 ? `${sentence.slice(0, 197).trimEnd()}...` : sentence;
+}
+
+/** Split a comma-separated list of globs, keeping commas inside `{a,b}`. */
+export function splitGlobs(value: string): string[] {
+  const globs: string[] = [];
+  let current = "";
+  let depth = 0;
+  for (const char of value) {
+    if (char === "{") depth += 1;
+    if (char === "}") depth = Math.max(0, depth - 1);
+    if (char === "," && depth === 0) {
+      globs.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  globs.push(current);
+  return globs.map((glob) => glob.trim()).filter(Boolean);
 }

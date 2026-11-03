@@ -12,7 +12,7 @@ carries the built CLI as a tarball (attached by the Release workflow when a
 `v*` tag is pushed):
 
 ```sh
-npm install -g https://github.com/gdamron/mahler/releases/download/v2026.10.2/mahler-2026.10.2.tgz
+npm install -g https://github.com/gdamron/mahler/releases/download/v2026.11.0/mahler-2026.11.0.tgz
 mahler --version
 ```
 
@@ -45,7 +45,7 @@ Versions are date-based, `<year>.<month>.<n>`: `n` counts releases within the
 month from 0, and the month has no leading zero (npm rejects one), so January
 2027's first release is `2027.1.0`. To cut a release, set `version` in
 `package.json`, merge, then push a matching tag
-(`git tag v2026.10.2 && git push origin v2026.10.2`). The Release
+(`git tag v2026.11.0 && git push origin v2026.11.0`). The Release
 workflow runs the tests, checks the tag matches the version, and attaches the
 tarball.
 
@@ -286,6 +286,8 @@ defaults are kept, retired defaults are dropped, and newer defaults are added.
 - each repo's `checks`, the `merge` labels and paths, the `risk` labels, the
   `acceptance` suite settings, and the `models`, `concurrency`,
   `guardrails`, and `definitionOfDone` overrides;
+- the `knowledge` settings (`path`, `repo`, `branch`, `publish`) and
+  `decisions` (`repo`, `branch`);
 - each runtime's `profile` and `role` under `agents` (for example, switching
   Claude's default profile from `composer` to `conductor`), plus whole entries
   for runtimes Mahler doesn't define. Each runtime's `skills` and `policies`
@@ -293,6 +295,11 @@ defaults are kept, retired defaults are dropped, and newer defaults are added.
   what a profile may do.
 
 The repo list itself is rediscovered on every run.
+
+The READMEs in `.harness/decisions/`, `.harness/knowledge/`, and
+`.harness/custom/` are yours once written. Reinstall replaces one only while
+it's still exactly as an earlier Mahler version wrote it, so upgrades bring
+new guidance without overwriting your edits.
 
 ## Manual Dogfood Checklist
 

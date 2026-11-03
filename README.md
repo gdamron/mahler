@@ -84,7 +84,7 @@ other roles pick one.
 ## Commands
 
 ```sh
-npm install -g https://github.com/gdamron/mahler/releases/download/v2026.10.2/mahler-2026.10.2.tgz   # pinned; see INSTALL.md
+npm install -g https://github.com/gdamron/mahler/releases/download/v2026.11.0/mahler-2026.11.0.tgz   # pinned; see INSTALL.md
 mahler --version
 mahler install /path/to/product-workspace --linear-assignee gonzo --linear-label agent
 mahler issue DEV-123 --workspace /path/to/product-workspace --agent codex
@@ -120,9 +120,9 @@ has a `package.json`, install pre-populates per-repo `checks` (test/lint/build
 commands) from its scripts; edit `.harness/config.json` to adjust them.
 Reinstalling keeps human-set config: the Mahler command, worktree root, Linear
 filters, repo checks, merge labels and paths, risk labels, the acceptance
-suite, each runtime's agent profile, and changes
-to Mahler's default model tiers, concurrency caps, guardrails, and Definition
-of Done, which are stored as overrides so new defaults still arrive (see
+suite, each runtime's agent profile, the knowledge and decisions settings, and
+changes to Mahler's default model tiers, concurrency caps, guardrails, and
+Definition of Done, which are stored as overrides so new defaults still arrive (see
 [INSTALL.md](INSTALL.md#what-reinstall-keeps)).
 
 `mahler check` is a local mirror of CI: it runs each repo's configured check

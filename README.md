@@ -120,9 +120,9 @@ has a `package.json`, install pre-populates per-repo `checks` (test/lint/build
 commands) from its scripts; edit `.harness/config.json` to adjust them.
 Reinstalling keeps human-set config: the Mahler command, worktree root, Linear
 filters, repo checks, merge labels and paths, risk labels, the acceptance
-suite, each runtime's agent profile, and changes
-to Mahler's default model tiers, concurrency caps, guardrails, and Definition
-of Done, which are stored as overrides so new defaults still arrive (see
+suite, each runtime's agent profile, the knowledge and decisions settings, and
+changes to Mahler's default model tiers, concurrency caps, guardrails, and
+Definition of Done, which are stored as overrides so new defaults still arrive (see
 [INSTALL.md](INSTALL.md#what-reinstall-keeps)).
 
 `mahler check` is a local mirror of CI: it runs each repo's configured check

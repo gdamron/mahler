@@ -286,6 +286,8 @@ defaults are kept, retired defaults are dropped, and newer defaults are added.
 - each repo's `checks`, the `merge` labels and paths, the `risk` labels, the
   `acceptance` suite settings, and the `models`, `concurrency`,
   `guardrails`, and `definitionOfDone` overrides;
+- the `knowledge` settings (`path`, `repo`, `branch`, `publish`) and
+  `decisions` (`repo`, `branch`);
 - each runtime's `profile` and `role` under `agents` (for example, switching
   Claude's default profile from `composer` to `conductor`), plus whole entries
   for runtimes Mahler doesn't define. Each runtime's `skills` and `policies`
@@ -293,6 +295,11 @@ defaults are kept, retired defaults are dropped, and newer defaults are added.
   what a profile may do.
 
 The repo list itself is rediscovered on every run.
+
+The READMEs in `.harness/decisions/`, `.harness/knowledge/`, and
+`.harness/custom/` are yours once written. Reinstall replaces one only while
+it's still exactly as an earlier Mahler version wrote it, so upgrades bring
+new guidance without overwriting your edits.
 
 ## Manual Dogfood Checklist
 

@@ -32,6 +32,7 @@ import {
   sourceLabel,
   type Source,
 } from "../scaffold.js";
+import { isEarlierReadme } from "../readme-versions.js";
 import { renderTemplate } from "../templates.js";
 import { ensureDir, mahlerVersion, writeFileEnsured } from "../util.js";
 
@@ -91,19 +92,13 @@ export function install(workspaceInput: string, flags: Flags): void {
   for (const kind of ["policies", "skills", "agents"] as const) {
     ensureDir(resolve(workspace, ".harness", "custom", kind));
   }
-  // Human-owned files: written once, never overwritten by reinstall.
-  writeIfMissing(
-    resolve(workspace, ".harness", "custom", "README.md"),
-    renderTemplate("custom-readme"),
-  );
-  writeIfMissing(
-    resolve(workspace, ".harness", "decisions", "README.md"),
-    renderTemplate("decisions-readme"),
-  );
-  writeIfMissing(
-    resolve(knowledgeDir(workspace, config), "README.md"),
-    renderTemplate("knowledge-readme"),
-  );
+  // Human-owned files: written once, and replaced by reinstall only while
+  // they're still exactly as an earlier Mahler version wrote them.
+  const refreshed = [
+    writeReadme(resolve(workspace, ".harness", "custom", "README.md"), "custom-readme"),
+    writeReadme(resolve(workspace, ".harness", "decisions", "README.md"), "decisions-readme"),
+    writeReadme(resolve(knowledgeDir(workspace, config), "README.md"), "knowledge-readme"),
+  ].filter((path): path is string => path !== undefined);
   writeFileEnsured(
     resolve(workspace, ".harness", "config.json"),
     serializeConfig(config),
@@ -209,6 +204,7 @@ export function install(workspaceInput: string, flags: Flags): void {
   );
   console.log(`Installed Mahler workflow into ${workspace}`);
   if (cloned) console.log(cloned);
+  for (const path of refreshed) console.log(`Updated ${path}: it was unedited since an earlier Mahler version.`);
   console.log(
     `Configured ${config.repos.length} repo(s): ${config.repos.map((repo) => repo.name).join(", ") || "(none)"}`,
   );
@@ -269,8 +265,17 @@ function pruneStaleSkills(workspace: string, skills: string[]): void {
   }
 }
 
-function writeIfMissing(path: string, content: string): void {
-  if (!existsSync(path)) writeFileEnsured(path, content);
+/** Write a human-owned README if missing or unedited since an earlier version; returns the path when it replaced one. */
+function writeReadme(path: string, template: string): string | undefined {
+  const content = renderTemplate(template);
+  if (!existsSync(path)) {
+    writeFileEnsured(path, content);
+    return undefined;
+  }
+  const current = readFileSync(path, "utf8");
+  if (current === content || !isEarlierReadme(template, current)) return undefined;
+  writeFileEnsured(path, content);
+  return path;
 }
 
 function mergeRootInstruction(path: string, block: string): void {

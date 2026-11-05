@@ -62,11 +62,12 @@ git diff --staged
 git diff --staged | grep -i "password\|secret\|api_key\|token"
 
 # 3. Run the configured checks for touched repos — a local mirror of CI.
-#    Per-repo commands live under "checks" in .harness/config.json.
+#    Per-repo commands live under "checks" in .harness/config.json; every
+#    configured check runs (test, lint, typecheck, build, then any others).
 #    --issue checks every worktree for the issue; --path checks just one.
 mahler check --workspace <workspace> --issue <ISSUE>
 
-# 4. Run additional checks not configured above (e.g. type checking, formatting)
+# 4. Run additional checks CI runs that are not configured above (e.g. formatting)
 ```
 
 ### Handling Generated Files

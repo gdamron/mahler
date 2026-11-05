@@ -5,7 +5,7 @@ import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
 import { repoForDir } from "../repos.js";
 import { baseRef, frozenAcceptanceFindings } from "./acceptance.js";
-import type { Finding, HarnessConfig, RepoConfig } from "../types.js";
+import type { Finding, HarnessConfig, RepoChecks, RepoConfig } from "../types.js";
 import { abs, listDirectories } from "../util.js";
 
 /** One working directory to run a repo's checks in. */
@@ -16,8 +16,37 @@ interface CheckTarget {
   label: string;
 }
 
+/** Well-known check names, run first and in this order; other names follow in config order. */
+const knownCheckOrder = ["test", "lint", "typecheck", "build"];
+
+/**
+ * Splits a repo's configured checks into the ones to run, in run order, and
+ * the names skipped because they have no runnable command, so none is dropped
+ * silently.
+ */
+export function plannedChecks(checks: RepoChecks | undefined): {
+  entries: { name: string; command: string }[];
+  skipped: string[];
+} {
+  const configured = Object.keys(checks ?? {});
+  const names = [
+    ...knownCheckOrder.filter((name) => configured.includes(name)),
+    ...configured.filter((name) => !knownCheckOrder.includes(name)),
+  ];
+  const entries: { name: string; command: string }[] = [];
+  const skipped: string[] = [];
+  for (const name of names) {
+    const command = checks?.[name];
+    if (typeof command === "string" && command.trim() !== "") {
+      entries.push({ name, command });
+    } else {
+      skipped.push(name);
+    }
+  }
+  return { entries, skipped };
+}
+
 export function check(flags: Flags): void {
-  const checkOrder = ["test", "lint", "build"] as const;
   const workspace = workspaceFlag(flags);
   const config = loadConfig(workspace);
   const repoFilter = stringFlag(flags, "repo");
@@ -58,14 +87,13 @@ export function check(flags: Flags): void {
       });
       continue;
     }
-    const entries = checkOrder
-      .map((name) => ({ name, command: repo.checks?.[name] }))
-      .filter(
-        (
-          entry,
-        ): entry is { name: (typeof checkOrder)[number]; command: string } =>
-          Boolean(entry.command),
-      );
+    const { entries, skipped } = plannedChecks(repo.checks);
+    for (const name of skipped) {
+      results.push({
+        level: "warn",
+        message: `${label}/${name}: skipped — configured without a command; set a shell command or remove it from .harness/config.json`,
+      });
+    }
     for (const finding of frozenAcceptanceFindings(workspace, config, repo, cwd, label, issue)) {
       if (finding.level === "error") failures += 1;
       results.push(finding);

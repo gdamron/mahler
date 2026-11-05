@@ -156,3 +156,97 @@ test("doctor warns when a configured repo has no checks", () => {
   const result = spawnSync(cli[0], [cli[1], "doctor", workspace], { encoding: "utf8" });
   assert.match(result.stdout, /repo app has no checks configured/);
 });
+
+/** A check command that prints its own name, so output order shows run order. */
+function echoCheck(name: string, exitCode = 0): string {
+  return `node -e "console.log('RAN-${name}'); process.exit(${exitCode})"`;
+}
+
+function ranOrder(stdout: string): string[] {
+  return [...stdout.matchAll(/^RAN-(\S+)$/gm)].map((match) => match[1]);
+}
+
+function workspaceWithChecks(checks: Record<string, string>): string {
+  const workspace = installWorkspaceWithRepo(undefined);
+  const config = loadConfig(workspace);
+  config.repos[0].checks = checks;
+  saveConfig(workspace, config);
+  return workspace;
+}
+
+test("check runs a configured typecheck", () => {
+  const workspace = workspaceWithChecks({ test: echoCheck("test"), typecheck: echoCheck("typecheck") });
+  const { status, stdout } = runCheck(workspace);
+  assert.equal(status, 0, stdout);
+  assert.deepEqual(ranOrder(stdout), ["test", "typecheck"]);
+  assert.match(stdout, /ok {2}\s*app\/typecheck/);
+});
+
+test("check runs a custom-named check", () => {
+  const workspace = workspaceWithChecks({ test: echoCheck("test"), "e2e-smoke": echoCheck("e2e-smoke") });
+  const { status, stdout } = runCheck(workspace);
+  assert.equal(status, 0, stdout);
+  assert.deepEqual(ranOrder(stdout), ["test", "e2e-smoke"]);
+  assert.match(stdout, /ok {2}\s*app\/e2e-smoke/);
+});
+
+test("check runs test, lint, typecheck, build, then other names in config order", () => {
+  // Deliberately scrambled in the config.
+  const workspace = workspaceWithChecks({
+    zeta: echoCheck("zeta"),
+    build: echoCheck("build"),
+    alpha: echoCheck("alpha"),
+    typecheck: echoCheck("typecheck"),
+    lint: echoCheck("lint"),
+    test: echoCheck("test"),
+  });
+  const { status, stdout } = runCheck(workspace);
+  assert.equal(status, 0, stdout);
+  assert.deepEqual(ranOrder(stdout), ["test", "lint", "typecheck", "build", "zeta", "alpha"]);
+});
+
+test("check with only test, lint and build runs them in the same order", () => {
+  const workspace = workspaceWithChecks({
+    build: echoCheck("build"),
+    test: echoCheck("test"),
+    lint: echoCheck("lint"),
+  });
+  const { status, stdout } = runCheck(workspace);
+  assert.equal(status, 0, stdout);
+  assert.deepEqual(ranOrder(stdout), ["test", "lint", "build"]);
+  assert.doesNotMatch(stdout, /skipped/);
+});
+
+test("check fails overall when typecheck fails, and still runs the other checks", () => {
+  const workspace = workspaceWithChecks({
+    test: echoCheck("test"),
+    typecheck: echoCheck("typecheck", 1),
+    build: echoCheck("build"),
+  });
+  const { status, stdout } = runCheck(workspace);
+  assert.notEqual(status, 0);
+  assert.deepEqual(ranOrder(stdout), ["test", "typecheck", "build"]);
+  assert.match(stdout, /ok {2}\s*app\/test/);
+  assert.match(stdout, /fail app\/typecheck/);
+  assert.match(stdout, /1 check\(s\) failed/);
+});
+
+test("check says which configured check it skipped and why", () => {
+  const workspace = workspaceWithChecks({ test: echoCheck("test"), typecheck: "  ", lint: echoCheck("lint") });
+  const { status, stdout } = runCheck(workspace);
+  assert.equal(status, 0, stdout);
+  assert.deepEqual(ranOrder(stdout), ["test", "lint"]);
+  assert.match(stdout, /warn app\/typecheck: skipped — configured without a command/);
+});
+
+test("doctor accepts typecheck and custom check names without errors", () => {
+  const workspace = workspaceWithChecks({
+    test: echoCheck("test"),
+    typecheck: echoCheck("typecheck"),
+    "e2e-smoke": echoCheck("e2e-smoke"),
+  });
+  const result = spawnSync(cli[0], [cli[1], "doctor", workspace], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stdout);
+  assert.match(result.stdout, / 0 error\(s\)/);
+  assert.doesNotMatch(result.stdout, /repo app has no checks configured/);
+});

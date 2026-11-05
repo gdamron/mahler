@@ -9,10 +9,17 @@ export interface RepoConfig {
   checks?: RepoChecks;
 }
 
+/**
+ * Check names mapped to shell commands. `mahler check` runs every entry: the
+ * well-known names (test, lint, typecheck, build) first in that order, then any
+ * other names in config order.
+ */
 export interface RepoChecks {
   test?: string;
   lint?: string;
+  typecheck?: string;
   build?: string;
+  [name: string]: string | undefined;
 }
 
 export interface HarnessConfig {

@@ -142,6 +142,82 @@ test("cleanup removes worktrees of a repo with a separate git dir", () => {
   assert.equal(existsSync(wt), false);
 });
 
+const commit = (cwd: string, message: string) =>
+  git(cwd, ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", message]);
+
+/** Adds MAH-1's tester worktree `tests/app` on `mah-1-acceptance`, with one commit. */
+function addTester(app: string, workspace: string): string {
+  const tests = resolve(workspace, "workspaces", "issues", "MAH-1", "tests", "app");
+  mkdirSync(resolve(tests, ".."), { recursive: true });
+  assert.equal(git(app, ["worktree", "add", "-q", "-b", "mah-1-acceptance", tests, "main"]).status, 0);
+  writeFileSync(resolve(tests, "acceptance.test.js"), "// AC1\n");
+  git(tests, ["add", "."]);
+  commit(tests, "Add acceptance tests");
+  return tests;
+}
+
+test("cleanup removes a tester worktree and deletes its branch once the issue branch has it", () => {
+  const { workspace, app, repos } = workspaceWithWorktrees();
+  const tests = addTester(app, workspace);
+  // Merged locally, never pushed: the worktrees share one repository.
+  assert.equal(git(resolve(repos, "app"), ["merge", "-q", "--no-edit", "mah-1-acceptance"]).status, 0);
+
+  const dry = runCleanup(workspace, ["--dry-run"]);
+  assert.match(dry.stdout, /tests\/app: would remove \(branch mah-1-acceptance would be deleted if merged\)/);
+  assert.equal(existsSync(tests), true);
+
+  const result = runCleanup(workspace);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /^ok   .*tests\/app: removed \(branch mah-1-acceptance deleted\)$/m);
+  assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-1")), false);
+  assert.equal(git(app, ["branch", "--list", "mah-1-acceptance"]).stdout, "");
+  assert.match(git(app, ["branch", "--list", "mah-1-*"]).stdout, /mah-1-core[\s\S]*mah-1-docs/);
+});
+
+test("cleanup keeps an unmerged tester branch and says so", () => {
+  const { workspace, app } = workspaceWithWorktrees();
+  const tests = addTester(app, workspace);
+
+  const result = runCleanup(workspace);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(
+    result.stdout,
+    /^warn .*tests\/app: removed \(branch mah-1-acceptance is not merged into the issue branch or the main checkout's HEAD; kept/m,
+  );
+  assert.equal(existsSync(tests), false);
+  assert.match(git(app, ["branch", "--list", "mah-1-acceptance"]).stdout, /mah-1-acceptance/);
+});
+
+test("cleanup keeps a tester worktree with uncommitted changes", () => {
+  const { workspace, app } = workspaceWithWorktrees();
+  const tests = addTester(app, workspace);
+  writeFileSync(resolve(tests, "draft.test.js"), "// AC2\n");
+
+  const result = runCleanup(workspace);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /tests\/app: has uncommitted or untracked changes; kept/);
+  assert.equal(existsSync(resolve(tests, "draft.test.js")), true);
+  assert.match(git(app, ["branch", "--list", "mah-1-acceptance"]).stdout, /mah-1-acceptance/);
+});
+
+test("cleanup never deletes a pushed tester branch from the remote", () => {
+  const { workspace, app } = workspaceWithWorktrees();
+  const remote = resolve(workspace, "remote.git");
+  spawnSync("git", ["init", "-q", "--bare", remote]);
+  git(app, ["remote", "add", "origin", remote]);
+  const tests = addTester(app, workspace);
+  assert.equal(git(tests, ["push", "-q", "-u", "origin", "mah-1-acceptance"]).status, 0);
+
+  const result = runCleanup(workspace);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(
+    result.stdout,
+    /tests\/app: removed \(branch mah-1-acceptance deleted; its remote branch origin\/mah-1-acceptance is left for the human\)/,
+  );
+  assert.equal(git(app, ["branch", "--list", "mah-1-acceptance"]).stdout, "");
+  assert.match(git(app, ["ls-remote", "--heads", "origin"]).stdout, /refs\/heads\/mah-1-acceptance/);
+});
+
 test("spotlightFinding is ok at zero and warns with the fix otherwise", () => {
   assert.equal(spotlightFinding("/w/workspaces", "workspaces", 0)?.level, "ok");
   const warn = spotlightFinding("/w/workspaces", "workspaces", 1234);

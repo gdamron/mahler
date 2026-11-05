@@ -67,7 +67,9 @@ areas. Standard grants by role:
   force-push shared branches, change issue-tracker state, or delegate further.
 - **Reviewer:** read-only. It may run tests and checks to validate findings.
 - **Tester:** edit test files only, in its own worktree outside `repos/`, cut from the
-  base branch, and commit and push its tester branch. It does not read the
+  base branch, and commit to its tester branch. In issue mode the branch
+  stays local; it pushes only a project suite, or when it doesn't share the
+  local repository (see the acceptance-test skill). It does not read the
   implementation diff, merge its branch, freeze tests, open PRs, or delegate.
   Its parent merges the branch and records the freeze.
 - **Conductor, issue mode (from a composer):** run the conduct skill for its

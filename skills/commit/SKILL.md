@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Commit a tested increment of issue-scoped work as a save point, and push the working branch.
+description: Commit a tested increment of issue-scoped work as a save point, and push the working branch unless it is a tester's local branch.
 ---
 
 # Commit
@@ -27,6 +27,9 @@ description: Commit a tested increment of issue-scoped work as a save point, and
 - `git commit`
 - `git push` for the issue or slice branch only; never force-push a shared
   branch or push to a base branch
+- a tester's commits stay on its local branch: push it only when the
+  acceptance-test skill says to (a project suite, or a tester that doesn't
+  share the local repository)
 - repo-local tests/checks needed before commit
 
 ## Expected Inputs

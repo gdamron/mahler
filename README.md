@@ -153,10 +153,12 @@ worktree, or its base branch) and runs `acceptance.run` with `<manifest>` and
 from `.harness/config.json`, with an ok/busy verdict. Agents run it before
 launching parallel agents or heavy commands. Like `check`, it is advisory.
 
-`mahler cleanup` removes an issue's worktrees once its PRs are merged, keeping
-branches and the issue brief. It refuses to remove a worktree with uncommitted
-or untracked changes. Finished worktrees otherwise keep costing disk, and on
-macOS, Spotlight indexing; `mahler doctor` reports when Spotlight is indexing
+`mahler cleanup` removes an issue's worktrees once its PRs are merged, tester
+worktrees under `tests/` included, keeping issue branches and the issue brief.
+It deletes tester branches locally with `git branch -d`, so an unmerged one is
+kept and reported, and it never deletes a remote branch. It refuses to remove
+a worktree with uncommitted or untracked changes. Finished worktrees otherwise
+keep costing disk, and on macOS, Spotlight indexing; `mahler doctor` reports when Spotlight is indexing
 the worktree root (exclude it in System Settings → Spotlight → Search Privacy;
 folder markers such as `.metadata_never_index` are not honored there).
 

@@ -87,9 +87,10 @@ commit, handoff. Skip the rest; your parent owns them.
    implementer) to write acceptance tests from the spec in its own worktree
    at `<issue root>/tests/<repo>`, cut from the base branch. Freeze its
    commit with `mahler acceptance freeze --issue <ISSUE> --repo <repo>
-   --commit <sha>`, merge its branch into the issue branch, and remove its
-   worktree. The implementer makes those tests pass without changing
-   them.
+   --commit <sha>` and merge (not cherry-pick) its local branch into the
+   issue branch; the tester doesn't push it. Leave its worktree for disputes:
+   `mahler cleanup` removes it and deletes the merged branch. The implementer
+   makes those tests pass without changing them.
 4. **Implement.** Do your own slice with the implement skill. For each
    delegated slice, use the delegate skill to pick the tier and write the
    brief: base profile `conductor`, `slice mode`, authority `edit`, allowed

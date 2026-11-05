@@ -65,6 +65,11 @@ The tester profile follows the acceptance-test skill. In short:
   `<issue root>/tests/<repo>`, and commits to its own branch. The worktree
   stays outside `repos/` because its tests fail until the implementation
   lands, and `mahler check --issue` runs every worktree under `repos/`.
+- In issue mode its branch stays local. The tester worktree shares one
+  repository with the issue worktrees, so the conductor merges the branch and
+  freezes its commit without a fetch, and no remote branch is left to delete.
+  It pushes only a project suite, or when it doesn't share the local
+  repository (in the cloud or on another machine).
 - Each test names the criterion it checks.
 - It reports which criterion each test covers, and any criterion it could not
   test, with the reason.
@@ -78,12 +83,14 @@ mahler acceptance freeze --issue <ISSUE> --repo <repo> --commit <sha>
 # or, for several commits: --commit <base>..<sha>
 ```
 
-Then it merges the tester's branch into the issue branch and removes the
-tester's worktree (`git worktree remove`). From then on, `mahler check` fails
-if a checked worktree's copy of those files differs from the frozen commit, or
-is missing. For a slice worktree, pass `--worktree <dir>`. A range freeze
-counts only the range's own commits, so base-branch changes made after the
-tester branched are not frozen.
+Then it merges the tester's local branch into the issue branch (a merge, not
+a cherry-pick, so `git branch -d` can tell the branch landed). The tester's
+worktree stays for any dispute fix; `mahler cleanup <ISSUE>` removes it with
+the issue's other worktrees and deletes the merged branch with `git branch
+-d`. From then on, `mahler check` fails if a checked worktree's copy of those
+files differs from the frozen commit, or is missing. For a slice worktree,
+pass `--worktree <dir>`. A range freeze counts only the range's own commits,
+so base-branch changes made after the tester branched are not frozen.
 
 Only the tester changes frozen tests, and only after a dispute decision.
 

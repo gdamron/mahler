@@ -224,7 +224,7 @@ const commands: Record<string, Command> = {
   cleanup: {
     usage: "mahler cleanup <ISSUE> --workspace <path> [--dry-run]",
     summary:
-      "Remove an issue's clean worktrees (branches are kept). --dry-run lists what would be removed.",
+      "Remove an issue's clean worktrees, tester worktrees included. Issue branches are kept; merged tester branches are deleted locally, never on a remote. --dry-run lists what would be removed.",
     positionals: 1,
     flags: { ...workspace, "dry-run": "boolean" },
     run: (args) =>

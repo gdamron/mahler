@@ -32,7 +32,7 @@ in project mode (see the verification policy).
   base branch
 - repo-local build and test commands inside that worktree
 - `git status`, `git diff`, `git add`, `git commit` (via the commit skill)
-- `git push` for the tester branch only
+- `git push` for the tester branch only, and only when step 6 says to
 - `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`
 
 ## Expected Inputs
@@ -71,13 +71,22 @@ in project mode (see the verification policy).
    the expected reason (missing feature, not a broken test). After
    implementation, report what passes and what fails; don't change a test to
    make it pass.
-6. Commit with the commit skill and push the branch. Don't merge it, freeze
-   it, or open a PR: your parent does that.
+6. Commit with the commit skill. Don't merge the branch, freeze it, or open
+   a PR: your parent does that.
+   - **Issue mode: don't push.** Your worktree shares its repository with the
+     conductor's `repos/<repo>` worktree (`git rev-parse --git-common-dir`
+     prints the same path in both), so the conductor merges your local
+     branch and `mahler acceptance freeze` finds your commit without a fetch.
+   - **Push only when the commit can't be reached locally:** in project mode,
+     where the suite lands in the acceptance repo through a PR, or when your
+     worktree doesn't share the conductor's repository (you run in the cloud
+     or on another machine). Say in your report that you pushed, and why.
 7. Report back.
 
 ## Required Outputs
 
-- Commits on the tester branch, pushed, holding only test files
+- Commits on the tester branch, holding only test files, pushed only when
+  step 6 says to
 - A table mapping each criterion to the tests that check it
 - Criteria you could not test, and why
 - Possible spec gaps, with the reading you chose
@@ -88,8 +97,9 @@ in project mode (see the verification policy).
 ## Disputes
 
 If your parent sends you a dispute decision that says a test is wrong or a
-criterion changed, fix only what the decision covers, commit, push, and report
-the new commit so the parent can freeze again with the decision as the reason.
+criterion changed, fix only what the decision covers, commit (pushing only
+when step 6 says to), and report the new commit so the parent can freeze again
+with the decision as the reason.
 
 ## Stop Conditions
 

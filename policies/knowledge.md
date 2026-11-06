@@ -14,7 +14,12 @@ session doesn't rediscover it. It lives at `knowledge.path` in
   when it generalizes (see the judgment policy).
 - **A preference** is how this human wants work done. It belongs in
   `.harness/custom/` overlays or the instruction files, which the human owns.
-- **Design rationale** for code belongs in that repo's docs, next to the code.
+- **A design decision** is a rule for how the code should be built: "Parsers
+  return errors and never throw." So is the rationale behind code. Both
+  belong in that repo's design docs, next to the code, not in the ledger or
+  the knowledge store. Write it into the docs in the current change. If the
+  current change doesn't touch that repo, list it as a follow-up in
+  `HANDOFF.md` and tell the human.
 
 ## Reading
 

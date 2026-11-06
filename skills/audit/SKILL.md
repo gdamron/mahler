@@ -61,7 +61,7 @@ Use judgment about depth: a quick pass over a small workspace is fine.
     (and the issue to its `sources`), then archiving the ledger note.
   - **Policy or overlay change:** the norm was wrong for this workspace, or a
     recurring theme across notes is really a rule.
-  - **Repo docs:** design rationale that belongs next to the code.
+  - **Repo docs:** a design decision or rationale that belongs next to the code.
   - **Preference:** how this human wants work done; an overlay or
     instruction-file rule.
   - **Archive:** a one-off with nothing left to learn, a note already folded

@@ -225,6 +225,9 @@ sync commits or proposes only its own folder, and the two take turns in the
 clone. Sharing, the ledger publishes the way the knowledge store does. With
 `knowledge.publish` set to `"pr"`, decisions also go up as a PR, apart from
 the knowledge PRs, so a decision isn't backed up until a human merges it.
+If the PR is closed unmerged, its decisions stay in the local ledger,
+flagged by `mahler doctor` as not backed up, and aren't proposed again
+unless you edit them.
 
 Install compiles canonical Mahler source into native agent artifacts:
 

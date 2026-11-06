@@ -436,6 +436,13 @@ export function ledgerRepoFindings(workspace: string, config: HarnessConfig): Fi
         message: `${status.unproposed} decisions ledger ${status.unproposed === 1 ? "change isn't" : "changes aren't"} proposed in a PR yet; run \`mahler knowledge sync\``,
       });
     }
+    if (status.closed) {
+      const { files, urls } = status.closed;
+      findings.push({
+        level: "warn",
+        message: `${files} decisions ledger ${files === 1 ? "change" : "changes"} not backed up: ${urls.length > 1 ? "their PRs were" : files === 1 ? "its PR was" : "their PR was"} closed${urls.length > 0 ? ` (${urls.join(", ")})` : ""}. They stay here and aren't proposed again; edit one to propose it again`,
+      });
+    }
     return findings;
   }
   const findings: Finding[] = [

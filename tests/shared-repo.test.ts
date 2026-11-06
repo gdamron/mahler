@@ -349,3 +349,36 @@ test("with PR publish, a merged decision edited here since isn't taken for anoth
   assert.match(synced.stdout + synced.stderr, new RegExp(`couldn't pull: your edits to decisions/${note.replace(/\./g, "\\.")} conflict`));
   assert.match(readFileSync(resolve(ledger(ws), note), "utf8"), /Edited here\./, "the local edit is kept");
 });
+
+test("with PR publish, a decision whose PR was closed unmerged stays here, flagged, and isn't proposed again", () => {
+  const { shared, ws, gh } = prWorkspace();
+  assert.equal(decide(ws, "skip-tester", gh.env).status, 0);
+  const [note] = ledgerNotes(ws).filter((file) => file.includes("skip-tester"));
+  const [closedPr] = gh.prs();
+  gh.setState(closedPr.url, "CLOSED");
+
+  const synced = run(["knowledge", "sync", "--workspace", ws], gh.env);
+  assert.equal(synced.status, 0, synced.stderr);
+  assert.match(synced.stdout, /https:\/\/forge\.example\/pr\/1 was closed unmerged; its change stays here, not backed up, and won't be proposed again/);
+  assert.ok(existsSync(resolve(ledger(ws), note)), "the decision is kept");
+  assert.match(readFileSync(resolve(ledger(ws), "INDEX.md"), "utf8"), /skip-tester applied\./);
+  assert.equal(gh.prs().length, 1, "no new PR");
+  assert.match(
+    run(["doctor", ws], gh.env).stdout,
+    /1 decisions ledger change not backed up: its PR was closed \(https:\/\/forge\.example\/pr\/1\)/,
+  );
+
+  // A later decision gets a PR of its own, without the closed one.
+  assert.equal(decide(ws, "commit-size", gh.env).status, 0);
+  const [, next] = gh.prs();
+  const [later] = ledgerNotes(ws).filter((file) => file.includes("commit-size"));
+  assert.deepEqual(git(shared, ["diff", "--name-only", `main...${next.head}`]).split("\n"), [`decisions/${later}`]);
+
+  // Edited since, the closed decision is proposed again.
+  writeFileSync(resolve(ledger(ws), note), `${readFileSync(resolve(ledger(ws), note), "utf8")}\nRevisited.\n`);
+  const again = run(["knowledge", "sync", "--workspace", ws], gh.env);
+  assert.equal(again.status, 0, again.stderr);
+  assert.match(again.stdout, new RegExp(`decisions/${note.replace(/\./g, "\\.")} changed since https://forge\\.example/pr/1 was closed; proposing it again`));
+  assert.deepEqual(git(shared, ["diff", "--name-only", `main...${next.head}`]).split("\n").sort(), [`decisions/${later}`, `decisions/${note}`].sort());
+  assert.doesNotMatch(run(["doctor", ws], gh.env).stdout, /not backed up: its PR was closed/);
+});

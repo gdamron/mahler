@@ -88,6 +88,12 @@ export interface Ledger {
    * name clash to rename.
    */
   held?: string[];
+  /**
+   * Ledger changes whose PR a reviewer closed unmerged: kept here, not
+   * backed up, and not proposed again unless they change. Path → blob id
+   * when closed (null for a deletion), and the PR.
+   */
+  closed?: Record<string, { blob: string | null; url?: string }>;
 }
 
 type PrState = "OPEN" | "MERGED" | "CLOSED" | "NONE";
@@ -232,6 +238,11 @@ function renameLedgerClashes(scope: PrScope, remote: string, ledger: Ledger, don
     let target = file;
     for (let n = 2; taken(target); n += 1) target = `${stem}-${n}.md`;
     renameSync(resolve(dir, path), resolve(dir, scope.prefix + target));
+    if (ledger.closed?.[path]) {
+      ledger.closed[scope.prefix + target] = ledger.closed[path];
+      delete ledger.closed[path];
+      writeLedger(scope, ledger);
+    }
     renamed[file] = target;
     done.push(`renamed ${file} (another machine had used the name) to ${target}`);
   }
@@ -383,6 +394,17 @@ function settleBatch(
     }
     return { state: info.state };
   }
+  const name = batch.url ?? batch.branch;
+  if (info.state === "CLOSED" && scope.kind === "decisions") {
+    // A ledger records what was decided, so a reviewer closing the PR
+    // doesn't undo it here: the changes stay, flagged as not backed up.
+    ledger.closed ??= {};
+    for (const [path] of entries) ledger.closed[path] = { blob: localBlobId(dir, path), url: batch.url };
+    delete ledger.batch;
+    writeLedger(scope, ledger);
+    done.push(`${name} was closed unmerged; its ${entries.length === 1 ? "change stays" : `${entries.length} changes stay`} here, not backed up, and won't be proposed again`);
+    return { state: info.state };
+  }
   ensureCommit(dir, info.head);
   // Decide everything first, and record the edits to carry over, so nothing
   // is lost if the restores below are interrupted.
@@ -421,7 +443,6 @@ function settleBatch(
   delete ledger.batch;
   writeLedger(scope, ledger);
   for (const carry of carries) restore(dir, carry.path);
-  const name = batch.url ?? batch.branch;
   const later = kept > 0 ? `, keeping your later edits to ${kept} ${kept === 1 ? "file" : "files"}` : "";
   done.push(info.state === "MERGED" ? `${name} merged${later}` : `dropped the edits in ${name} (closed unmerged)${later}`);
   return { state: info.state };
@@ -709,8 +730,7 @@ function proposeEdits(
   fall: (why: string) => void,
 ): void {
   const dir = scope.root;
-  const files: Record<string, string | null> = {};
-  for (const path of changedPaths(scope)) files[path] = localBlobId(dir, path);
+  const files = proposable(scope, ledger, done);
   const paths = Object.keys(files);
   let batch = ledger.batch;
   if (batch && state === undefined) {
@@ -793,6 +813,33 @@ function proposeEdits(
   batch.url = opened.url;
   writeLedger(scope, ledger);
   done.push(`proposed ${paths.length} ${paths.length === 1 ? "edit" : "edits"} in ${opened.url}`);
+}
+
+/**
+ * The changed files to propose, with their blob ids: all of them, less
+ * ledger changes whose PR was closed and that are as they were then. A
+ * closed change edited since is proposed again; one that's no longer a
+ * change is forgotten.
+ */
+function proposable(scope: PrScope, ledger: Ledger, done?: string[]): Record<string, string | null> {
+  const dir = scope.root;
+  const files: Record<string, string | null> = {};
+  for (const path of changedPaths(scope)) files[path] = localBlobId(dir, path);
+  if (!ledger.closed) return files;
+  for (const [path, entry] of Object.entries(ledger.closed)) {
+    if (path in files && files[path] === entry.blob) {
+      delete files[path];
+      continue;
+    }
+    if (!done) continue;
+    if (path in files) done.push(`${path} changed since ${entry.url ?? "its PR"} was closed; proposing it again`);
+    delete ledger.closed[path];
+  }
+  if (done) {
+    if (Object.keys(ledger.closed).length === 0) delete ledger.closed;
+    writeLedger(scope, ledger);
+  }
+  return files;
 }
 
 function sameFiles(a: Record<string, string | null>, b: Record<string, string | null>): boolean {
@@ -888,6 +935,11 @@ export function leavePrMode(scope: PrScope, branch: string): { done: string[]; b
   const ledger = readLedger(scope);
   const done: string[] = [];
   pruneLedger(scope, ledger, done);
+  // Direct publish commits the whole folder, so kept closed changes go up too.
+  if (ledger.closed) {
+    delete ledger.closed;
+    writeLedger(scope, ledger);
+  }
   const files = pendingNotes(scopeFolder(scope));
   if (files.length === 0 && !ledger.batch && Object.keys(ledger.notes).length === 0 && !ledger.settling?.length) return { done };
   if (ledger.settling?.length) {
@@ -956,6 +1008,7 @@ export function leavePrMode(scope: PrScope, branch: string): { done: string[]; b
     delete ledger.notes[slug];
     moved += 1;
   }
+  delete ledger.closed;
   writeLedger(scope, ledger);
   if (moved > 0) done.push(`moved ${moved} pending ${moved === 1 ? "note" : "notes"} into notes/`);
   if (withdraw.length > 0) done.push(`close ${withdraw.join(", ")} on the forge: this sync publishes ${withdraw.length === 1 ? "its" : "their"} changes directly`);
@@ -974,6 +1027,8 @@ export interface ProposalStatus {
   unproposed: number;
   /** Pending notes that changed after their PR merged and need a hand merge. */
   conflicted: string[];
+  /** Ledger changes kept after their PR was closed unmerged, and those PRs. */
+  closed?: { files: number; urls: string[] };
 }
 
 export function proposalStatus(scope: PrScope): ProposalStatus {
@@ -988,8 +1043,9 @@ export function proposalStatus(scope: PrScope): ProposalStatus {
     if (entry?.merged) conflicted.push(slug);
     else if (!entry?.url || entry.blob !== blobIdOf(dir, readFileSync(file, "utf8"))) unproposed += 1;
   }
-  const edits: Record<string, string | null> = {};
-  for (const path of changedPaths(scope)) edits[path] = localBlobId(dir, path);
+  const edits = proposable(scope, ledger);
+  const all = changedPaths(scope);
+  const closed = Object.entries(ledger.closed ?? {}).filter(([path]) => all.includes(path) && !(path in edits));
   const proposed = ledger.batch?.url ? ledger.batch.files : {};
   for (const path of new Set([...Object.keys(edits), ...Object.keys(proposed)])) {
     if (!(path in edits) || !(path in proposed) || edits[path] !== proposed[path]) unproposed += 1;
@@ -999,6 +1055,10 @@ export function proposalStatus(scope: PrScope): ProposalStatus {
     batch: ledger.batch ? { files: Object.keys(ledger.batch.files).length, url: ledger.batch.url } : undefined,
     unproposed,
     conflicted,
+    closed:
+      closed.length > 0
+        ? { files: closed.length, urls: [...new Set(closed.map(([, entry]) => entry.url).filter((url): url is string => url !== undefined))] }
+        : undefined,
   };
 }
 
@@ -1018,7 +1078,7 @@ export function pendingNotes(dir: string): string[] {
 function readLedger(scope: PrScope): Ledger {
   try {
     const parsed = JSON.parse(readFileSync(resolve(scopeFolder(scope), "pending", LEDGER), "utf8")) as Partial<Ledger>;
-    return { notes: parsed.notes ?? {}, batch: parsed.batch, settling: parsed.settling, held: parsed.held };
+    return { notes: parsed.notes ?? {}, batch: parsed.batch, settling: parsed.settling, held: parsed.held, closed: parsed.closed };
   } catch {
     return { notes: {} };
   }
@@ -1026,7 +1086,7 @@ function readLedger(scope: PrScope): Ledger {
 
 function writeLedger(scope: PrScope, ledger: Ledger): void {
   const file = resolve(scopeFolder(scope), "pending", LEDGER);
-  if (!ledger.batch && Object.keys(ledger.notes).length === 0 && !ledger.settling?.length && !ledger.held?.length) {
+  if (!ledger.batch && Object.keys(ledger.notes).length === 0 && !ledger.settling?.length && !ledger.held?.length && !Object.keys(ledger.closed ?? {}).length) {
     rmSync(file, { force: true });
     return;
   }

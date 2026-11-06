@@ -89,8 +89,10 @@ worktree stays for any dispute fix; `mahler cleanup <ISSUE>` removes it with
 the issue's other worktrees and deletes the merged branch with `git branch
 -d`. From then on, `mahler check` fails if a checked worktree's copy of those
 files differs from the frozen commit, or is missing. For a slice worktree,
-pass `--worktree <dir>`. A range freeze counts only the range's own commits,
-so base-branch changes made after the tester branched are not frozen.
+pass `--worktree <dir>`: the directory name under the issue's `repos/` (a
+path to the worktree is read as that name). A range freeze counts only the
+range's own commits, so base-branch changes made after the tester branched
+are not frozen.
 
 Only the tester changes frozen tests, and only after a dispute decision.
 
@@ -107,8 +109,12 @@ The composer decides one of three things:
   the tests to match.
 
 After a change, the conductor freezes again with the decision:
-`mahler acceptance freeze ... --reason "<decision>"`. The replaced freeze stays
-in the history. A dispute that changes what the human's project criteria mean
+`mahler acceptance freeze ... --reason "<decision>"`. The new freeze covers the
+whole suite at its commit: every file of the freeze it replaces, plus the
+files the new commit adds or changes. It fails if a frozen file is missing at
+that commit; when the decision removes a test file, pass `--drop <file>`. The
+replaced freeze stays in the history, with the reason and the commit that
+superseded it. A dispute that changes what the human's project criteria mean
 goes to the human.
 
 For a project suite, the tester's fix goes through a PR in the acceptance

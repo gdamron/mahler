@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { basename, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
 import type { Finding, HarnessConfig, RepoConfig } from "../types.js";
@@ -25,8 +25,11 @@ export interface FrozenSet {
 
 interface AcceptanceRecord {
   frozen: FrozenSet[];
-  /** Earlier freezes a re-freeze replaced, with the reason (a dispute decision). */
-  history: Array<FrozenSet & { replacedAt: string; reason: string }>;
+  /**
+   * Earlier freezes a re-freeze replaced, with the reason (a dispute decision)
+   * and the commit of the freeze that replaced it.
+   */
+  history: Array<FrozenSet & { replacedAt: string; reason: string; supersededBy?: string }>;
 }
 
 interface Scope {
@@ -58,32 +61,45 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
   const repo = repoNamed(config, stringFlag(flags, "repo"));
   const commitArg = stringFlag(flags, "commit");
   if (!commitArg) throw new Error("--commit <sha> or --commit <base>..<sha> is required");
-  const source = abs(workspace, repo.path);
-  const commit = frozenCommit(source, commitArg);
-  const files = frozenFiles(source, commitArg, commit);
-  if (files.length === 0) {
-    throw new Error(`${commitArg} adds or changes no files in ${repo.name}; nothing to freeze.`);
-  }
   if (scope.kind === "project" && stringFlag(flags, "worktree")) {
     throw new Error("--worktree applies to issue freezes only; a project freeze applies to every worktree that contains its commit.");
   }
-  const worktree =
-    scope.kind === "issue" ? (stringFlag(flags, "worktree") ?? repo.name) : undefined;
+  const source = abs(workspace, repo.path);
+  const commit = frozenCommit(source, commitArg);
+  const reposRoot = scope.kind === "issue" ? issueReposRoot(workspace, config, scope.name) : undefined;
+  const worktree = reposRoot ? worktreeFlagKey(reposRoot, stringFlag(flags, "worktree") ?? repo.name) : undefined;
   const record = readRecord(scope.dir);
   const now = new Date().toISOString();
-  const existing = record.frozen.find(
-    (set) => set.repo === repo.name && set.worktree === worktree,
+  // Older records may key the same worktree by a path; they match it too.
+  const existing = record.frozen.filter(
+    (set) =>
+      set.repo === repo.name &&
+      (reposRoot ? storedWorktreeKey(reposRoot, set, repo) === worktree : set.worktree === undefined),
   );
-  if (existing) {
-    const reason = stringFlag(flags, "reason");
-    if (!reason) {
-      throw new Error(
-        `${scope.kind} ${scope.name} already has acceptance tests frozen in ${repo.name} at ${existing.commit.slice(0, 12)}. Changing them needs a dispute decision: pass --reason with it (see the verification policy).`,
-      );
-    }
-    record.history.push({ ...existing, replacedAt: now, reason });
-    record.frozen = record.frozen.filter((set) => set !== existing);
+  const reason = stringFlag(flags, "reason");
+  if (existing.length > 0 && !reason) {
+    throw new Error(
+      `${scope.kind} ${scope.name} already has acceptance tests frozen in ${repo.name} at ${existing[0].commit.slice(0, 12)}. Changing them needs a dispute decision: pass --reason with it (see the verification policy).`,
+    );
   }
+  const dropped = (stringFlag(flags, "drop") ?? "").split(",").map((file) => file.trim()).filter(Boolean);
+  const changed = frozenFiles(source, commitArg, commit, existing.length > 0);
+  // A re-freeze pins the whole suite at the new commit, not only what that commit changed.
+  const carried = [...new Set(existing.flatMap((set) => set.files))].filter((file) => !changed.includes(file));
+  const files = [...carried, ...changed].filter((file) => !dropped.includes(file));
+  const gone = files.filter((file) => !existsAt(source, commit, file));
+  if (gone.length > 0) {
+    throw new Error(
+      `${gone.join(", ")} ${gone.length === 1 ? "is" : "are"} frozen for ${scope.kind} ${scope.name} but missing at ${commit.slice(0, 12)}. Freeze a commit that has ${gone.length === 1 ? "it" : "them"}, or, if the dispute decision removes ${gone.length === 1 ? "it" : "them"}, pass --drop ${gone.join(",")}.`,
+    );
+  }
+  if (files.length === 0) {
+    throw new Error(`Nothing left to freeze in ${repo.name} at ${commit.slice(0, 12)}.`);
+  }
+  for (const set of existing) {
+    record.history.push({ ...set, replacedAt: now, reason: reason ?? "", supersededBy: commit });
+  }
+  record.frozen = record.frozen.filter((set) => !existing.includes(set));
   record.frozen.push({
     repo: repo.name,
     commit,
@@ -93,10 +109,57 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
   });
   writeFileEnsured(resolve(scope.dir, recordFile), `${JSON.stringify(record, null, 2)}\n`);
   console.log(
-    `Froze ${files.length} acceptance file(s) in ${repo.name} at ${commit.slice(0, 12)} for ${scope.kind} ${scope.name}:`,
+    `Froze ${files.length} acceptance file(s) in ${repo.name} at ${commit.slice(0, 12)} for ${scope.kind} ${scope.name}${worktree && worktree !== repo.name ? ` (worktree ${worktree})` : ""}:`,
   );
-  for (const file of files) console.log(`- ${file}`);
+  for (const file of files) console.log(`- ${file}${carried.includes(file) ? " (from the previous freeze)" : ""}`);
+  const droppedFrozen = dropped.filter((file) => existing.some((set) => set.files.includes(file)));
+  for (const file of droppedFrozen) console.log(`Dropped from the freeze: ${file}`);
+  if (existing.length > 0) {
+    console.log(`Replaced the freeze at ${existing.map((set) => set.commit.slice(0, 12)).join(", ")}; it is kept in history.`);
+  }
   console.log("`mahler check` now fails if a checked worktree changes them.");
+}
+
+/** Where an issue's worktrees live: `<workspaceDir>/issues/<ISSUE>/repos`. */
+function issueReposRoot(workspace: string, config: HarnessConfig, issue: string): string {
+  return resolve(issuePaths(workspace, config, issue).worktreeRoot, "repos");
+}
+
+/**
+ * The key `mahler check` matches an issue freeze by: the worktree's directory
+ * name under the issue's `repos/`. A path to a worktree (absolute, or with a
+ * slash) becomes that name, so one worktree never gets two freezes.
+ */
+function worktreeFlagKey(reposRoot: string, value: string): string {
+  const trimmed = value.trim().replace(/[\\/]+$/, "");
+  if (!isAbsolute(trimmed) && !/[\\/]/.test(trimmed)) return trimmed;
+  const key = keyUnder(reposRoot, resolve(trimmed));
+  if (!key) {
+    throw new Error(
+      `--worktree ${value} is not a worktree of this issue (under ${reposRoot}). Pass the worktree's directory name there, such as ${basename(trimmed)}.`,
+    );
+  }
+  return key;
+}
+
+/** A stored freeze's worktree key, reading an older path-valued key as its directory name. */
+function storedWorktreeKey(reposRoot: string, set: FrozenSet, repo: RepoConfig): string {
+  const value = set.worktree ?? repo.name;
+  return isAbsolute(value) ? (keyUnder(reposRoot, value) ?? value) : value;
+}
+
+/** The first directory of `path` under `root`, comparing real paths too (macOS /var is /private/var). */
+function keyUnder(root: string, path: string): string | undefined {
+  const real = (value: string) => (existsSync(value) ? realpathSync(value) : value);
+  for (const [from, to] of [[root, path], [real(root), real(path)]]) {
+    const rel = relative(from, to);
+    if (rel && !rel.startsWith("..") && !isAbsolute(rel)) return rel.split(sep)[0];
+  }
+  return undefined;
+}
+
+function existsAt(source: string, commit: string, file: string): boolean {
+  return spawnSync("git", ["cat-file", "-e", `${commit}:${file}`], { cwd: source }).status === 0;
 }
 
 /**
@@ -195,14 +258,15 @@ export function frozenAcceptanceFindings(
   const owner = issue ?? issueForDir(workspace, config, cwd);
   const sets: Array<{ set: FrozenSet; scope: string }> = [];
   if (owner) {
+    const reposRoot = issueReposRoot(workspace, config, owner);
     const own = readRecord(issuePaths(workspace, config, owner).meta).frozen
       .filter((set) => set.repo === repo.name);
-    const matched = own.filter((set) => (set.worktree ?? repo.name) === basename(cwd));
+    const matched = own.filter((set) => storedWorktreeKey(reposRoot, set, repo) === basename(cwd));
     for (const set of matched) sets.push({ set, scope: `issue ${owner}` });
     if (own.length > 0 && matched.length === 0) {
       findings.push({
         level: "warn",
-        message: `${label}: issue ${owner} has acceptance tests frozen in ${repo.name} for ${own.map((set) => set.worktree ?? repo.name).join(", ")}, not ${basename(cwd)}; they were not compared here`,
+        message: `${label}: issue ${owner} has acceptance tests frozen in ${repo.name} for ${own.map((set) => storedWorktreeKey(reposRoot, set, repo)).join(", ")}, not ${basename(cwd)}; they were not compared here`,
       });
     }
   }
@@ -266,7 +330,7 @@ function frozenCommit(source: string, commitArg: string): string {
  * tester branched are not frozen. A merge commit counts against its first
  * parent.
  */
-function frozenFiles(source: string, commitArg: string, commit: string): string[] {
+function frozenFiles(source: string, commitArg: string, commit: string, refreeze: boolean): string[] {
   const [from] = splitRange(commitArg);
   const parents = gitOrThrow(source, ["rev-list", "--parents", "-n", "1", commit]).split(" ").length - 1;
   const listed = from
@@ -275,7 +339,7 @@ function frozenFiles(source: string, commitArg: string, commit: string): string[
       ? gitOrThrow(source, ["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", "--diff-filter=AM", commit])
       : gitOrThrow(source, ["diff", "--name-only", "--no-renames", "--diff-filter=AM", `${commit}^1`, commit]);
   const files = listed.split("\n").filter(Boolean);
-  if (files.length === 0) {
+  if (files.length === 0 && !refreeze) {
     throw new Error(`${commitArg} adds or changes no files; nothing to freeze.`);
   }
   return files;

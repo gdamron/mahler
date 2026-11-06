@@ -194,7 +194,7 @@ const commands: Record<string, Command> = {
   },
   acceptance: {
     usage:
-      "mahler acceptance freeze|manifest|run --workspace <path> (--issue <ISSUE> | --project <slug>) [--repo <name> --commit <sha|base..sha> [--worktree <dir>] [--reason <why>]] [--out <file>]",
+      "mahler acceptance freeze|manifest|run --workspace <path> (--issue <ISSUE> | --project <slug>) [--repo <name> --commit <sha|base..sha> [--worktree <dir>] [--reason <why>] [--drop <file>[,<file>...]]] [--out <file>]",
     summary:
       "Freeze a tester's acceptance tests, write the revision manifest, or run the project acceptance suite.",
     positionals: 1,
@@ -206,6 +206,7 @@ const commands: Record<string, Command> = {
       commit: "string",
       worktree: "string",
       reason: "string",
+      drop: "string",
       out: "string",
     },
     run: (args) =>

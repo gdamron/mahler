@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -263,4 +263,139 @@ test("check warns when an issue's frozen tests belong to a different worktree", 
   assert.equal(frozen.status, 0, frozen.stderr);
   const result = check(workspace);
   assert.match(result.stdout, /warn app: issue MAH-1 has acceptance tests frozen in app for app-ui, not app/);
+});
+
+const readRecord = (workspace: string, issue = "MAH-1") =>
+  JSON.parse(readFileSync(resolve(workspace, ".harness", "issues", issue, "acceptance.json"), "utf8"));
+
+/** A commit on `tests` that rewrites one acceptance file. */
+function amendTest(app: string, file: string, content: string): string {
+  git(app, "checkout", "-q", "tests");
+  writeFileSync(resolve(app, file), content);
+  git(app, "commit", "-qam", `amend ${file}`);
+  git(app, "checkout", "-q", "main");
+  return git(app, "rev-parse", "tests");
+}
+
+test("re-freezing with a path to the worktree replaces the freeze for that worktree", () => {
+  const { workspace, app, worktree } = setup();
+  const args = ["acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1", "--repo", "app"];
+  assert.equal(run([...args, "--commit", "tests", "--worktree", "app"]).status, 0);
+  const first = git(app, "rev-parse", "tests");
+
+  const second = amendTest(app, "tests/accept.txt", "corrected\n");
+  // The real path, as `pwd -P` gives it, which differs from the workspace path when a parent is a symlink.
+  const replaced = run([...args, "--commit", second, "--worktree", realpathSync(worktree), "--reason", "test fixed after a dispute"]);
+  assert.equal(replaced.status, 0, replaced.stderr);
+
+  const record = readRecord(workspace);
+  assert.equal(record.frozen.length, 1);
+  assert.equal(record.frozen[0].worktree, "app");
+  assert.equal(record.frozen[0].commit, second);
+  assert.equal(record.history.length, 1);
+  assert.equal(record.history[0].commit, first);
+  assert.equal(record.history[0].supersededBy, second);
+  assert.equal(record.history[0].reason, "test fixed after a dispute");
+
+  git(worktree, "merge", "-q", "tests");
+  const checked = check(workspace);
+  assert.equal(checked.status, 0, checked.stdout);
+  assert.match(checked.stdout, /ok {3}app: 1 frozen acceptance file\(s\) for issue MAH-1 match/);
+  assert.doesNotMatch(checked.stdout, /were not compared here/);
+});
+
+test("a freeze keyed by a worktree path in an older record is compared and replaced", () => {
+  const { workspace, app, worktree } = setup();
+  const args = ["acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1", "--repo", "app"];
+  assert.equal(run([...args, "--commit", "tests"]).status, 0);
+  const path = resolve(workspace, ".harness", "issues", "MAH-1", "acceptance.json");
+  const legacy = readRecord(workspace);
+  legacy.frozen[0].worktree = worktree;
+  writeFileSync(path, `${JSON.stringify(legacy, null, 2)}\n`);
+
+  git(worktree, "merge", "-q", "tests");
+  const checked = check(workspace);
+  assert.equal(checked.status, 0, checked.stdout);
+  assert.match(checked.stdout, /ok {3}app: 1 frozen acceptance file\(s\) for issue MAH-1 match/);
+  assert.doesNotMatch(checked.stdout, /were not compared here/);
+
+  const second = amendTest(app, "tests/accept.txt", "corrected\n");
+  assert.equal(run([...args, "--commit", second, "--reason", "test fixed after a dispute"]).status, 0);
+  const record = readRecord(workspace);
+  assert.deepEqual(record.frozen.map((set: { worktree: string }) => set.worktree), ["app"]);
+  assert.equal(record.history.length, 1);
+  assert.equal(record.history[0].supersededBy, second);
+});
+
+test("--worktree must be a worktree of the issue", () => {
+  const { workspace, app } = setup();
+  const result = run([
+    "acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1",
+    "--repo", "app", "--commit", "tests", "--worktree", app,
+  ]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /is not a worktree of this issue/);
+});
+
+test("re-freezing at a commit that changes one file keeps the whole suite frozen", () => {
+  const { workspace, app, worktree } = setup();
+  const suite = ["accept.txt", ...[2, 3, 4, 5, 6, 7].map((n) => `accept-${n}.txt`)].map((name) => `tests/${name}`);
+  git(app, "checkout", "-q", "tests");
+  for (const file of suite.slice(1)) writeFileSync(resolve(app, file), `${file}\n`);
+  git(app, "add", ".");
+  git(app, "commit", "-qm", "more acceptance tests");
+  git(app, "checkout", "-q", "main");
+  const args = ["acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1", "--repo", "app"];
+  const frozen = run([...args, "--commit", "main..tests"]);
+  assert.equal(frozen.status, 0, frozen.stderr);
+  assert.match(frozen.stdout, /Froze 7 acceptance file/);
+
+  const second = amendTest(app, "tests/accept-4.txt", "corrected\n");
+  const replaced = run([...args, "--commit", second, "--reason", "test fixed after a dispute"]);
+  assert.equal(replaced.status, 0, replaced.stderr);
+  assert.match(replaced.stdout, /Froze 7 acceptance file/);
+  const record = readRecord(workspace);
+  assert.equal(record.frozen.length, 1);
+  assert.equal(record.frozen[0].commit, second);
+  assert.deepEqual([...record.frozen[0].files].sort(), [...suite].sort());
+
+  git(worktree, "merge", "-q", "tests");
+  const checked = check(workspace);
+  assert.equal(checked.status, 0, checked.stdout);
+  assert.match(checked.stdout, /ok {3}app: 7 frozen acceptance file\(s\) for issue MAH-1 match/);
+
+  writeFileSync(resolve(worktree, "tests", "accept-2.txt"), "loosened\n");
+  const tampered = check(workspace);
+  assert.notEqual(tampered.status, 0);
+  assert.match(tampered.stdout, /differ .*tests\/accept-2\.txt/);
+});
+
+test("re-freezing at a commit that deletes a frozen file fails unless the file is dropped", () => {
+  const { workspace, app } = setup();
+  git(app, "checkout", "-q", "tests");
+  writeFileSync(resolve(app, "tests", "extra.txt"), "extra\n");
+  git(app, "add", ".");
+  git(app, "commit", "-qm", "another test");
+  git(app, "checkout", "-q", "main");
+  const args = ["acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1", "--repo", "app"];
+  assert.equal(run([...args, "--commit", "main..tests"]).status, 0);
+
+  git(app, "checkout", "-q", "tests");
+  git(app, "rm", "-q", "tests/extra.txt");
+  writeFileSync(resolve(app, "tests", "accept.txt"), "covers extra too\n");
+  git(app, "commit", "-qam", "fold extra into accept");
+  git(app, "checkout", "-q", "main");
+  const reason = ["--reason", "extra was a duplicate"];
+
+  const refused = run([...args, "--commit", "tests", ...reason]);
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /tests\/extra\.txt is frozen for issue MAH-1 but missing at .*pass --drop tests\/extra\.txt/);
+  assert.equal(readRecord(workspace).history.length, 0);
+
+  const dropped = run([...args, "--commit", "tests", ...reason, "--drop", "tests/extra.txt"]);
+  assert.equal(dropped.status, 0, dropped.stderr);
+  assert.match(dropped.stdout, /Dropped from the freeze: tests\/extra\.txt/);
+  const record = readRecord(workspace);
+  assert.deepEqual(record.frozen[0].files, ["tests/accept.txt"]);
+  assert.deepEqual([...record.history[0].files].sort(), ["tests/accept.txt", "tests/extra.txt"]);
 });

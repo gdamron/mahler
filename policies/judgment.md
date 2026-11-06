@@ -41,7 +41,9 @@ Keep the ledger lean. `HANDOFF.md` is per-issue and a later session never reads
 a _prior_ issue's handoff, so the ledger carries forward only deviations whose
 reasons a later session should know. A purely issue-local judgment call stays
 in `HANDOFF.md` only. What you learned about the code or tools is knowledge,
-not a deviation: record it with `mahler learn` (see the knowledge policy).
+not a deviation: record it with `mahler learn` (see the knowledge policy). A
+settled design decision isn't a deviation either: it goes in the repo's design
+docs, not the ledger (see "What Goes Where" in the knowledge policy).
 
 At the start of a session, read `.harness/decisions/INDEX.md`, which Mahler
 generates with one line per active note, and open the notes that bear on your

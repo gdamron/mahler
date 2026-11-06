@@ -144,7 +144,9 @@ linear-template task`) or `--title`, `--description`, and `--risk`.
 
 `mahler acceptance freeze` records the commit that holds a tester's
 acceptance tests, for an issue or a project; changing a frozen set needs
-`--reason` with the dispute decision, and the old set stays in the history.
+`--reason` with the dispute decision. A re-freeze pins the whole suite at the
+new commit (`--drop <file>` removes a deleted test), and the old set stays in
+the history.
 `mahler acceptance run` writes a revision manifest (each repo's issue
 worktree, or its base branch) and runs `acceptance.run` with `<manifest>` and
 `<project>` filled in.

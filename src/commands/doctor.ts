@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { configPath, loadConfig } from "../config.js";
 import { decisionsDir, knowledgeDir, knowledgeIndex, readLedger, readNotes } from "../knowledge.js";
-import { knowledgeStore, ledgerRepoProblem, ledgerStore, prPublish, storeState } from "../knowledge-repo.js";
+import { knowledgeStore, ledgerStore, prPublish, prScope, type RepoStore, storeRepoProblem, storeState } from "../knowledge-repo.js";
 import { frontmatterField, pendingNotes, proposalStatus } from "../knowledge-pr.js";
 import { modelConfigProblems, tierVariants } from "../models.js";
 import { spotlightFinding } from "../spotlight.js";
@@ -370,20 +370,21 @@ export function knowledgeFindings(workspace: string, config: HarnessConfig): Fin
   if (!repo) {
     findings.push({ level: "ok", message: `knowledge store: local folder ${dir}` });
   } else {
-    const state = storeState(workspace, knowledgeStore(workspace, config));
+    const store = knowledgeStore(workspace, config);
+    const state = storeState(workspace, store);
     if (state.problem) {
       findings.push({ level: "error", message: `knowledge store: ${state.problem}` });
       return findings;
     }
     findings.push({
       level: "ok",
-      message: `knowledge store: clone of ${repo} on ${state.branch}${prPublish(config) ? ", publishing through PRs" : ""}`,
+      message: `knowledge store: clone of ${repo} on ${state.branch}${sharedNote(store)}${prPublish(config) ? ", publishing through PRs" : ""}`,
     });
     if (publish !== undefined && publish !== "direct" && publish !== "pr") {
       findings.push({ level: "error", message: `knowledge.publish must be "direct" or "pr", not ${JSON.stringify(publish)}` });
     }
     if (prPublish(config)) {
-      findings.push(...pendingFindings(dir));
+      findings.push(...pendingFindings(store));
       if ((state.behind ?? 0) > 0) {
         findings.push({ level: "info", message: `knowledge store is ${state.behind} ${state.behind === 1 ? "commit" : "commits"} behind the remote, as of the last fetch; run \`mahler knowledge sync\`` });
       }
@@ -406,16 +407,46 @@ export function knowledgeFindings(workspace: string, config: HarnessConfig): Fin
   return findings;
 }
 
-/** With `decisions.repo`: whether the ledger's clone is sound and backed up. */
+/**
+ * With `decisions.repo`: whether the ledger's clone is sound and backed up.
+ * Also reports how the two stores' repos are set, when that's wrong.
+ */
 export function ledgerRepoFindings(workspace: string, config: HarnessConfig): Finding[] {
   const store = ledgerStore(workspace, config);
+  const clash = storeRepoProblem(workspace, config);
+  if (clash) return [{ level: "error", message: `${store.repo ? "decisions ledger" : "knowledge store"}: ${clash}` }];
   if (!store.repo) return [];
-  const clash = ledgerRepoProblem(workspace, config);
-  if (clash) return [{ level: "error", message: `decisions ledger: ${clash}` }];
   const state = storeState(workspace, store);
   if (state.problem) return [{ level: "error", message: `decisions ledger: ${state.problem}` }];
+  if (store.pr) {
+    // Shared with a knowledge store that publishes through PRs: a decision is backed up once its PR merges.
+    const status = proposalStatus(prScope(store));
+    const findings: Finding[] = [
+      { level: "ok", message: `decisions ledger: backed up to ${store.repo} on ${state.branch}${sharedNote(store)}, through PRs` },
+    ];
+    if (status.batch) {
+      findings.push({
+        level: "info",
+        message: `decisions ledger PR awaiting review: ${status.batch.files} ${status.batch.files === 1 ? "change" : "changes"}, not backed up until it merges${status.batch.url ? ` (${status.batch.url})` : ""}`,
+      });
+    }
+    if (status.unproposed > 0) {
+      findings.push({
+        level: "warn",
+        message: `${status.unproposed} decisions ledger ${status.unproposed === 1 ? "change isn't" : "changes aren't"} proposed in a PR yet; run \`mahler knowledge sync\``,
+      });
+    }
+    if (status.closed) {
+      const { files, urls } = status.closed;
+      findings.push({
+        level: "warn",
+        message: `${files} decisions ledger ${files === 1 ? "change" : "changes"} not backed up: ${urls.length > 1 ? "their PRs were" : files === 1 ? "its PR was" : "their PR was"} closed${urls.length > 0 ? ` (${urls.join(", ")})` : ""}. They stay here and aren't proposed again; edit one to propose it again`,
+      });
+    }
+    return findings;
+  }
   const findings: Finding[] = [
-    { level: "ok", message: `decisions ledger: backed up to ${store.repo} on ${state.branch}` },
+    { level: "ok", message: `decisions ledger: backed up to ${store.repo} on ${state.branch}${sharedNote(store)}` },
   ];
   if ((state.ahead ?? 0) > 0) {
     findings.push({ level: "warn", message: `decisions ledger has ${state.ahead} ${state.ahead === 1 ? "commit" : "commits"} not backed up; run \`mahler knowledge sync\`` });
@@ -429,10 +460,16 @@ export function ledgerRepoFindings(workspace: string, config: HarnessConfig): Fi
 /** A pending note older than this has waited too long for review. */
 const PENDING_REVIEW_DAYS = 7;
 
+/** In a shared clone: which folder of the repo the store is. */
+function sharedNote(store: RepoStore): string {
+  return store.shared ? `, in ${store.prefix} (shared with the ${store.name === "knowledge" ? "decisions ledger" : "knowledge store"})` : "";
+}
+
 /** PR publish: what waits for review, and what hasn't been proposed yet. */
-function pendingFindings(dir: string): Finding[] {
+function pendingFindings(store: RepoStore): Finding[] {
+  const { dir } = store;
   const findings: Finding[] = [];
-  const status = proposalStatus(dir);
+  const status = proposalStatus(prScope(store));
   if (status.notes > 0 || status.batch) {
     const edits = status.batch?.files ?? 0;
     const parts = [

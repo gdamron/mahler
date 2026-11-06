@@ -9,7 +9,7 @@ import {
   withInstallOptions,
 } from "../config.js";
 import { knowledgeDir, writeIndexes } from "../knowledge.js";
-import { cloneStore, knowledgeStore, ledgerRepoProblem, ledgerStore } from "../knowledge-repo.js";
+import { cloneStore, knowledgeStore, ledgerStore, storeRepoProblem } from "../knowledge-repo.js";
 import { agentNameCollisions, defaultModelFor, tierVariants } from "../models.js";
 import { parseProfileSource } from "../profiles.js";
 import {
@@ -77,8 +77,8 @@ export function install(workspaceInput: string, flags: Flags): void {
   }
   ensureDir(resolve(workspace, ".harness", "policies"));
   ensureDir(resolve(workspace, ".harness", "agents", "profiles"));
-  const ledgerProblem = ledgerRepoProblem(workspace, config);
-  if (ledgerProblem) throw new Error(`Cannot install: ${ledgerProblem}.`);
+  const repoProblem = storeRepoProblem(workspace, config);
+  if (repoProblem) throw new Error(`Cannot install: ${repoProblem}.`);
   // Reported at once: a later step may fail, and the ledger has switched by then.
   const clonedLedger = cloneStore(workspace, ledgerStore(workspace, config));
   if (clonedLedger) console.log(clonedLedger);

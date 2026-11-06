@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import { parseNote } from "./knowledge.js";
@@ -23,11 +23,34 @@ import { blobIdOf, firstLine, gh, git, gitOrThrow, gitText, IGNORED, NETWORK_TIM
  * reviewer's commits are never overwritten. Once a PR merges or closes, sync
  * drops the local copy and pulls; an edit made after the PR's last push is
  * kept, folded into the merged version when it merged.
+ *
+ * When the knowledge store shares its repo with the decisions ledger, the
+ * ledger publishes this way too, with no pending notes: its new notes and
+ * archive moves stay in the working tree and go up as its own batch PR.
+ * Each store's sync proposes only the files under its own folder.
  */
 
 export interface PrSyncResult {
   done: string[];
   published: boolean;
+  /** Ledger notes renamed because another machine had used the name: old path → new, relative to the store. */
+  renamed?: Record<string, string>;
+}
+
+/**
+ * Where a store publishes: `root` is its clone, where git runs, and `prefix`
+ * its folder in the repo ("" when it has the whole repo, else ending in "/").
+ * Paths in git and in the PR records are relative to `root`.
+ */
+export interface PrScope {
+  root: string;
+  prefix: string;
+  kind: "knowledge" | "decisions";
+}
+
+/** The store's own folder. */
+export function scopeFolder(scope: PrScope): string {
+  return resolve(scope.root, scope.prefix);
 }
 
 interface Proposal {
@@ -59,6 +82,18 @@ export interface Ledger {
   batch?: BatchProposal;
   /** Edits set aside for a pull, to put back once it's done; kept here so a crash can't lose them. */
   settling?: Carry[];
+  /**
+   * Ledger notes whose PR merged, then edited here in ways that conflict with
+   * the merged version: the same decision, waiting on a hand merge, so not a
+   * name clash to rename.
+   */
+  held?: string[];
+  /**
+   * Ledger changes whose PR a reviewer closed unmerged: kept here, not
+   * backed up, and not proposed again unless they change. Path → blob id
+   * when closed (null for a deletion), and the PR.
+   */
+  closed?: Record<string, { blob: string | null; url?: string }>;
 }
 
 type PrState = "OPEN" | "MERGED" | "CLOSED" | "NONE";
@@ -73,11 +108,27 @@ interface PrInfo {
 
 const LEDGER = "prs.json";
 
+/** The other store in a shared clone, settled alongside this one. */
+interface Side {
+  scope: PrScope;
+  ledger: Ledger;
+  /** Its messages, reported with its name. */
+  done: string[];
+}
+
 /**
  * `quick` (for briefs): pull and settle using only what git can see, without
  * asking the forge about PRs or opening any, so a brief never waits on it.
  */
-export function prModeSync(dir: string, branch: string, repo: string, message: string, quick = false): PrSyncResult {
+export function prModeSync(
+  scope: PrScope,
+  branch: string,
+  repo: string,
+  message: string,
+  quick = false,
+  other?: PrScope,
+): PrSyncResult {
+  const dir = scope.root;
   const done: string[] = [];
   let published = true;
   const fall = (why: string) => {
@@ -86,10 +137,15 @@ export function prModeSync(dir: string, branch: string, repo: string, message: s
   };
   ensureExcluded(dir);
   git(dir, ["worktree", "prune"]);
-  const ledger = readLedger(dir);
-  pruneLedger(dir, ledger, done);
+  const ledger = readLedger(scope);
+  pruneLedger(scope, ledger, done);
+  // In a shared clone, the other store's settled PR and set-aside edits sit
+  // in the pull's way too, so this sync settles them as well. Its messages
+  // are marked with its name.
+  const side: Side | undefined = other && { scope: other, ledger: readLedger(other), done: [] };
   // Ask the forge before fetching, so a PR it calls merged is in the fetch.
   const answers = quick ? new Map<string, PrInfo | undefined>() : askForge(dir, ledger);
+  if (!quick && side?.ledger.batch) answers.set(side.ledger.batch.branch, findPr(dir, side.ledger.batch));
   const ask = (proposal: Proposal) => answers.get(proposal.branch);
   const fetch = git(dir, ["fetch", "--quiet", "--prune", "origin"], NETWORK_TIMEOUT_MS);
   if (!fetch.ok) {
@@ -111,31 +167,86 @@ export function prModeSync(dir: string, branch: string, repo: string, message: s
     );
   }
 
-  resumeSettling(dir, ledger, done);
-  const batch = settleBatch(dir, remote, ledger, ask, true, done);
-  const pulled = pull(dir, remote, branch, ledger, done, fall);
-  const settled = applySettling(dir, ledger, pulled, fall);
-  const notes = settlePendingNotes(dir, remote, ask, pulled, ledger, done, fall);
-  if (quick) return { done, published };
+  resumeSettling(scope, ledger, done);
+  if (side) resumeSettling(side.scope, side.ledger, side.done);
+  const batch = settleBatch(scope, remote, ledger, ask, true, done);
+  const sideBatch = side && settleBatch(side.scope, remote, side.ledger, ask, true, side.done);
+  // The ledger's new notes can't wait under pending/, so a name another
+  // machine took first is resolved here, before the pull trips on it.
+  let renamed: Record<string, string> = {};
+  if (scope.kind === "decisions" && batch.state !== undefined) renamed = renameLedgerClashes(scope, remote, ledger, done);
+  if (side?.scope.kind === "decisions" && sideBatch?.state !== undefined) renameLedgerClashes(side.scope, remote, side.ledger, side.done);
+  const report = () => {
+    if (!side) return;
+    const name = side.scope.kind === "decisions" ? "decisions ledger" : "knowledge store";
+    done.push(...side.done.splice(0).map((line) => `${line} (${name})`));
+  };
+  report();
+  const pulled = pull(scope, remote, branch, ledger, done, fall, side);
+  const settled = applySettling(scope, ledger, pulled, fall);
+  if (side) applySettling(side.scope, side.ledger, pulled, (why) => side.done.push(why));
+  report();
+  const notes = settlePendingNotes(scope, remote, ask, pulled, ledger, done, fall);
+  if (quick) return { done, published, renamed };
 
-  for (const file of pendingNotes(dir)) {
+  for (const file of pendingNotes(scopeFolder(scope))) {
     const slug = basename(file, ".md");
     if (notes.waiting.has(slug)) continue;
     try {
-      proposeNote(dir, remote, branch, slug, ledger, notes.states.get(slug), message, done, fall);
+      proposeNote(scope, remote, branch, slug, ledger, notes.states.get(slug), message, done, fall);
     } catch (error) {
       fall(`couldn't propose ${slug} (${(error as Error).message})`);
     }
   }
   // After a blocked pull the working tree sits on an old commit, and its
   // files would undo newer changes on the branch.
-  if (!pulled || !settled) return { done, published };
+  if (!pulled || !settled) return { done, published, renamed };
   try {
-    proposeEdits(dir, remote, branch, ledger, batch.state, done, fall);
+    proposeEdits(scope, remote, branch, ledger, batch.state, done, fall);
   } catch (error) {
     fall(`couldn't propose your edits (${(error as Error).message})`);
   }
-  return { done, published };
+  return { done, published, renamed };
+}
+
+/**
+ * Ledger notes are named by date and rule, so two machines can pick the same
+ * name. A new local note whose name the remote already holds with other
+ * content is renamed to a free name; the batch PR follows on this sync.
+ */
+function renameLedgerClashes(scope: PrScope, remote: string, ledger: Ledger, done: string[]): Record<string, string> {
+  const dir = scope.root;
+  const renamed: Record<string, string> = {};
+  // A held note stops being one once the hand merge lands it in the clone.
+  if (ledger.held) {
+    ledger.held = ledger.held.filter((path) => existsSync(resolve(dir, path)) && blobId(dir, "HEAD", path) === null);
+    if (ledger.held.length === 0) delete ledger.held;
+    writeLedger(scope, ledger);
+  }
+  for (const path of changedPaths(scope)) {
+    if (ledger.held?.includes(path)) continue;
+    const file = path.slice(scope.prefix.length);
+    if (/[\\/]/.test(file) || !file.endsWith(".md") || ["README.md", "INDEX.md"].includes(file)) continue;
+    if (blobId(dir, "HEAD", path) !== null || !existsSync(resolve(dir, path))) continue;
+    const theirs = blobId(dir, remote, path);
+    if (theirs === null || theirs === localBlobId(dir, path)) continue;
+    const taken = (candidate: string) =>
+      [candidate, `archive/${candidate}`].some(
+        (name) => existsSync(resolve(dir, scope.prefix + name)) || blobId(dir, remote, scope.prefix + name) !== null,
+      );
+    const stem = file.replace(/\.md$/, "");
+    let target = file;
+    for (let n = 2; taken(target); n += 1) target = `${stem}-${n}.md`;
+    renameSync(resolve(dir, path), resolve(dir, scope.prefix + target));
+    if (ledger.closed?.[path]) {
+      ledger.closed[scope.prefix + target] = ledger.closed[path];
+      delete ledger.closed[path];
+      writeLedger(scope, ledger);
+    }
+    renamed[file] = target;
+    done.push(`renamed ${file} (another machine had used the name) to ${target}`);
+  }
+  return renamed;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +262,7 @@ export function prModeSync(dir: string, branch: string, repo: string, message: s
  * wait on a pull or a hand merge, which must not be proposed again.
  */
 function settlePendingNotes(
-  dir: string,
+  scope: PrScope,
   remote: string,
   ask: (proposal: Proposal) => PrInfo | undefined,
   pulled: boolean,
@@ -159,17 +270,18 @@ function settlePendingNotes(
   done: string[],
   fall: (why: string) => void,
 ): { states: Map<string, PrState>; waiting: Set<string> } {
+  const dir = scope.root;
   const states = new Map<string, PrState>();
   const waiting = new Set<string>();
   let merged = 0;
-  for (const file of pendingNotes(dir)) {
+  for (const file of pendingNotes(scopeFolder(scope))) {
     const slug = basename(file, ".md");
     const entry = ledger.notes[slug];
     if (!entry) {
       states.set(slug, "NONE");
       continue;
     }
-    const path = `notes/${slug}.md`;
+    const path = `${scope.prefix}notes/${slug}.md`;
     const info: PrInfo | undefined = entry.merged ? { state: "MERGED", head: entry.mergedHead } : noteState(dir, remote, ask, entry, path);
     if (!info) continue;
     if (info.url && !entry.url) {
@@ -209,7 +321,7 @@ function settlePendingNotes(
     if (!unchanged && folded === undefined) {
       Object.assign(entry, { merged: true, mergedHead: info.head });
       waiting.add(slug);
-      fall(`pending/${slug}.md changed after ${name} merged, in ways that conflict with the merged ${path}; fold your changes into it by hand and delete pending/${slug}.md`);
+      fall(`pending/${slug}.md changed after ${name} merged, in ways that conflict with the merged notes/${slug}.md; fold your changes into it by hand and delete pending/${slug}.md`);
       continue;
     }
     if (folded !== undefined && folded !== theirs) {
@@ -220,7 +332,7 @@ function settlePendingNotes(
     delete ledger.notes[slug];
     merged += 1;
   }
-  writeLedger(dir, ledger);
+  writeLedger(scope, ledger);
   if (merged > 0) done.push(`${merged} pending ${merged === 1 ? "note" : "notes"} merged`);
   return { states, waiting };
 }
@@ -254,16 +366,18 @@ interface Carry {
  * edit. For a merged batch, `carry` folds that edit into the merged version
  * and sets it aside in the ledger to write after the pull; without it, or
  * when the edit conflicts, the file is left as it is. Returns the batch's PR
- * state, absent when the forge couldn't say.
+ * state, absent when the forge couldn't say. A merged batch's files left as
+ * they are go in the ledger's `held`.
  */
 function settleBatch(
-  dir: string,
+  scope: PrScope,
   remote: string,
   ledger: Ledger,
   ask: (proposal: Proposal) => PrInfo | undefined,
   carry: boolean,
   done: string[],
 ): { state?: PrState } {
+  const dir = scope.root;
   const { batch } = ledger;
   if (!batch) return { state: "NONE" };
   const entries = Object.entries(batch.files);
@@ -275,9 +389,20 @@ function settleBatch(
   if (info.state === "OPEN" || info.state === "NONE") {
     if (info.url && !batch.url) {
       batch.url = info.url;
-      writeLedger(dir, ledger);
+      writeLedger(scope, ledger);
       done.push(`found ${info.url} for your edits`);
     }
+    return { state: info.state };
+  }
+  const name = batch.url ?? batch.branch;
+  if (info.state === "CLOSED" && scope.kind === "decisions") {
+    // A ledger records what was decided, so a reviewer closing the PR
+    // doesn't undo it here: the changes stay, flagged as not backed up.
+    ledger.closed ??= {};
+    for (const [path] of entries) ledger.closed[path] = { blob: localBlobId(dir, path), url: batch.url };
+    delete ledger.batch;
+    writeLedger(scope, ledger);
+    done.push(`${name} was closed unmerged; its ${entries.length === 1 ? "change stays" : `${entries.length} changes stay`} here, not backed up, and won't be proposed again`);
     return { state: info.state };
   }
   ensureCommit(dir, info.head);
@@ -309,15 +434,15 @@ function settleBatch(
     }
     kept += 1;
     if (text !== undefined) carries.push({ path, local: localText, text, onto: theirs });
+    else if (info.state === "MERGED") ledger.held = [...new Set([...(ledger.held ?? []), path])];
   }
   // Files with nothing to keep go first: if one fails, the batch is still
   // recorded and the next sync settles it again.
   for (const path of restores) restore(dir, path);
   ledger.settling = [...(ledger.settling ?? []), ...carries];
   delete ledger.batch;
-  writeLedger(dir, ledger);
+  writeLedger(scope, ledger);
   for (const carry of carries) restore(dir, carry.path);
-  const name = batch.url ?? batch.branch;
   const later = kept > 0 ? `, keeping your later edits to ${kept} ${kept === 1 ? "file" : "files"}` : "";
   done.push(info.state === "MERGED" ? `${name} merged${later}` : `dropped the edits in ${name} (closed unmerged)${later}`);
   return { state: info.state };
@@ -328,7 +453,16 @@ function settleBatch(
  * the incoming changes (three-way, against HEAD) and put back after; only
  * edits that conflict block the pull.
  */
-function pull(dir: string, remote: string, branch: string, ledger: Ledger, done: string[], fall: (why: string) => void): boolean {
+function pull(
+  scope: PrScope,
+  remote: string,
+  branch: string,
+  ledger: Ledger,
+  done: string[],
+  fall: (why: string) => void,
+  side?: Side,
+): boolean {
+  const dir = scope.root;
   const behind = count(dir, `HEAD..${remote}`);
   if (behind === 0) return true;
   let merge = git(dir, ["merge", "--ff-only", "--quiet", remote]);
@@ -345,11 +479,21 @@ function pull(dir: string, remote: string, branch: string, ledger: Ledger, done:
       else folds.push({ path, local, text, onto: theirs });
     }
     if (conflicts.length === 0) {
-      ledger.settling = [...(ledger.settling ?? []), ...folds];
-      writeLedger(dir, ledger);
+      // Each edit is set aside in its own store's records, which its own
+      // sync reads if this one is interrupted.
+      const sides = (fold: Carry) => side !== undefined && fold.path.startsWith(side.scope.prefix);
+      ledger.settling = [...(ledger.settling ?? []), ...folds.filter((fold) => !sides(fold))];
+      writeLedger(scope, ledger);
+      if (side && folds.some(sides)) {
+        side.ledger.settling = [...(side.ledger.settling ?? []), ...folds.filter(sides)];
+        writeLedger(side.scope, side.ledger);
+      }
       for (const fold of folds) restore(dir, fold.path);
       merge = git(dir, ["merge", "--ff-only", "--quiet", remote]);
-      if (merge.ok) done.push(`folded your edits to ${folds.map((fold) => fold.path).join(", ")} into the pulled changes`);
+      // In a shared clone, the other store's files that already match the
+      // pull (its merged PR, say) are its own sync's to report.
+      const folded = folds.filter((fold) => fold.path.startsWith(scope.prefix) || fold.local !== fold.text).map((fold) => fold.path);
+      if (merge.ok && folded.length > 0) done.push(`folded your edits to ${folded.join(", ")} into the pulled changes`);
       else blocking = overwrittenPaths(merge.stderr);
     } else {
       blocking = conflicts;
@@ -366,7 +510,8 @@ function pull(dir: string, remote: string, branch: string, ledger: Ledger, done:
 }
 
 /** Put back edits set aside for the pull: folded after a successful one, as they were after a failed one. */
-function applySettling(dir: string, ledger: Ledger, pulled: boolean, fall: (why: string) => void): boolean {
+function applySettling(scope: PrScope, ledger: Ledger, pulled: boolean, fall: (why: string) => void): boolean {
+  const dir = scope.root;
   if (!ledger.settling || ledger.settling.length === 0) return true;
   let clean = true;
   for (const carry of ledger.settling) {
@@ -389,7 +534,7 @@ function applySettling(dir: string, ledger: Ledger, pulled: boolean, fall: (why:
     writeOrRemove(resolve(dir, carry.path), text ?? null);
   }
   delete ledger.settling;
-  writeLedger(dir, ledger);
+  writeLedger(scope, ledger);
   return clean;
 }
 
@@ -398,7 +543,8 @@ function applySettling(dir: string, ledger: Ledger, pulled: boolean, fall: (why:
  * yet, so this sync's pull puts them back. A file edited since is left as
  * it is, and the earlier edits are saved under `pending/recovered/`.
  */
-function resumeSettling(dir: string, ledger: Ledger, done: string[]): void {
+function resumeSettling(scope: PrScope, ledger: Ledger, done: string[]): void {
+  const dir = scope.root;
   if (!ledger.settling || ledger.settling.length === 0) return;
   ledger.settling = ledger.settling.filter((carry) => {
     const now = existsSync(resolve(dir, carry.path)) ? readFileSync(resolve(dir, carry.path), "utf8") : null;
@@ -410,7 +556,7 @@ function resumeSettling(dir: string, ledger: Ledger, done: string[]): void {
     if (localBlobId(dir, carry.path) === blobId(dir, "HEAD", carry.path)) return true;
     // Edited again since: keep the earlier edits beside it rather than choose.
     const saved = `pending/recovered/${carry.path}`;
-    if (carry.local !== null) writeOrRemove(resolve(dir, saved), carry.local);
+    if (carry.local !== null) writeOrRemove(resolve(scopeFolder(scope), saved), carry.local);
     done.push(
       carry.local === null
         ? `left ${carry.path} as you edited it (an interrupted sync had set aside its deletion)`
@@ -419,7 +565,7 @@ function resumeSettling(dir: string, ledger: Ledger, done: string[]): void {
     return false;
   });
   if (ledger.settling.length === 0) delete ledger.settling;
-  writeLedger(dir, ledger);
+  writeLedger(scope, ledger);
 }
 
 /** Ask the forge about every recorded PR, once per sync. */
@@ -434,8 +580,8 @@ function askForge(dir: string, ledger: Ledger): Map<string, PrInfo | undefined> 
 }
 
 /** Forget PRs whose pending note is gone (deleted by hand, or dropped by an interrupted sync). */
-function pruneLedger(dir: string, ledger: Ledger, done: string[]): void {
-  const present = new Set(pendingNotes(dir).map((file) => basename(file, ".md")));
+function pruneLedger(scope: PrScope, ledger: Ledger, done: string[]): void {
+  const present = new Set(pendingNotes(scopeFolder(scope)).map((file) => basename(file, ".md")));
   const gone = Object.keys(ledger.notes).filter((slug) => !present.has(slug));
   if (gone.length === 0) return;
   for (const slug of gone) {
@@ -443,7 +589,7 @@ function pruneLedger(dir: string, ledger: Ledger, done: string[]): void {
     delete ledger.notes[slug];
     if (url && !merged) done.push(`forgot the PR for ${slug}, since pending/${slug}.md is gone; close ${url} if it's still open`);
   }
-  writeLedger(dir, ledger);
+  writeLedger(scope, ledger);
 }
 
 /**
@@ -502,7 +648,7 @@ function ensureCommit(dir: string, head: string | undefined): void {
 
 /** Open a PR for a pending note, or push its local edits to the PR it has. */
 function proposeNote(
-  dir: string,
+  scope: PrScope,
   remote: string,
   branch: string,
   slug: string,
@@ -512,7 +658,8 @@ function proposeNote(
   done: string[],
   fall: (why: string) => void,
 ): void {
-  const text = readFileSync(resolve(dir, "pending", `${slug}.md`), "utf8");
+  const dir = scope.root;
+  const text = readFileSync(resolve(scopeFolder(scope), "pending", `${slug}.md`), "utf8");
   const local = blobIdOf(dir, text);
   let entry = ledger.notes[slug];
   if (entry && state === undefined) {
@@ -522,14 +669,14 @@ function proposeNote(
   if (!entry) {
     // Name the branch once, so retries reuse it.
     entry = ledger.notes[slug] = { branch: `knowledge/${slug}-${randomBytes(2).toString("hex")}` };
-    writeLedger(dir, ledger);
+    writeLedger(scope, ledger);
   }
   if (entry.blob !== local || lostBranch(dir, entry)) {
-    const path = `notes/${slug}.md`;
+    const path = `${scope.prefix}notes/${slug}.md`;
     const pushed = pushToBranch(dir, remote, entry, message.endsWith(slug) ? message : `knowledge: add ${slug}`, {
       has: (ref) => blobId(dir, ref, path) === local,
       fill: (worktree) => writeOrRemove(resolve(worktree, path), text),
-    }, () => writeLedger(dir, ledger));
+    }, () => writeLedger(scope, ledger));
     if (pushed.foreign) {
       fall(`${entry.url ?? entry.branch} has commits from someone else, so Mahler leaves it alone; your newer edits to pending/${slug}.md wait until it merges or closes`);
       return;
@@ -539,26 +686,26 @@ function proposeNote(
       return;
     }
     Object.assign(entry, { head: pushed.head, blob: local, pushing: undefined });
-    writeLedger(dir, ledger);
+    writeLedger(scope, ledger);
     if (entry.url) done.push(`updated ${entry.url} for ${slug}`);
   }
   if (entry.url) return;
   const note = parseNote(text, slug);
-  const opened = openOrFindPr(dir, branch, entry.branch, `Knowledge: ${note.title}`, noteBody(note, slug));
+  const opened = openOrFindPr(dir, branch, entry.branch, `Knowledge: ${note.title}`, noteBody(note, `${scope.prefix}notes/${slug}.md`));
   if (!opened.url) {
     fall(`couldn't open a PR for ${slug} (${opened.error}); run \`mahler knowledge sync\` later`);
     return;
   }
   entry.url = opened.url;
-  writeLedger(dir, ledger);
+  writeLedger(scope, ledger);
   done.push(`opened ${opened.url} for ${slug}`);
 }
 
-function noteBody(note: ReturnType<typeof parseNote>, slug: string): string {
+function noteBody(note: ReturnType<typeof parseNote>, path: string): string {
   return [
     note.description,
     "",
-    `- Note: \`notes/${slug}.md\``,
+    `- Note: \`${path}\``,
     ...(note.tags.length > 0 ? [`- Tags: ${note.tags.join(", ")}`] : []),
     ...(note.repos.length > 0 ? [`- Repos: ${note.repos.join(", ")}`] : []),
     ...(note.sources.length > 0 ? [`- Sources: ${note.sources.join(", ")}`] : []),
@@ -574,7 +721,7 @@ function noteBody(note: ReturnType<typeof parseNote>, slug: string): string {
  * is undone, so a file never sits in two competing PRs.
  */
 function proposeEdits(
-  dir: string,
+  scope: PrScope,
   remote: string,
   branch: string,
   ledger: Ledger,
@@ -582,8 +729,8 @@ function proposeEdits(
   done: string[],
   fall: (why: string) => void,
 ): void {
-  const files: Record<string, string | null> = {};
-  for (const path of changedPaths(dir)) files[path] = localBlobId(dir, path);
+  const dir = scope.root;
+  const files = proposable(scope, ledger, done);
   const paths = Object.keys(files);
   let batch = ledger.batch;
   if (batch && state === undefined) {
@@ -608,27 +755,33 @@ function proposeEdits(
       }
     }
     delete ledger.batch;
-    writeLedger(dir, ledger);
+    writeLedger(scope, ledger);
     done.push(`closed ${name(batch)}: its edits were undone`);
     return;
   }
   if (paths.length === 0) return;
-  const title = paths.length === 1 ? `Knowledge: update ${paths[0]}` : `Knowledge: update ${paths.length} files`;
+  const ledgerKind = scope.kind === "decisions";
+  const noun = ledgerKind ? "Decisions" : "Knowledge";
+  const title = paths.length === 1 ? `${noun}: update ${paths[0]}` : `${noun}: update ${paths.length} files`;
   const body = [
-    "Edits to the knowledge store (verified dates, corrections, merges, or retirements):",
+    ledgerKind
+      ? "Changes to the decisions ledger (new decisions, and notes moved to `archive/`):"
+      : "Edits to the knowledge store (verified dates, corrections, merges, or retirements):",
     "",
     ...paths.map((path) => `- \`${path}\`${files[path] === null ? " (removed)" : ""}`),
     "",
-    "Proposed by Mahler, which updates this PR as the edits change. Merge to publish them to every clone of this store; close the PR to drop them.",
+    ledgerKind
+      ? "Proposed by Mahler, which updates this PR as the ledger changes. Merge to back these decisions up to every clone of this ledger; until then they are only on the machine that recorded them."
+      : "Proposed by Mahler, which updates this PR as the edits change. Merge to publish them to every clone of this store; close the PR to drop them.",
   ].join("\n");
   const changed = !batch || !sameFiles(batch.files, files) || lostBranch(dir, batch);
   if (!batch) {
-    batch = ledger.batch = { branch: `knowledge/update-${new Date().toISOString().slice(0, 10)}-${randomBytes(3).toString("hex")}`, files: {} };
-    writeLedger(dir, ledger);
+    batch = ledger.batch = { branch: `${scope.kind}/update-${new Date().toISOString().slice(0, 10)}-${randomBytes(3).toString("hex")}`, files: {} };
+    writeLedger(scope, ledger);
   }
   if (changed) {
     const undone = Object.keys(batch.files).filter((path) => !(path in files));
-    const pushed = pushToBranch(dir, remote, batch, title.replace(/^Knowledge: /, "knowledge: "), {
+    const pushed = pushToBranch(dir, remote, batch, title.replace(/^(Knowledge|Decisions): /, `${scope.kind}: `), {
       has: (ref, base) =>
         paths.every((path) => blobId(dir, ref, path) === files[path]) &&
         undone.every((path) => blobId(dir, ref, path) === blobId(dir, base, path)),
@@ -636,14 +789,14 @@ function proposeEdits(
         for (const path of paths) writeOrRemove(resolve(worktree, path), files[path] === null ? null : readFileSync(resolve(dir, path), "utf8"));
         for (const path of undone) writeOrRemove(resolve(worktree, path), blobId(dir, base, path) === null ? null : gitText(dir, ["show", `${base}:${path}`]) ?? "");
       },
-    }, () => writeLedger(dir, ledger));
+    }, () => writeLedger(scope, ledger));
     if (pushed.foreign) return foreign(batch);
     if (pushed.error) {
       fall(`couldn't push your edits for review (${pushed.error}); run \`mahler knowledge sync\` later`);
       return;
     }
     Object.assign(batch, { head: pushed.head, files, pushing: undefined });
-    writeLedger(dir, ledger);
+    writeLedger(scope, ledger);
     if (batch.url) {
       const edit = gh(dir, ["pr", "edit", batch.url, "--title", title, "--body", body]);
       done.push(`updated ${batch.url} with ${paths.length} ${paths.length === 1 ? "edit" : "edits"}`);
@@ -658,8 +811,35 @@ function proposeEdits(
     return;
   }
   batch.url = opened.url;
-  writeLedger(dir, ledger);
+  writeLedger(scope, ledger);
   done.push(`proposed ${paths.length} ${paths.length === 1 ? "edit" : "edits"} in ${opened.url}`);
+}
+
+/**
+ * The changed files to propose, with their blob ids: all of them, less
+ * ledger changes whose PR was closed and that are as they were then. A
+ * closed change edited since is proposed again; one that's no longer a
+ * change is forgotten.
+ */
+function proposable(scope: PrScope, ledger: Ledger, done?: string[]): Record<string, string | null> {
+  const dir = scope.root;
+  const files: Record<string, string | null> = {};
+  for (const path of changedPaths(scope)) files[path] = localBlobId(dir, path);
+  if (!ledger.closed) return files;
+  for (const [path, entry] of Object.entries(ledger.closed)) {
+    if (path in files && files[path] === entry.blob) {
+      delete files[path];
+      continue;
+    }
+    if (!done) continue;
+    if (path in files) done.push(`${path} changed since ${entry.url ?? "its PR"} was closed; proposing it again`);
+    delete ledger.closed[path];
+  }
+  if (done) {
+    if (Object.keys(ledger.closed).length === 0) delete ledger.closed;
+    writeLedger(scope, ledger);
+  }
+  return files;
 }
 
 function sameFiles(a: Record<string, string | null>, b: Record<string, string | null>): boolean {
@@ -750,11 +930,17 @@ function openOrFindPr(dir: string, branch: string, head: string, title: string, 
  * the forge can't settle wait in `pending/`. Returns what happened, for the
  * sync summary.
  */
-export function leavePrMode(dir: string, branch: string): { done: string[]; blocked?: string } {
-  const ledger = readLedger(dir);
+export function leavePrMode(scope: PrScope, branch: string): { done: string[]; blocked?: string } {
+  const dir = scope.root;
+  const ledger = readLedger(scope);
   const done: string[] = [];
-  pruneLedger(dir, ledger, done);
-  const files = pendingNotes(dir);
+  pruneLedger(scope, ledger, done);
+  // Direct publish commits the whole folder, so kept closed changes go up too.
+  if (ledger.closed) {
+    delete ledger.closed;
+    writeLedger(scope, ledger);
+  }
+  const files = pendingNotes(scopeFolder(scope));
   if (files.length === 0 && !ledger.batch && Object.keys(ledger.notes).length === 0 && !ledger.settling?.length) return { done };
   if (ledger.settling?.length) {
     return {
@@ -769,7 +955,7 @@ export function leavePrMode(dir: string, branch: string): { done: string[]; bloc
   const withdraw: string[] = [];
   if (ledger.batch) {
     const batch = ledger.batch;
-    const { state } = settleBatch(dir, remote, ledger, ask, false, done);
+    const { state } = settleBatch(scope, remote, ledger, ask, false, done);
     if (state === undefined) {
       // It may have closed: don't publish edits a reviewer turned down.
       return {
@@ -785,7 +971,7 @@ export function leavePrMode(dir: string, branch: string): { done: string[]; bloc
   for (const file of files) {
     const slug = basename(file, ".md");
     const entry = ledger.notes[slug];
-    const path = `notes/${slug}.md`;
+    const path = `${scope.prefix}notes/${slug}.md`;
     const info: PrInfo | undefined = !entry
       ? { state: "NONE" }
       : entry.merged
@@ -803,7 +989,7 @@ export function leavePrMode(dir: string, branch: string): { done: string[]; bloc
       return local !== baseBlob(dir, info.head, entry?.head, path, entry?.blob) && local !== blobId(dir, remote, path);
     };
     if (info.state === "MERGED" && changed()) {
-      done.push(`left pending/${slug}.md: it changed after its PR merged; fold your changes into ${path} by hand and delete it`);
+      done.push(`left pending/${slug}.md: it changed after its PR merged; fold your changes into notes/${slug}.md by hand and delete it`);
       continue;
     }
     if (info.state === "MERGED" || (info.state === "CLOSED" && !changed())) {
@@ -812,7 +998,7 @@ export function leavePrMode(dir: string, branch: string): { done: string[]; bloc
       continue;
     }
     if (existsSync(resolve(dir, path))) {
-      done.push(`left pending/${slug}.md alone: ${path} already exists; merge them by hand`);
+      done.push(`left pending/${slug}.md alone: notes/${slug}.md already exists; merge them by hand`);
       continue;
     }
     mkdirSync(dirname(resolve(dir, path)), { recursive: true });
@@ -822,7 +1008,8 @@ export function leavePrMode(dir: string, branch: string): { done: string[]; bloc
     delete ledger.notes[slug];
     moved += 1;
   }
-  writeLedger(dir, ledger);
+  delete ledger.closed;
+  writeLedger(scope, ledger);
   if (moved > 0) done.push(`moved ${moved} pending ${moved === 1 ? "note" : "notes"} into notes/`);
   if (withdraw.length > 0) done.push(`close ${withdraw.join(", ")} on the forge: this sync publishes ${withdraw.length === 1 ? "its" : "their"} changes directly`);
   return { done };
@@ -840,11 +1027,14 @@ export interface ProposalStatus {
   unproposed: number;
   /** Pending notes that changed after their PR merged and need a hand merge. */
   conflicted: string[];
+  /** Ledger changes kept after their PR was closed unmerged, and those PRs. */
+  closed?: { files: number; urls: string[] };
 }
 
-export function proposalStatus(dir: string): ProposalStatus {
-  const ledger = readLedger(dir);
-  const files = pendingNotes(dir);
+export function proposalStatus(scope: PrScope): ProposalStatus {
+  const dir = scope.root;
+  const ledger = readLedger(scope);
+  const files = pendingNotes(scopeFolder(scope));
   let unproposed = 0;
   const conflicted: string[] = [];
   for (const file of files) {
@@ -853,8 +1043,9 @@ export function proposalStatus(dir: string): ProposalStatus {
     if (entry?.merged) conflicted.push(slug);
     else if (!entry?.url || entry.blob !== blobIdOf(dir, readFileSync(file, "utf8"))) unproposed += 1;
   }
-  const edits: Record<string, string | null> = {};
-  for (const path of changedPaths(dir)) edits[path] = localBlobId(dir, path);
+  const edits = proposable(scope, ledger);
+  const all = changedPaths(scope);
+  const closed = Object.entries(ledger.closed ?? {}).filter(([path]) => all.includes(path) && !(path in edits));
   const proposed = ledger.batch?.url ? ledger.batch.files : {};
   for (const path of new Set([...Object.keys(edits), ...Object.keys(proposed)])) {
     if (!(path in edits) || !(path in proposed) || edits[path] !== proposed[path]) unproposed += 1;
@@ -864,6 +1055,10 @@ export function proposalStatus(dir: string): ProposalStatus {
     batch: ledger.batch ? { files: Object.keys(ledger.batch.files).length, url: ledger.batch.url } : undefined,
     unproposed,
     conflicted,
+    closed:
+      closed.length > 0
+        ? { files: closed.length, urls: [...new Set(closed.map(([, entry]) => entry.url).filter((url): url is string => url !== undefined))] }
+        : undefined,
   };
 }
 
@@ -880,18 +1075,18 @@ export function pendingNotes(dir: string): string[] {
     .sort();
 }
 
-function readLedger(dir: string): Ledger {
+function readLedger(scope: PrScope): Ledger {
   try {
-    const parsed = JSON.parse(readFileSync(resolve(dir, "pending", LEDGER), "utf8")) as Partial<Ledger>;
-    return { notes: parsed.notes ?? {}, batch: parsed.batch, settling: parsed.settling };
+    const parsed = JSON.parse(readFileSync(resolve(scopeFolder(scope), "pending", LEDGER), "utf8")) as Partial<Ledger>;
+    return { notes: parsed.notes ?? {}, batch: parsed.batch, settling: parsed.settling, held: parsed.held, closed: parsed.closed };
   } catch {
     return { notes: {} };
   }
 }
 
-function writeLedger(dir: string, ledger: Ledger): void {
-  const file = resolve(dir, "pending", LEDGER);
-  if (!ledger.batch && Object.keys(ledger.notes).length === 0 && !ledger.settling?.length) {
+function writeLedger(scope: PrScope, ledger: Ledger): void {
+  const file = resolve(scopeFolder(scope), "pending", LEDGER);
+  if (!ledger.batch && Object.keys(ledger.notes).length === 0 && !ledger.settling?.length && !ledger.held?.length && !Object.keys(ledger.closed ?? {}).length) {
     rmSync(file, { force: true });
     return;
   }
@@ -923,14 +1118,20 @@ export function ensureExcluded(dir: string): void {
   writeFileSync(file, `${prefix}${missing.join("\n")}\n`);
 }
 
-/** Tracked files changed in the working tree, plus new files git doesn't ignore. */
-function changedPaths(dir: string): string[] {
-  const list = (args: string[]) => git(dir, args).stdout.split("\0").filter(Boolean);
+/**
+ * Tracked files changed in the working tree, plus new files git doesn't
+ * ignore: only those under the store's folder, relative to the clone.
+ */
+function changedPaths(scope: PrScope): string[] {
+  const list = (args: string[]) => git(scope.root, args).stdout.split("\0").filter(Boolean);
+  const only = scope.prefix ? ["--", scope.prefix] : [];
   const paths = new Set([
-    ...list(["diff", "--name-only", "-z", "HEAD"]),
-    ...list(["ls-files", "--others", "--exclude-standard", "-z"]),
+    ...list(["diff", "--name-only", "-z", "HEAD", ...only]),
+    ...list(["ls-files", "--others", "--exclude-standard", "-z", ...only]),
   ]);
-  return [...paths].filter((path) => !isMachineLocal(path)).sort();
+  return [...paths]
+    .filter((path) => path.startsWith(scope.prefix) && !isMachineLocal(path.slice(scope.prefix.length)))
+    .sort();
 }
 
 /** Never proposed, even when the repo tracks it by mistake. */

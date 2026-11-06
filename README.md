@@ -208,9 +208,28 @@ To back the ledger up, set `decisions.repo` (and optionally
 which clones the repo into `.harness/decisions/` and carries over the notes
 already there. It can be its own repo, or the knowledge repo on another
 branch. `mahler decide` and `mahler knowledge import --archive` then commit
-and push, and briefs and `mahler knowledge sync` pull and push. The ledger
-always pushes directly, never through PRs. When two machines record notes
-with the same name, the one pushed second is renamed (`-2`), so both are kept.
+and push, and briefs and `mahler knowledge sync` pull and push. When two
+machines record notes with the same name, the one pushed second is renamed
+(`-2`), so both are kept. With a repo of its own, the ledger always pushes
+directly, never through PRs.
+
+The two stores can also share one repo and branch, each in its own folder:
+
+```json
+"knowledge": { "path": ".harness/knowledge", "repo": "git@example.com:team/memory.git", "repoPath": "knowledge" },
+"decisions": { "repo": "git@example.com:team/memory.git", "repoPath": "decisions" }
+```
+
+Install clones the repo once, into `.harness/stores/`. It then makes
+`.harness/knowledge` and `.harness/decisions` links to their folders in that
+clone and carries their notes over, keeping each old folder beside it. Each
+sync commits or proposes only its own folder, and the two take turns in the
+clone. Sharing, the ledger publishes the way the knowledge store does. With
+`knowledge.publish` set to `"pr"`, decisions also go up as a PR, apart from
+the knowledge PRs, so a decision isn't backed up until a human merges it.
+If the PR is closed unmerged, its decisions stay in the local ledger,
+flagged by `mahler doctor` as not backed up, and aren't proposed again
+unless you edit them.
 
 Install compiles canonical Mahler source into native agent artifacts:
 

@@ -107,9 +107,10 @@ function writeBrief(
     writeIndexes(workspace, config);
     console.warn(`Knowledge sync skipped: ${(error as Error).message}`);
   }
-  // Pull the ledger too: sessions read its index at start.
+  // Pull the ledger too: sessions read its index at start. Through PRs (a
+  // shared clone), quick: it opens none and doesn't wait on the forge.
   try {
-    const result = syncLedger(workspace, config, { lockWaitMs: 15_000 });
+    const result = syncLedger(workspace, config, { lockWaitMs: 15_000, quick: true });
     if (result && !result.published) console.warn(result.summary);
   } catch (error) {
     writeIndexes(workspace, config);

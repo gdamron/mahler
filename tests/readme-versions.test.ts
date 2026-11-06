@@ -9,8 +9,8 @@ import { run, workspace } from "./knowledge-fixtures.js";
 // hash: add the old hash to EARLIER_README_HASHES, so reinstall can update
 // workspaces that never edited it, then update this one.
 const CURRENT = {
-  "decisions-readme": "234f155d8bc1a3067168f2c307ab7ffffadf151f8966644c4a8a7d8e988df5c4",
-  "knowledge-readme": "cdaf96a2fe311ff74bff7195aa22c11f0bc079a82479cffba68c6eab425f507a",
+  "decisions-readme": "335064145e764b0747564e1c982bd1b64acf019dd87ce4a4d8a5fb6a2923d7dc",
+  "knowledge-readme": "8c368f02a788df3cde78fc416f3d1f71cf240860af73f75b1cc8b564033dca9d",
   "custom-readme": "c06d6e480ce7424b536fbdd8e4c85d8a984e9ee53d5ecefa85f023f2e870120c",
 };
 

@@ -43,3 +43,10 @@ that repo. `mahler decide` commits and pushes each note, and briefs and
 only warns, and the next sync pushes. A note another machine already pushed
 under the same name is renamed (`-2`), so both are kept. `INDEX.md` is
 generated and stays out of the repo.
+
+With `decisions.repoPath` too, the ledger shares the knowledge store's repo
+and branch. This folder is then a link to its folder in the shared clone at
+`.harness/stores/`, and the ledger publishes the way the knowledge store
+does. With `knowledge.publish: "pr"`, new notes and archive moves wait here
+as uncommitted changes, in a PR of their own, and are backed up once a human
+merges it.

@@ -8,6 +8,7 @@ This directory contains runtime configuration and policies installed by the Mahl
 - `agents/`: workspace-local adapter notes for supported runtimes.
 - `decisions/`: append-only ledger of recorded Tier-1 deviations (see `mahler decide`), with a generated `INDEX.md`.
 - `knowledge/`: what agents and humans have learned about the code, tools, and project, one fact per note (see `mahler learn` and `policies/knowledge.md`). The path is `knowledge.path` in `config.json`.
+- `stores/`: when both stores share one repo (a `repoPath` for each in `config.json`), its clone; `decisions/` and the knowledge folder are links into it.
 
 Native agent artifacts are generated outside .harness:
 

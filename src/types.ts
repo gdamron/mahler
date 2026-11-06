@@ -123,14 +123,30 @@ export interface KnowledgeConfig {
   branch?: string;
   /** How notes reach `branch`: "direct" pushes (the default); "pr" opens a PR for the human to merge. */
   publish?: "direct" | "pr";
+  /**
+   * The store's folder inside `repo`, when the decisions ledger shares the
+   * repo and branch (see `DecisionsConfig.repoPath`).
+   */
+  repoPath?: string;
 }
 
-/** The decisions ledger stays at `.harness/decisions`; a repo only backs it up. */
+/**
+ * The decisions ledger stays at `.harness/decisions`; a repo only backs it up.
+ * It can have a repo of its own, another branch of `knowledge.repo`, or a
+ * folder on `knowledge.repo`'s branch: with both `repoPath`s set, the two
+ * stores share one clone, each under its own folder.
+ */
 export interface DecisionsConfig {
-  /** A git remote to back the ledger up to; not `knowledge.repo`'s branch. Always publishes directly. */
+  /** A git remote to back the ledger up to. */
   repo?: string;
   /** The branch the ledger is pushed to (default "main"). */
   branch?: string;
+  /**
+   * The ledger's folder inside `repo`, when it is `knowledge.repo` on the
+   * same branch. Shared, the ledger publishes the way the knowledge store
+   * does (`knowledge.publish`); otherwise it always publishes directly.
+   */
+  repoPath?: string;
 }
 
 export interface ConcurrencyConfig {

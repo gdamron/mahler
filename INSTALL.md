@@ -286,8 +286,8 @@ defaults are kept, retired defaults are dropped, and newer defaults are added.
 - each repo's `checks`, the `merge` labels and paths, the `risk` labels, the
   `acceptance` suite settings, and the `models`, `concurrency`,
   `guardrails`, and `definitionOfDone` overrides;
-- the `knowledge` settings (`path`, `repo`, `branch`, `publish`) and
-  `decisions` (`repo`, `branch`);
+- the `knowledge` settings (`path`, `repo`, `branch`, `publish`,
+  `repoPath`) and `decisions` (`repo`, `branch`, `repoPath`);
 - each runtime's `profile` and `role` under `agents` (for example, switching
   Claude's default profile from `composer` to `conductor`), plus whole entries
   for runtimes Mahler doesn't define. Each runtime's `skills` and `policies`
@@ -295,6 +295,12 @@ defaults are kept, retired defaults are dropped, and newer defaults are added.
   what a profile may do.
 
 The repo list itself is rediscovered on every run.
+
+When both stores share one repo and branch (a `repoPath` for each), the
+clone at `.harness/stores/` and the links to it are kept. A reinstall only
+adds what's missing, such as a store's link after its `repoPath` changes.
+Before moving a store that publishes through PRs into a shared repo, settle
+its PRs: install stops while its `pending/prs.json` still lists any.
 
 The READMEs in `.harness/decisions/`, `.harness/knowledge/`, and
 `.harness/custom/` are yours once written. Reinstall replaces one only while

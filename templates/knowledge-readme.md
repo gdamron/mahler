@@ -16,6 +16,10 @@ it writes a brief. After editing notes by hand, run `mahler knowledge sync`.
 `INDEX.md` is gitignored, since each clone builds its own, and so are
 Obsidian's settings (`.obsidian/`, `.trash/`) and `.DS_Store`.
 
+With `knowledge.repoPath`, the store shares its repo and branch with the
+decisions ledger. This folder is then a link to its folder in the shared
+clone at `.harness/stores/`, and syncs touch only that folder.
+
 With `knowledge.publish: "pr"`, changes go up as pull requests (through the
 GitHub CLI, `gh`) for a human to merge, and this folder only ever pulls:
 

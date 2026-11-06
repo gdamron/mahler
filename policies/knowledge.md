@@ -69,6 +69,12 @@ branch: Mahler stops updating a PR once anyone else commits to it. A PR the
 human closes drops its change from this machine too, unless the change was
 edited since.
 
+When the decisions ledger shares the knowledge store's repo
+(`decisions.repoPath` in config), it publishes the same way. With PR publish,
+`mahler decide` records the note at once, and the note goes up in a ledger PR
+of its own. It isn't backed up until the human merges that PR. The same
+rule applies: never merge it yourself.
+
 Conductors and composers run `mahler learn`. Slice conductors, testers, and
 reviewers put proposed notes (title, description, scope) in their report, and
 their parent records them.

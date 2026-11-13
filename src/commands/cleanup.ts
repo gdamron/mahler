@@ -10,14 +10,17 @@ import { listDirectories } from "../util.js";
 /**
  * Remove an issue's worktrees once its work is merged, so finished issues stop
  * costing disk, CPU, and Spotlight indexing. Issue branches and the issue
- * brief stay. Tester worktrees under `tests/` go too, and their local branches
- * are deleted with `git branch -d`, which refuses unmerged work. A worktree
- * with uncommitted or untracked changes is kept: only the human may discard
- * work. Remote branches are never touched.
+ * brief stay. Tester worktrees under `tests/` go too, with their local
+ * branches: a tester's suite never joins the issue branch (the tests worth
+ * keeping were promoted into it), so the branch is deleted whether or not
+ * anything contains it, and its tip is printed for recovery. A worktree with
+ * uncommitted or untracked changes is kept: only the human may discard work.
+ * A tester branch's remote copy is deleted only with `--remote`.
  */
 export function cleanup(identifier: string, flags: Flags): void {
   const workspace = workspaceFlag(flags);
   const dryRun = flags["dry-run"] === true;
+  const remote = flags.remote === true;
   const { worktreeRoot } = issuePaths(workspace, loadConfig(workspace), identifier);
   const reposDir = resolve(worktreeRoot, "repos");
   const testsDir = resolve(worktreeRoot, "tests");
@@ -26,7 +29,7 @@ export function cleanup(identifier: string, flags: Flags): void {
   // the issue worktrees still have checked out.
   const findings = [
     ...listDirectories(testsDir).map((dir) =>
-      cleanupWorktree(workspace, resolve(testsDir, dir), dryRun, issueDirs),
+      cleanupWorktree(workspace, resolve(testsDir, dir), dryRun, { remote }),
     ),
     ...issueDirs.map((dir) => cleanupWorktree(workspace, dir, dryRun)),
   ];
@@ -48,10 +51,10 @@ export function cleanup(identifier: string, flags: Flags): void {
 }
 
 /**
- * Remove one worktree. `issueDirs` marks a tester worktree: its branch is then
- * deleted locally if one of those worktrees (or the main checkout) reaches it.
+ * Remove one worktree. `tester` marks a tester worktree: its local branch is
+ * then deleted, and its remote branch too when `tester.remote` is set.
  */
-function cleanupWorktree(workspace: string, dir: string, dryRun: boolean, issueDirs?: string[]): Finding {
+function cleanupWorktree(workspace: string, dir: string, dryRun: boolean, tester?: { remote: boolean }): Finding {
   const label = relative(workspace, dir);
   const common = gitCommonDir(dir);
   if (!common) {
@@ -80,17 +83,22 @@ function cleanupWorktree(workspace: string, dir: string, dryRun: boolean, issueD
       message: `${label}: detached HEAD has commits on no branch, tag, or remote; kept — create a branch for them or ask the human before discarding`,
     };
   }
-  const tester = issueDirs !== undefined;
   // Tester branches stay local by design, so "on no remote" is only news for
   // an issue branch.
   const unpushed = branch && !tester
     ? readGit(dir, ["log", "--oneline", branch, "--not", "--remotes"])
     : "";
-  const upstream = branch && tester ? readGit(dir, ["rev-parse", "--abbrev-ref", `${branch}@{upstream}`]) : "";
+  const upstream = branch && tester ? testerUpstream(dir, branch) : undefined;
+  const tip = branch && tester ? readGit(dir, ["rev-parse", "--short=12", "HEAD"]) : "";
+  const remoteWord = upstream
+    ? tester?.remote
+      ? ` and ${upstream.label}`
+      : `; its remote branch ${upstream.label} is left (pass --remote to delete it)`
+    : "";
   const note = !branch
     ? ""
     : tester
-      ? ` (branch ${branch} would be deleted if merged)`
+      ? ` (branch ${branch}${tester.remote && upstream ? remoteWord : ""} would be deleted${tester.remote ? "" : remoteWord})`
       : unpushed
         ? ` (branch ${branch} has commits on no remote; the branch is kept)`
         : ` (branch ${branch} kept)`;
@@ -109,39 +117,40 @@ function cleanupWorktree(workspace: string, dir: string, dryRun: boolean, issueD
   if (!tester || !branch) {
     return { level: unpushed ? "warn" : "ok", message: `${label}: removed${note}` };
   }
-  const remoteNote = upstream ? `; its remote branch ${upstream} is left for the human` : "";
-  const refusal = deleteMergedBranch(common, branch, issueDirs);
-  if (refusal === undefined) {
-    return { level: "ok", message: `${label}: removed (branch ${branch} deleted${remoteNote})` };
+  // -D, not -d: by design nothing contains a tester branch, least of all
+  // after a squash merge. The tip is printed so the suite can be recovered
+  // (`git branch <name> <tip>`) until git collects it.
+  const deleted = spawnSync("git", ["--git-dir", common, "branch", "-D", branch], { encoding: "utf8" });
+  if (deleted.status !== 0) {
+    return {
+      level: "warn",
+      message: `${label}: removed (branch ${branch} could not be deleted: ${deleted.stderr.trim().split("\n")[0]}; kept)`,
+    };
   }
-  const why = /not fully merged/i.test(refusal)
-    ? "is not merged into the issue branch or the main checkout's HEAD"
-    : `could not be deleted: ${refusal.split("\n")[0]}`;
-  return {
-    level: "warn",
-    message: `${label}: removed (branch ${branch} ${why}; kept — check its commits landed, or ask the human before deleting it${remoteNote})`,
-  };
+  let remoteNote = remoteWord;
+  if (upstream && tester.remote) {
+    const pushed = spawnSync(
+      "git", ["--git-dir", common, "push", "--quiet", upstream.remote, "--delete", upstream.branch],
+      { encoding: "utf8" },
+    );
+    if (pushed.status !== 0) {
+      return {
+        level: "warn",
+        message: `${label}: removed (branch ${branch} deleted, was at ${tip}; its remote branch ${upstream.label} could not be deleted: ${pushed.stderr.trim().split("\n")[0]})`,
+      };
+    }
+    remoteNote = `; remote branch ${upstream.label} deleted`;
+  }
+  return { level: "ok", message: `${label}: removed (branch ${branch} deleted, was at ${tip}${remoteNote})` };
 }
 
-/**
- * Delete a branch with `git branch -d`, which refuses one that HEAD (or the
- * branch's upstream) doesn't reach. Tries each issue worktree of the same
- * repository, whose HEAD is the issue branch the tester's work was merged
- * into, then the main checkout. Returns git's last refusal, or `undefined`
- * once deleted. Never deletes a remote branch.
- */
-function deleteMergedBranch(common: string, branch: string, issueDirs: string[]): string | undefined {
-  const places = [
-    ...issueDirs.filter((dir) => gitCommonDir(dir) === common).map((dir) => ["-C", dir]),
-    ["--git-dir", common],
-  ];
-  let refusal = "";
-  for (const place of places) {
-    const result = spawnSync("git", [...place, "branch", "-d", branch], { encoding: "utf8" });
-    if (result.status === 0) return undefined;
-    refusal = result.stderr.trim();
-  }
-  return refusal;
+/** A tester branch's configured upstream, when it tracks a branch on a remote. */
+function testerUpstream(dir: string, branch: string): { remote: string; branch: string; label: string } | undefined {
+  const remote = readGit(dir, ["config", "--get", `branch.${branch}.remote`]);
+  const merge = readGit(dir, ["config", "--get", `branch.${branch}.merge`]);
+  if (!remote || remote === "." || !merge) return undefined;
+  const name = merge.replace(/^refs\/heads\//, "");
+  return { remote, branch: name, label: `${remote}/${name}` };
 }
 
 function removeIfEmpty(dir: string): void {

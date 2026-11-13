@@ -5,6 +5,11 @@ and need to trust that what agents merge works. That trust comes from three
 things: tests written by an agent that did not write the code, checks that
 grow with risk, and a record of what was verified.
 
+A tester's suite verifies one change, through the outermost surface the
+criteria are stated against. It never joins the issue branch: it runs from
+the tester's own worktree, and the tests that add lasting coverage are
+promoted into the codebase (see "Promoting Acceptance Tests").
+
 The work's risk level (see the risk policy) picks the section below. Each
 level includes everything in the levels before it.
 
@@ -13,8 +18,8 @@ level includes everything in the levels before it.
 - The implementer writes tests for the behavior it changes, and `mahler check`
   passes.
 - A reviewer that did not write the code reviews it (see the review policy).
-- Frozen acceptance tests are unchanged. `mahler check` fails if a worktree
-  changes them.
+- Frozen acceptance tests are unchanged. `mahler check` fails if they differ
+  from what was frozen.
 - When the work belongs to a project with an acceptance suite, the suite
   passes for this change: `mahler acceptance run --project <slug> --issue
 <ISSUE>`.
@@ -32,8 +37,13 @@ level includes everything in the levels before it.
 ## Medium Risk
 
 - After implementation, a tester writes acceptance tests from the spec alone.
-  It runs alongside the reviewer.
+  It runs alongside the reviewer. When no criterion can be reached from
+  outside (an internal refactor, a change nothing outside can observe), skip
+  the tester and record why in the verification record; the implementer's
+  tests and the reviewer cover it. At high risk that is a Tier 1 deviation.
 - The tester's tests must pass before merge. This blocks the merge.
+- Once they pass on the final implementation, the conductor promotes the ones
+  worth keeping before opening the PR (see "Promoting Acceptance Tests").
 - A standard-tier reviewer.
 - When a tester's test fails, the conductor decides what failed:
   - **Implementation bug:** fix the code.
@@ -45,7 +55,8 @@ level includes everything in the levels before it.
 
 - The tester writes acceptance tests before implementation starts, and they
   are frozen before the implementer begins. The implementer makes them pass
-  without changing them.
+  without changing them, running them from the tester's worktree (see
+  "Running the Tester's Suite").
 - The tester runs on a different model from the implementer: a tier that
   routes to another model family when the install has one, otherwise a
   different tier.
@@ -64,15 +75,24 @@ The tester profile follows the acceptance-test skill. In short:
 - It works in its own worktree, cut from the base branch, at
   `<issue root>/tests/<repo>`, and commits to its own branch. The worktree
   stays outside `repos/` because its tests fail until the implementation
-  lands, and `mahler check --issue` runs every worktree under `repos/`.
-- In issue mode its branch stays local. The tester worktree shares one
-  repository with the issue worktrees, so the conductor merges the branch and
-  freezes its commit without a fetch, and no remote branch is left to delete.
-  It pushes only a project suite, or when it doesn't share the local
+  exists, and `mahler check --issue` runs every worktree under `repos/`.
+- Its branch is scratch work. In issue mode it is never pushed, never merged
+  into the issue branch, and never opened as a PR; `mahler cleanup` deletes
+  it. It pushes only a project suite, or when it doesn't share the local
   repository (in the cloud or on another machine).
+- It puts its tests in new files rather than editing existing ones, so the
+  implementation never conflicts with them.
+- It tests only through the outermost surface: the running product, or a
+  library's public API when the library is what ships. It can't see the
+  implementer's tests, so a test at their level mostly repeats one. Unit
+  tests are the implementer's job.
+- It writes one test per criterion plus its failure edge, tests behavior
+  rather than shape, and doesn't guess at names it can't see.
+- It reads `.harness/custom/acceptance-priorities.md` when the workspace has
+  one: what this workspace most wants acceptance tests to protect.
 - Each test names the criterion it checks.
 - It reports which criterion each test covers, and any criterion it could not
-  test, with the reason.
+  test from outside, with the reason.
 
 ## Freezing Tests
 
@@ -83,18 +103,97 @@ mahler acceptance freeze --issue <ISSUE> --repo <repo> --commit <sha>
 # or, for several commits: --commit <base>..<sha>
 ```
 
-Then it merges the tester's local branch into the issue branch (a merge, not
-a cherry-pick, so `git branch -d` can tell the branch landed). The tester's
-worktree stays for any dispute fix; `mahler cleanup <ISSUE>` removes it with
-the issue's other worktrees and deletes the merged branch with `git branch
--d`. From then on, `mahler check` fails if a checked worktree's copy of those
-files differs from the frozen commit, or is missing. For a slice worktree,
-pass `--worktree <dir>`: the directory name under the issue's `repos/` (a
-path to the worktree is read as that name). A range freeze counts only the
+The freeze records each file's content. With a tester worktree at
+`<issue root>/tests/<repo>`, it applies there, and `mahler check --issue
+<ISSUE>` (or `--path` on any of the issue's worktrees) fails if a frozen file
+in that worktree is missing or differs, committed or not. For a second tester
+worktree, pass `--worktree tests/<dir>`. A range freeze counts only the
 range's own commits, so base-branch changes made after the tester branched
 are not frozen.
 
+A freeze compares content, not history. Rebasing, restacking, or merging the
+issue branch into the tester's worktree leaves the files alone, so none of
+them needs a new freeze. Freeze again only when a dispute decision changes
+the tests.
+
 Only the tester changes frozen tests, and only after a dispute decision.
+
+## Running the Tester's Suite
+
+The suite runs in the tester's worktree, against the implementation, once the
+tester has reported:
+
+```sh
+cd <issue root>/tests/<repo>
+git merge --no-edit <issue branch>   # the top branch, for a stack
+<the repo's test command for the tester's files>
+```
+
+The merge goes one way only: the issue branch into the tester's branch, never
+the reverse. The worktrees share one repository, so the issue branch is
+already there without a fetch. Merge again after each implementation change
+you want to test. At high risk the implementer works this way from the
+start: the tests fail first, and it makes them pass without touching them.
+
+If the merge conflicts, the tester edited a file the implementation also
+changed. Don't resolve it by changing a frozen file: have the tester move its
+tests into new files, and freeze that commit with the reason.
+
+## Promoting Acceptance Tests
+
+A tester's suite proves one change met its spec. It is written to a bar (see
+the acceptance-test skill) so that most of it is worth keeping, but it was
+still written without seeing the code: a test may repeat one the implementer
+wrote, bring its own helpers, or cite criterion numbers from a task file the
+repo doesn't have. So the whole suite verifies the change, and the tests that
+add lasting coverage land, as ordinary tests.
+
+**When:** after every frozen test passes on the final implementation and the
+review findings are handled, before the PR opens. Promotion never hides a
+failing test: a test that fails is a fix or a dispute, not a drop.
+
+**Who:** the conductor. Finding duplicates means reading the implementer's
+tests, and independence has already done its job once the frozen suite passed
+unchanged.
+
+**Keep** a test unless a rule below drops it. **Drop** a test when:
+
+- An existing test checks the same behavior at the same level. Keep the
+  stronger of the two, or fold the extra cases into one.
+- It misses the tester's bar: it tests below the outermost surface, restates
+  the spec's shape (field lists, ordering, names, message wording), or
+  hedges against code the tester couldn't see. If the behavior matters and
+  nothing else covers it, write the direct test instead.
+
+Never drop a test that caught a bug, or one that covers what
+`.harness/custom/acceptance-priorities.md` names, unless a stronger test of
+the same thing stays. Say in the PR which tests you dropped and under which
+rule. If you are dropping most of the suite, the tester missed its bar: note
+that in `HANDOFF.md` so an audit can see it.
+
+**How:**
+
+1. In one commit on the issue branch, write each kept test into the repo's
+   ordinary tests, beside the tests for the code it covers. Rewrite it against
+   the real interface: the repo's shared test helpers instead of a private
+   rig, a name that says the behavior, and no criterion numbers. Keep its
+   inputs, tolerances and assertions. Tightening them is fine; loosening them
+   is not. For a stack, each test goes in the PR whose code it covers.
+2. The reviewer re-reviews that commit against the frozen originals in the
+   tester's worktree. It confirms each kept test asserts at least what its
+   original did, and each drop fits a rule above.
+3. The verification record gives the frozen commit, the count kept, and the
+   count dropped under each rule. No new
+   freeze is needed: the tester's files haven't changed, and the promoted
+   tests are ordinary tests that CI runs from now on.
+
+The tester's branch and worktree stay until the issue's PRs merge, for
+disputes and review. `mahler cleanup <ISSUE>` then removes the worktree and
+deletes the branch, printing its tip. The suite is not kept after that; what
+was worth keeping is in the repo.
+
+Project suites are not promoted. They stay in the acceptance repo for the
+life of the project.
 
 ## Disputes
 
@@ -164,8 +263,9 @@ and the PR description carries it:
 ```md
 - Risk: <level> (<source>; raised from <level> because <reason>, if raised)
 - Implementer tests: <what they cover>; mahler check <status>
-- Acceptance tests: frozen at <sha> (<n> files) | not required (low risk)
+- Acceptance tests: frozen at <sha> (<n> files) | not required (low risk) | skipped (no criterion reachable from outside: <why>)
 - Tester results: <n> pass; <failures and how each was classified>
+- Promoted: <k> of <n> tests, to <paths>; dropped <d> (<rule>: <count>, ...) | not required
 - Project suite: <pass | fail | none>
 - Reviewer: <tier>; findings handled
 - Proof: <what shows it working, and where: PR body, PR comment, Linear comment>
@@ -175,7 +275,7 @@ and the PR description carries it:
 
 ## What CI Must Do
 
-`mahler check` runs locally and is a Tier 1 control. The tests themselves land
-in the PR, so the repo's CI runs them on every later change. That makes CI the
-regression guardrail: each repo's CI should run its full test suite, including
-merged acceptance tests, on every PR. Name any gap in `guardrails`.
+`mahler check` runs locally and is a Tier 1 control. The implementer's tests
+and the promoted acceptance tests land in the PR, so the repo's CI runs them
+on every later change. That makes CI the regression guardrail: each repo's CI
+should run its full test suite on every PR. Name any gap in `guardrails`.

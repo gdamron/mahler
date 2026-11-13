@@ -18,6 +18,10 @@ On install, Mahler writes its canonical defaults, then overlays this directory:
 - `skills/<name>/SKILL.md` — override or add a skill compiled to `.agents/skills/` and `.claude/skills/`.
   Must start with frontmatter containing `name: <name>` and `description:`.
 - `agents/<name>.json` — override or add a profile (same shape as a Mahler profile).
+- `acceptance-priorities.md` — optional. What this workspace most wants acceptance tests to
+  protect (for example: the paths users depend on, failures that are hard to notice). It adds
+  to the verification policy instead of replacing it: the tester weights its tests toward it,
+  and the conductor never drops a test that covers it. Plain prose or a short list.
 
 `mahler doctor` validates the overlay: malformed sources fail `install`, and a profile that
 allows a skill which is not installed is reported as a warning.

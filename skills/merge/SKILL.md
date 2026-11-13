@@ -31,7 +31,7 @@ description: Decide whether a verified PR may be merged by an agent, then merge 
 - Linear MCP `get_issue` and `get_project` for labels
 - `mahler check --workspace <workspace> --issue <ISSUE>` and
   `mahler acceptance run --workspace <workspace> --project <slug> --issue <ISSUE>`
-- `mahler cleanup <ISSUE> --workspace <workspace>`, `git fetch`, and `git branch -d` for post-merge cleanup
+- `mahler cleanup <ISSUE> --workspace <workspace> [--remote]`, `git fetch`, and `git branch -d` for post-merge cleanup
 
 ## Expected Inputs
 
@@ -49,10 +49,12 @@ description: Decide whether a verified PR may be merged by an agent, then merge 
    list any changed human-review paths.
 2. Check the PR against the risk policy's signals and raise the level if one
    matches. Then confirm that level's verification is complete (see the
-   verification policy): tester results, frozen tests, the project suite, and
-   the reviewer's tier.
+   verification policy): tester results, frozen tests, promotion, the
+   project suite, and the reviewer's tier. A PR that carries the tester's
+   whole suite, rather than the few tests worth keeping, isn't ready.
 3. Verify every readiness item yourself; do not rely only on the conductor's
-   record.
+   record. `mahler check` costs little here: it reruns only what changed
+   since the conductor's run.
 4. When an agent merge is allowed, merge with the repo's merge method:
    - a single PR with `gh pr merge`;
    - a linked stack whose PRs all pass steps 1–3 and show CI checks, in one

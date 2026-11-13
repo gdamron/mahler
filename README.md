@@ -36,7 +36,12 @@ other roles pick one.
   tester after implementation whose tests must pass. High risk has the tester
   write tests before implementation, on a different model, plus a deep review
   and a rollout plan. Tester tests are frozen: `mahler check` fails if anyone
-  else changes them, and disputes go to the composer.
+  else changes them, and disputes go to the composer. A tester's suite runs
+  from its own worktree and never joins the issue branch. It tests only
+  through the outermost surface (the running product or a public API), and
+  the tests that add lasting coverage are promoted into the PR. A workspace
+  names what it most wants protected in
+  `.harness/custom/acceptance-priorities.md`.
 - A project's acceptance suite lives in a repo of its own or in a directory
   of a shared repo (`acceptance` in `.harness/config.json`). `mahler
   acceptance run` tests each issue's worktrees, and base branches elsewhere,
@@ -95,13 +100,13 @@ mahler profile codex --workspace /path/to/product-workspace
 mahler can codex commit --workspace /path/to/product-workspace
 mahler handoff DEV-123 --workspace /path/to/product-workspace --agent codex
 mahler decide --rule scope --description "Fixed an adjacent bug in scope" --reason "expanded to fix adjacent bug" --issue DEV-123 --agent codex --workspace /path/to/product-workspace
-mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue DEV-123 | --path <worktree>]
+mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue DEV-123 | --path <worktree>] [--fresh]
 mahler acceptance freeze --workspace /path/to/product-workspace --issue DEV-123 --repo <name> --commit <sha|base..sha> [--reason "<dispute decision>"]
 mahler acceptance freeze --workspace /path/to/product-workspace --project <slug> --repo <name> --commit <sha>
 mahler acceptance manifest --workspace /path/to/product-workspace --issue DEV-123 | --project <slug>
 mahler acceptance run --workspace /path/to/product-workspace --project <slug> [--issue DEV-123]
 mahler capacity --workspace /path/to/product-workspace
-mahler cleanup DEV-123 --workspace /path/to/product-workspace [--dry-run]
+mahler cleanup DEV-123 --workspace /path/to/product-workspace [--dry-run] [--remote]
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project
@@ -133,18 +138,23 @@ example `e2e`) follow in config order. A configured check with no command is
 reported as skipped, never dropped silently. With `--issue` it checks every
 worktree under the issue's `repos/` dir, including slice worktrees such as
 `repos/<repo>-<slice>`, and fails if there are none; with `--path` it checks a
-single worktree; otherwise it checks each source repo. It also fails when a
-worktree changes frozen acceptance tests, and notes changes to
-`merge.humanReviewPaths`. It is local feedback — the forge/CI remains the
+single worktree; otherwise it checks each source repo. It also fails when
+frozen acceptance tests changed, in the tester's worktree or wherever the
+freeze names, and notes changes to
+`merge.humanReviewPaths`. A check that already passed on the same clean, committed tree is not rerun
+(passes are remembered for 14 days in `.harness/tmp/check-cache.json`);
+`--fresh` reruns everything. It is local feedback — the forge/CI remains the
 Tier 3 authority.
 
 `mahler task` writes a local task brief under `.harness/issues/local-<slug>/`,
 in the same layout as an issue brief, from a task file (`mahler
 linear-template task`) or `--title`, `--description`, and `--risk`.
 
-`mahler acceptance freeze` records the commit that holds a tester's
-acceptance tests, for an issue or a project; changing a frozen set needs
-`--reason` with the dispute decision. A re-freeze pins the whole suite at the
+`mahler acceptance freeze` records a tester's acceptance tests by content,
+for an issue or a project; an issue's freeze applies to its tester worktree
+(`tests/<repo>`) when there is one. The comparison is by content, so a rebase
+or restack needs no new freeze. Changing a frozen set needs `--reason` with
+the dispute decision. A re-freeze pins the whole suite at the
 new commit (`--drop <file>` removes a deleted test), and the old set stays in
 the history.
 `mahler acceptance run` writes a revision manifest (each repo's issue
@@ -157,8 +167,9 @@ launching parallel agents or heavy commands. Like `check`, it is advisory.
 
 `mahler cleanup` removes an issue's worktrees once its PRs are merged, tester
 worktrees under `tests/` included, keeping issue branches and the issue brief.
-It deletes tester branches locally with `git branch -d`, so an unmerged one is
-kept and reported, and it never deletes a remote branch. It refuses to remove
+It deletes tester branches locally and prints each one's tip (nothing
+contains a tester branch, by design), and deletes a pushed one from its
+remote only with `--remote`. It refuses to remove
 a worktree with uncommitted or untracked changes. Finished worktrees otherwise
 keep costing disk, and on macOS, Spotlight indexing; `mahler doctor` reports when Spotlight is indexing
 the worktree root (exclude it in System Settings → Spotlight → Search Privacy;

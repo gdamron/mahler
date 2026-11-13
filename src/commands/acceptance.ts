@@ -8,17 +8,28 @@ import { repoForDir } from "../repos.js";
 import { abs, listDirectories, slugify, writeFileEnsured } from "../util.js";
 
 /**
- * Acceptance tests written by a tester, pinned to the commit that holds them.
- * `mahler check` fails when a checked worktree's copy of any of these files
- * differs from that commit (see policies/verification.md).
+ * Acceptance tests written by a tester, pinned by content. `mahler check`
+ * fails when the copy of any of these files in the worktree the set names
+ * differs from what was frozen (see policies/verification.md). The comparison
+ * is by content, so a rebase or restack that leaves the files alone needs no
+ * new freeze.
  */
 export interface FrozenSet {
   repo: string;
-  /** Full SHA whose contents are the frozen version of `files`. */
+  /** Full SHA the tests were frozen at. A record of where they came from. */
   commit: string;
   /** Repo-relative paths the tester added or changed. */
   files: string[];
-  /** Issue scope only: the worktree dir under `repos/` the tests belong to. */
+  /**
+   * Each file's git blob id at `commit`: the frozen content itself. Records
+   * written before content freezes lack it and are read from `commit`.
+   */
+  blobs?: Record<string, string>;
+  /**
+   * Issue scope only: the worktree the tests are compared in. `tests/<dir>`
+   * is a tester worktree under the issue's `tests/`; a bare name is a
+   * worktree under `repos/`.
+   */
   worktree?: string;
   frozenAt: string;
 }
@@ -67,8 +78,10 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
   const source = abs(workspace, repo.path);
   const commit = frozenCommit(source, commitArg);
   const reposRoot = scope.kind === "issue" ? issueReposRoot(workspace, config, scope.name) : undefined;
-  const worktree = reposRoot ? worktreeFlagKey(reposRoot, stringFlag(flags, "worktree") ?? repo.name) : undefined;
   const record = readRecord(scope.dir);
+  const worktree = reposRoot
+    ? worktreeFlagKey(reposRoot, stringFlag(flags, "worktree") ?? defaultWorktreeKey(reposRoot, record, repo))
+    : undefined;
   const now = new Date().toISOString();
   // Older records may key the same worktree by a path; they match it too.
   const existing = record.frozen.filter(
@@ -79,7 +92,7 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
   const reason = stringFlag(flags, "reason");
   if (existing.length > 0 && !reason) {
     throw new Error(
-      `${scope.kind} ${scope.name} already has acceptance tests frozen in ${repo.name} at ${existing[0].commit.slice(0, 12)}. Changing them needs a dispute decision: pass --reason with it (see the verification policy).`,
+      `${scope.kind} ${scope.name} already has acceptance tests frozen in ${repo.name} at ${existing[0].commit.slice(0, 12)}. Changing them needs a dispute decision: pass --reason with it (see the verification policy). A rebase or restack that leaves the files unchanged needs no new freeze.`,
     );
   }
   const dropped = (stringFlag(flags, "drop") ?? "").split(",").map((file) => file.trim()).filter(Boolean);
@@ -104,6 +117,7 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
     repo: repo.name,
     commit,
     files,
+    blobs: Object.fromEntries(files.map((file) => [file, gitOrThrow(source, ["rev-parse", "--verify", `${commit}:${file}`])])),
     ...(worktree ? { worktree } : {}),
     frozenAt: now,
   });
@@ -117,7 +131,29 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
   if (existing.length > 0) {
     console.log(`Replaced the freeze at ${existing.map((set) => set.commit.slice(0, 12)).join(", ")}; it is kept in history.`);
   }
-  console.log("`mahler check` now fails if a checked worktree changes them.");
+  console.log(
+    worktree
+      ? `\`mahler check --issue ${scope.name}\` now fails if ${worktreeLabel(worktree)} changes them.`
+      : "`mahler check` now fails if a checked worktree changes them.",
+  );
+}
+
+const testsPrefix = "tests/";
+
+/** `tests/<dir>` for a tester worktree's key, `repos/<dir>` for an issue worktree's. */
+function worktreeLabel(key: string): string {
+  return key.startsWith(testsPrefix) ? key : `repos/${key}`;
+}
+
+/**
+ * Where a freeze applies when `--worktree` isn't given: the worktree the
+ * issue's one existing freeze for this repo names, else the tester worktree
+ * `tests/<repo>` when it exists, else the issue worktree `repos/<repo>`.
+ */
+function defaultWorktreeKey(reposRoot: string, record: AcceptanceRecord, repo: RepoConfig): string {
+  const existing = record.frozen.filter((set) => set.repo === repo.name);
+  if (existing.length === 1) return storedWorktreeKey(reposRoot, existing[0], repo);
+  return existsSync(resolve(reposRoot, "..", "tests", repo.name)) ? `${testsPrefix}${repo.name}` : repo.name;
 }
 
 /** Where an issue's worktrees live: `<workspaceDir>/issues/<ISSUE>/repos`. */
@@ -126,17 +162,23 @@ function issueReposRoot(workspace: string, config: HarnessConfig, issue: string)
 }
 
 /**
- * The key `mahler check` matches an issue freeze by: the worktree's directory
- * name under the issue's `repos/`. A path to a worktree (absolute, or with a
- * slash) becomes that name, so one worktree never gets two freezes.
+ * The key `mahler check` matches an issue freeze by: `tests/<dir>` for a
+ * tester worktree under the issue's `tests/`, or the directory name of a
+ * worktree under its `repos/`. A path to a worktree becomes its key, so one
+ * worktree never gets two freezes.
  */
 function worktreeFlagKey(reposRoot: string, value: string): string {
   const trimmed = value.trim().replace(/[\\/]+$/, "");
   if (!isAbsolute(trimmed) && !/[\\/]/.test(trimmed)) return trimmed;
+  const testsRoot = resolve(reposRoot, "..", "tests");
+  const literal = /^tests[\\/]([^\\/]+)$/.exec(trimmed);
+  if (literal) return `${testsPrefix}${literal[1]}`;
+  const tester = keyUnder(testsRoot, resolve(trimmed));
+  if (tester) return `${testsPrefix}${tester}`;
   const key = keyUnder(reposRoot, resolve(trimmed));
   if (!key) {
     throw new Error(
-      `--worktree ${value} is not a worktree of this issue (under ${reposRoot}). Pass the worktree's directory name there, such as ${basename(trimmed)}.`,
+      `--worktree ${value} is not a worktree of this issue (under ${reposRoot} or ${testsRoot}). Pass tests/<dir> for a tester worktree, or the directory name of one under repos/, such as ${basename(trimmed)}.`,
     );
   }
   return key;
@@ -146,6 +188,84 @@ function worktreeFlagKey(reposRoot: string, value: string): string {
 function storedWorktreeKey(reposRoot: string, set: FrozenSet, repo: RepoConfig): string {
   const value = set.worktree ?? repo.name;
   return isAbsolute(value) ? (keyUnder(reposRoot, value) ?? value) : value;
+}
+
+/**
+ * Frozen files whose content in the worktree at `cwd` differs from the
+ * freeze, or that are missing there. Reads the working tree, so uncommitted
+ * edits count. `undefined` when the frozen content can't be determined: an
+ * older record without blob ids whose commit is gone.
+ */
+function changedFrozenFiles(cwd: string, set: FrozenSet): string[] | undefined {
+  const top = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8" }).stdout.trim() || cwd;
+  const changed: string[] = [];
+  for (const file of set.files) {
+    let expected = set.blobs?.[file];
+    if (!expected) {
+      const at = spawnSync("git", ["rev-parse", "--verify", "--quiet", `${set.commit}:${file}`], { cwd: top, encoding: "utf8" });
+      if (at.status !== 0) return undefined;
+      expected = at.stdout.trim();
+    }
+    const actual = existsSync(resolve(top, file))
+      ? spawnSync("git", ["hash-object", "--", file], { cwd: top, encoding: "utf8" }).stdout.trim()
+      : "";
+    if (actual !== expected) changed.push(file);
+  }
+  return changed;
+}
+
+function comparison(cwd: string, label: string, set: FrozenSet, scope: string): Finding {
+  const short = set.commit.slice(0, 12);
+  const changed = changedFrozenFiles(cwd, set);
+  if (changed === undefined) {
+    return {
+      level: "error",
+      message: `${label}: cannot compare frozen acceptance tests for ${scope} (commit ${short} not found)`,
+    };
+  }
+  return changed.length === 0
+    ? { level: "ok", message: `${label}: ${set.files.length} frozen acceptance file(s) for ${scope} match ${short}` }
+    : {
+        level: "error",
+        message: `${label}: frozen acceptance tests for ${scope} differ from ${short} (missing or changed: ${changed.join(", ")}); only the tester changes them, after a dispute decision`,
+      };
+}
+
+/**
+ * Findings for an issue's freezes that live in tester worktrees
+ * (`<issue root>/tests/<dir>`), which `mahler check` doesn't run checks in:
+ * the suite never joins the issue branch, so it is compared where it is.
+ */
+export function testerWorktreeFindings(
+  workspace: string,
+  config: HarnessConfig,
+  issue: string,
+  repos: RepoConfig[],
+): Finding[] {
+  const reposRoot = issueReposRoot(workspace, config, issue);
+  const findings: Finding[] = [];
+  for (const set of readRecord(issuePaths(workspace, config, issue).meta).frozen) {
+    const repo = repos.find((candidate) => candidate.name === set.repo);
+    if (!repo) continue;
+    const key = storedWorktreeKey(reposRoot, set, repo);
+    if (!key.startsWith(testsPrefix)) continue;
+    const cwd = resolve(reposRoot, "..", key);
+    const label = `${repo.name} (${key})`;
+    findings.push(
+      existsSync(cwd)
+        ? comparison(cwd, label, set, `issue ${issue}`)
+        : {
+            level: "warn",
+            message: `${label}: the tester worktree is gone, so issue ${issue}'s frozen acceptance tests were not compared`,
+          },
+    );
+  }
+  return findings;
+}
+
+/** The issue a `--path` worktree belongs to, when it sits under an issue's `repos/`. */
+export function issueOwning(workspace: string, config: HarnessConfig, dir: string): string | undefined {
+  return issueForDir(workspace, config, dir);
 }
 
 /** The first directory of `path` under `root`, comparing real paths too (macOS /var is /private/var). */
@@ -259,8 +379,9 @@ export function frozenAcceptanceFindings(
   const sets: Array<{ set: FrozenSet; scope: string }> = [];
   if (owner) {
     const reposRoot = issueReposRoot(workspace, config, owner);
+    // Freezes in a tester worktree are compared there (testerWorktreeFindings).
     const own = readRecord(issuePaths(workspace, config, owner).meta).frozen
-      .filter((set) => set.repo === repo.name);
+      .filter((set) => set.repo === repo.name && !storedWorktreeKey(reposRoot, set, repo).startsWith(testsPrefix));
     const matched = own.filter((set) => storedWorktreeKey(reposRoot, set, repo) === basename(cwd));
     for (const set of matched) sets.push({ set, scope: `issue ${owner}` });
     if (own.length > 0 && matched.length === 0) {
@@ -280,29 +401,7 @@ export function frozenAcceptanceFindings(
       if (contains.status === 0) sets.push({ set, scope: `project ${project}` });
     }
   }
-  for (const { set, scope } of sets) {
-    const diff = spawnSync(
-      "git", ["diff", "--name-only", set.commit, "--", ...set.files.map((file) => `:(top,literal)${file}`)],
-      { cwd, encoding: "utf8" },
-    );
-    const short = set.commit.slice(0, 12);
-    if (diff.status !== 0) {
-      findings.push({
-        level: "error",
-        message: `${label}: cannot compare frozen acceptance tests for ${scope} (commit ${short} not found)`,
-      });
-      continue;
-    }
-    const changed = diff.stdout.split("\n").filter(Boolean);
-    findings.push(
-      changed.length === 0
-        ? { level: "ok", message: `${label}: ${set.files.length} frozen acceptance file(s) for ${scope} match ${short}` }
-        : {
-            level: "error",
-            message: `${label}: frozen acceptance tests for ${scope} differ from ${short} (missing or changed: ${changed.join(", ")}); only the tester changes them, after a dispute decision`,
-          },
-    );
-  }
+  for (const { set, scope } of sets) findings.push(comparison(cwd, label, set, scope));
   return findings;
 }
 

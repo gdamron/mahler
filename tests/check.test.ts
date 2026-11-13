@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -249,4 +249,69 @@ test("doctor accepts typecheck and custom check names without errors", () => {
   assert.equal(result.status, 0, result.stdout);
   assert.match(result.stdout, / 0 error\(s\)/);
   assert.doesNotMatch(result.stdout, /repo app has no checks configured/);
+});
+
+/** A workspace whose `app` repo has one commit and a `test` check that appends a line to a file outside the repo. */
+function countingWorkspace(): { workspace: string; app: string; runs: () => number } {
+  const workspace = installWorkspaceWithRepo(undefined);
+  const app = resolve(workspace, "app");
+  const log = resolve(workspace, "runs.log");
+  writeFileSync(resolve(app, "a.txt"), "one\n");
+  const git = (...args: string[]) =>
+    assert.equal(spawnSync("git", ["-C", app, "-c", "user.name=t", "-c", "user.email=t@t", ...args]).status, 0);
+  git("add", ".");
+  git("commit", "-qm", "init");
+  const config = loadConfig(workspace);
+  config.repos[0].checks = { test: `echo run >> "${log}"` };
+  saveConfig(workspace, config);
+  return { workspace, app, runs: () => (existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean).length : 0) };
+}
+
+test("check does not rerun a check that passed on the same clean tree, unless --fresh", () => {
+  const { workspace, runs } = countingWorkspace();
+  assert.equal(runCheck(workspace).status, 0);
+  assert.equal(runs(), 1);
+
+  const again = runCheck(workspace);
+  assert.equal(again.status, 0, again.stdout);
+  assert.match(again.stdout, /ok {2}\s*app\/test: .*not rerun: passed on this exact tree at .*--fresh reruns it/);
+  assert.equal(runs(), 1);
+
+  assert.equal(runCheck(workspace, ["--fresh"]).status, 0);
+  assert.equal(runs(), 2);
+});
+
+test("check reruns when the tree changes, is dirty, or the command changes", () => {
+  const { workspace, app, runs } = countingWorkspace();
+  assert.equal(runCheck(workspace).status, 0);
+
+  // Uncommitted and untracked changes are not what passed.
+  writeFileSync(resolve(app, "a.txt"), "two\n");
+  runCheck(workspace);
+  assert.equal(runs(), 2);
+  runCheck(workspace);
+  assert.equal(runs(), 3);
+
+  spawnSync("git", ["-C", app, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "change"]);
+  runCheck(workspace);
+  assert.equal(runs(), 4);
+  runCheck(workspace);
+  assert.equal(runs(), 4);
+
+  const config = loadConfig(workspace);
+  config.repos[0].checks = { test: `${config.repos[0].checks?.test} && true` };
+  saveConfig(workspace, config);
+  runCheck(workspace);
+  assert.equal(runs(), 5);
+});
+
+test("check never remembers a failure", () => {
+  const { workspace } = countingWorkspace();
+  const config = loadConfig(workspace);
+  config.repos[0].checks = { test: "node -e \"process.exit(1)\"" };
+  saveConfig(workspace, config);
+  assert.notEqual(runCheck(workspace).status, 0);
+  const again = runCheck(workspace);
+  assert.notEqual(again.status, 0);
+  assert.doesNotMatch(again.stdout, /not rerun/);
 });

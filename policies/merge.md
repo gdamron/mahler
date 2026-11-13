@@ -47,8 +47,9 @@ Every agent merge requires all of these, regardless of labels:
 - Reviewer sub-agent findings that matter have a response, such as a fix, an
   acknowledgement with a reason, a note for triage, or a rebuttal (see the
   review policy), and no human review comment is left unanswered.
-- `mahler check` passed for the touched repo, including its frozen
-  acceptance tests.
+- `mahler check` passed for the touched repo, including the frozen
+  acceptance tests in the tester's worktree, and the tests worth keeping were
+  promoted (see the verification policy).
 - No dispute is open.
 - The forge reports the PR mergeable with no conflicts.
 - For a stack, every PR up to the one being merged meets these items (see
@@ -112,7 +113,9 @@ against it:
   is documented, use the forge default.
 - Delete the merged branch (see the branching policy). Once all of an issue's
   PRs are merged, remove its worktrees with `mahler cleanup <ISSUE>`; it keeps
-  any worktree with uncommitted changes and reports it. When the human merges,
+  any worktree with uncommitted changes and reports it, and deletes the
+  tester's branch. If a tester branch was pushed in issue mode, add
+  `--remote` to delete that copy too. When the human merges,
   the next composer session (or the human) runs the cleanup.
 - A stack merge needs no retargeting. After a one-at-a-time merge, retarget
   or rebase the stacked PRs that depended on it.

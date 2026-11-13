@@ -11,7 +11,7 @@ import { run, workspace } from "./knowledge-fixtures.js";
 const CURRENT = {
   "decisions-readme": "335064145e764b0747564e1c982bd1b64acf019dd87ce4a4d8a5fb6a2923d7dc",
   "knowledge-readme": "8c368f02a788df3cde78fc416f3d1f71cf240860af73f75b1cc8b564033dca9d",
-  "custom-readme": "c06d6e480ce7424b536fbdd8e4c85d8a984e9ee53d5ecefa85f023f2e870120c",
+  "custom-readme": "43135aa619b15a362ff2c7ec9c230f632a209ec39a6d9fbee57caa966f4ddf26",
 };
 
 test("each changed README template keeps its earlier text's hash", () => {

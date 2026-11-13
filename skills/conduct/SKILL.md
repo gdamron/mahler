@@ -34,6 +34,8 @@ commit, handoff. Skip the rest; your parent owns them.
 - `mahler check --workspace <workspace> --issue <ISSUE>` (or `--path <worktree>`)
 - `mahler task <slug> --agent <agent> --task-file <task.json>` for a local task
 - `mahler acceptance freeze --workspace <workspace> --issue <ISSUE> --repo <repo> --commit <sha>`
+- `git merge --no-edit <issue branch>` in the tester's worktree, to run its
+  suite against the implementation (never the other way round)
 - `mahler acceptance run --workspace <workspace> --project <slug> --issue <ISSUE>`
 - `mahler capacity --workspace <workspace>`
 - `mahler knowledge search`, `mahler learn`, and `mahler knowledge verify`
@@ -87,10 +89,11 @@ commit, handoff. Skip the rest; your parent owns them.
    implementer) to write acceptance tests from the spec in its own worktree
    at `<issue root>/tests/<repo>`, cut from the base branch. Freeze its
    commit with `mahler acceptance freeze --issue <ISSUE> --repo <repo>
-   --commit <sha>` and merge (not cherry-pick) its local branch into the
-   issue branch; the tester doesn't push it. Leave its worktree for disputes:
-   `mahler cleanup` removes it and deletes the merged branch. The implementer
-   makes those tests pass without changing them.
+   --commit <sha>`. The tester's branch never joins the issue branch and is
+   never pushed. To run the suite, merge the issue branch into the tester's
+   worktree and test there (see "Running the Tester's Suite" in the
+   verification policy). The implementer makes those tests pass without
+   changing them.
 4. **Implement.** Do your own slice with the implement skill. For each
    delegated slice, use the delegate skill to pick the tier and write the
    brief: base profile `conductor`, `slice mode`, authority `edit`, allowed
@@ -110,9 +113,9 @@ commit, handoff. Skip the rest; your parent owns them.
    read-only brief covering the diff against its base branch; its tier
    follows the risk level (see the delegate skill). For more than one slice,
    review each slice's diff. At medium risk, launch a tester alongside the
-   reviewer. It works from the spec, not the diff; freeze its commit and merge
-   its branch as in step 3. At low risk, have the reviewer confirm the tests
-   can fail (see the verification policy).
+   reviewer, unless no criterion can be reached from outside (record why). It works from the spec, not the diff; freeze its commit and run
+   its suite from its worktree as in step 3. At low risk, have the reviewer
+   confirm the tests can fail (see the verification policy).
 7. **Iterate.** Weigh the findings as the review policy describes (for
    example fix, acknowledge, set aside for triage, or rebut). Fix the ones you accept (or
    send them back to the slice conductor), then ask the same reviewer to
@@ -126,10 +129,17 @@ commit, handoff. Skip the rest; your parent owns them.
    is at fault (see the verification policy). Fix the code yourself. For a
    wrong test or an unclear criterion, raise a dispute with your parent and
    wait for the decision. Never edit frozen tests yourself; after a decision,
-   the tester changes them and you freeze again with `--reason`.
+   the tester changes them and you freeze again with `--reason`. A rebase or
+   restack needs no new freeze: the comparison is by content.
+7a. **Promote (medium and high risk).** Once every frozen test passes on the
+   final implementation and the findings are handled, write the tests worth
+   keeping into the issue branch as ordinary tests, in one commit, and have
+   the same reviewer check that commit against the originals (see "Promoting
+   Acceptance Tests" in the verification policy). Keep a test unless a drop
+   rule applies, and say which you dropped and why.
 8. **Verify.** Run `mahler check --issue <ISSUE>`, which checks every worktree
    under the issue's `repos/` dir, slices included, and fails if a frozen
-   acceptance test changed. When the issue's project has an acceptance suite,
+   acceptance test in the tester's worktree changed. When the issue's project has an acceptance suite,
    run `mahler acceptance run --project <slug> --issue <ISSUE>`. Walk the
    Definition of Done checklist.
 9. **Open PRs** with the pr skill: one PR per slice branch, each with proof
@@ -168,7 +178,8 @@ Never edit frozen acceptance tests; report a test you think is wrong.
 - Issue brief and worktrees; the chosen shape and its reason in `HANDOFF.md`
 - A brief, with tier and reason, for every sub-agent launched
 - One open PR per slice, reviewed, with `mahler check` passing
-- Acceptance tests frozen when the risk level calls for them
+- Acceptance tests frozen when the risk level calls for them, passing from
+  the tester's worktree, with the ones worth keeping promoted
 - A verification record per PR
 - Updated `HANDOFF.md` and a synthesis reply to the parent
 

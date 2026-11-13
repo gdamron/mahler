@@ -48,7 +48,9 @@ the last known-good state instantly.
 
 - Verify the workspace belongs to the active issue.
 - Check `git status`.
-- Run relevant tests or record why they were not run (a Tier 1 deviation).
+- Run the focused tests for what you changed, or record why they were not
+  run (a Tier 1 deviation). The full `mahler check` runs once, before you
+  push or hand the work on, not before every commit.
 - Review the staged diff.
 - Do not include co-author metadata.
 
@@ -61,14 +63,28 @@ git diff --staged
 # 2. Ensure no secrets
 git diff --staged | grep -i "password\|secret\|api_key\|token"
 
-# 3. Run the configured checks for touched repos — a local mirror of CI.
-#    Per-repo commands live under "checks" in .harness/config.json; every
-#    configured check runs (test, lint, typecheck, build, then any others).
-#    --issue checks every worktree for the issue; --path checks just one.
+# 3. Run the focused tests for the change (the repo's own test command,
+#    narrowed to what you touched)
+```
+
+Before pushing or handing the work on, run the configured checks once, on
+committed work:
+
+```bash
+# A local mirror of CI. Per-repo commands live under "checks" in
+# .harness/config.json; every configured check runs (test, lint, typecheck,
+# build, then any others). --issue checks every worktree for the issue;
+# --path checks just one.
 mahler check --workspace <workspace> --issue <ISSUE>
 
-# 4. Run additional checks CI runs that are not configured above (e.g. formatting)
+# Then any checks CI runs that are not configured above (e.g. formatting)
 ```
+
+`mahler check` skips a check that already passed on the same clean tree, so
+running it again after a rebase that changed nothing, or at merge time, costs
+nothing. It only remembers passes on committed work: commit first. Pass
+`--fresh` when something outside the repo changed (a toolchain, a sibling
+repo the checks build against).
 
 ### Handling Generated Files
 
@@ -157,7 +173,7 @@ For every commit:
 
 - [ ] Commit does one logical thing
 - [ ] Message explains the why, follows type conventions
-- [ ] Tests pass before committing
+- [ ] Focused tests pass before committing; `mahler check` passes before pushing
 - [ ] No secrets in the diff
 - [ ] No formatting-only changes mixed with behavior changes
 - [ ] `.gitignore` covers standard exclusions

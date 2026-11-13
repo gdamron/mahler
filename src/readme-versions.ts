@@ -23,7 +23,9 @@ export const EARLIER_README_HASHES: Record<string, string[]> = {
     "51d0382fe6683c31d7424d5fbec243fbc1ffe8975e8fa9e0f0e3305db88dbdbc",
     "cdaf96a2fe311ff74bff7195aa22c11f0bc079a82479cffba68c6eab425f507a",
   ],
-  "custom-readme": [],
+  "custom-readme": [
+    "c06d6e480ce7424b536fbdd8e4c85d8a984e9ee53d5ecefa85f023f2e870120c",
+  ],
 };
 
 export function sha256(text: string): string {

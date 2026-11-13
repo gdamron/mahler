@@ -186,10 +186,10 @@ const commands: Record<string, Command> = {
   },
   check: {
     usage:
-      "mahler check --workspace <path> [--repo <name>] [--issue <ISSUE> | --path <worktree>]",
-    summary: "Run the configured checks.",
+      "mahler check --workspace <path> [--repo <name>] [--issue <ISSUE> | --path <worktree>] [--fresh]",
+    summary: "Run the configured checks. A check that already passed on the same clean tree is not rerun; --fresh reruns everything.",
     positionals: 0,
-    flags: { ...workspace, repo: "string", issue: "string", path: "string" },
+    flags: { ...workspace, repo: "string", issue: "string", path: "string", fresh: "boolean" },
     run: (args) => check(args.flags),
   },
   acceptance: {
@@ -223,11 +223,11 @@ const commands: Record<string, Command> = {
     run: (args) => capacity(workspaceFlag(args.flags)),
   },
   cleanup: {
-    usage: "mahler cleanup <ISSUE> --workspace <path> [--dry-run]",
+    usage: "mahler cleanup <ISSUE> --workspace <path> [--dry-run] [--remote]",
     summary:
-      "Remove an issue's clean worktrees, tester worktrees included. Issue branches are kept; merged tester branches are deleted locally, never on a remote. --dry-run lists what would be removed.",
+      "Remove an issue's clean worktrees, tester worktrees included. Issue branches are kept; tester branches are deleted locally, and on their remote with --remote. --dry-run lists what would be removed.",
     positionals: 1,
-    flags: { ...workspace, "dry-run": "boolean" },
+    flags: { ...workspace, "dry-run": "boolean", remote: "boolean" },
     run: (args) =>
       cleanup(required(args.rest[0], "issue identifier is required"), args.flags),
   },

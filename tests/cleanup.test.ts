@@ -156,36 +156,26 @@ function addTester(app: string, workspace: string): string {
   return tests;
 }
 
-test("cleanup removes a tester worktree and deletes its branch once the issue branch has it", () => {
-  const { workspace, app, repos } = workspaceWithWorktrees();
-  const tests = addTester(app, workspace);
-  // Merged locally, never pushed: the worktrees share one repository.
-  assert.equal(git(resolve(repos, "app"), ["merge", "-q", "--no-edit", "mah-1-acceptance"]).status, 0);
-
-  const dry = runCleanup(workspace, ["--dry-run"]);
-  assert.match(dry.stdout, /tests\/app: would remove \(branch mah-1-acceptance would be deleted if merged\)/);
-  assert.equal(existsSync(tests), true);
-
-  const result = runCleanup(workspace);
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stdout, /^ok   .*tests\/app: removed \(branch mah-1-acceptance deleted\)$/m);
-  assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-1")), false);
-  assert.equal(git(app, ["branch", "--list", "mah-1-acceptance"]).stdout, "");
-  assert.match(git(app, ["branch", "--list", "mah-1-*"]).stdout, /mah-1-core[\s\S]*mah-1-docs/);
-});
-
-test("cleanup keeps an unmerged tester branch and says so", () => {
+test("cleanup removes a tester worktree and deletes its branch, which nothing contains", () => {
   const { workspace, app } = workspaceWithWorktrees();
   const tests = addTester(app, workspace);
+  const tip = git(tests, ["rev-parse", "--short=12", "HEAD"]).stdout.trim();
+
+  const dry = runCleanup(workspace, ["--dry-run"]);
+  assert.match(dry.stdout, /tests\/app: would remove \(branch mah-1-acceptance would be deleted\)/);
+  assert.equal(existsSync(tests), true);
 
   const result = runCleanup(workspace);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(
     result.stdout,
-    /^warn .*tests\/app: removed \(branch mah-1-acceptance is not merged into the issue branch or the main checkout's HEAD; kept/m,
+    new RegExp(`^ok   .*tests/app: removed \\(branch mah-1-acceptance deleted, was at ${tip}\\)$`, "m"),
   );
-  assert.equal(existsSync(tests), false);
-  assert.match(git(app, ["branch", "--list", "mah-1-acceptance"]).stdout, /mah-1-acceptance/);
+  assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-1")), false);
+  assert.equal(git(app, ["branch", "--list", "mah-1-acceptance"]).stdout, "");
+  assert.match(git(app, ["branch", "--list", "mah-1-*"]).stdout, /mah-1-core[\s\S]*mah-1-docs/);
+  // The suite stays recoverable from the printed tip until git collects it.
+  assert.equal(git(app, ["cat-file", "-e", `${tip}^{commit}`]).status, 0);
 });
 
 test("cleanup keeps a tester worktree with uncommitted changes", () => {
@@ -200,22 +190,43 @@ test("cleanup keeps a tester worktree with uncommitted changes", () => {
   assert.match(git(app, ["branch", "--list", "mah-1-acceptance"]).stdout, /mah-1-acceptance/);
 });
 
-test("cleanup never deletes a pushed tester branch from the remote", () => {
+/** A tester worktree whose branch was pushed to a bare `origin`. */
+function pushedTester(): { workspace: string; app: string } {
   const { workspace, app } = workspaceWithWorktrees();
   const remote = resolve(workspace, "remote.git");
   spawnSync("git", ["init", "-q", "--bare", remote]);
   git(app, ["remote", "add", "origin", remote]);
   const tests = addTester(app, workspace);
   assert.equal(git(tests, ["push", "-q", "-u", "origin", "mah-1-acceptance"]).status, 0);
+  return { workspace, app };
+}
+
+test("cleanup leaves a pushed tester branch on the remote unless asked", () => {
+  const { workspace, app } = pushedTester();
 
   const result = runCleanup(workspace);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(
     result.stdout,
-    /tests\/app: removed \(branch mah-1-acceptance deleted; its remote branch origin\/mah-1-acceptance is left for the human\)/,
+    /tests\/app: removed \(branch mah-1-acceptance deleted, was at [0-9a-f]{12}; its remote branch origin\/mah-1-acceptance is left \(pass --remote to delete it\)\)/,
   );
   assert.equal(git(app, ["branch", "--list", "mah-1-acceptance"]).stdout, "");
   assert.match(git(app, ["ls-remote", "--heads", "origin"]).stdout, /refs\/heads\/mah-1-acceptance/);
+});
+
+test("cleanup --remote deletes a pushed tester branch from its remote, and no issue branch", () => {
+  const { workspace, app } = pushedTester();
+  assert.equal(git(app, ["push", "-q", "origin", "mah-1-core"]).status, 0);
+
+  const dry = runCleanup(workspace, ["--dry-run", "--remote"]);
+  assert.match(dry.stdout, /tests\/app: would remove \(branch mah-1-acceptance and origin\/mah-1-acceptance would be deleted\)/);
+
+  const result = runCleanup(workspace, ["--remote"]);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /tests\/app: removed \(branch mah-1-acceptance deleted, was at [0-9a-f]{12}; remote branch origin\/mah-1-acceptance deleted\)/);
+  const heads = git(app, ["ls-remote", "--heads", "origin"]).stdout;
+  assert.doesNotMatch(heads, /mah-1-acceptance/);
+  assert.match(heads, /refs\/heads\/mah-1-core/);
 });
 
 test("spotlightFinding is ok at zero and warns with the fix otherwise", () => {

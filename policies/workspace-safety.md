@@ -25,8 +25,8 @@ Spotlight indexing that can keep `mds_stores` busy for hours.
   them; a slice that edits docs or config can skip the install.
 - Remove an issue's worktrees with `mahler cleanup <ISSUE>` once its PRs are
   merged, tester worktrees under `tests/` included. It keeps issue branches
-  and the issue brief, deletes tester branches locally with `git branch -d`
-  (which refuses unmerged ones), never deletes a remote branch, and refuses to
+  and the issue brief, deletes tester branches locally (and on their remote
+  with `--remote`), never deletes any other remote branch, and refuses to
   remove a worktree with uncommitted or untracked changes.
 - `mahler doctor` reports whether Spotlight is indexing the worktree root. The
   fix (System Settings → Spotlight → Search Privacy) is the human's to make.

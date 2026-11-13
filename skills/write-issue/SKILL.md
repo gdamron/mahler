@@ -68,6 +68,10 @@ code.
 - **What must not change,** when breaking existing behavior is the risk.
 - **No implementation.** Leave out function, file, and library names and the
   approach, unless they are the public interface.
+- **Stated against a surface someone uses.** The tester checks only through
+  the outermost surface: the running product, or a public API. A criterion
+  about internals gets no acceptance test, so say what a user or caller
+  would see instead.
 
 | Weak | Testable |
 |---|---|

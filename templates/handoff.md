@@ -19,6 +19,7 @@
 - Risk: (level, reasons, and who set it; see `.harness/policies/risk.md`)
 - Acceptance tests: (tester, tier, commit, files, and `mahler acceptance freeze` status)
 - Tester results: (first run: passed, implementation bugs, test bugs, spec questions)
+- Promoted: (how many of the tester's tests were kept, and where)
 - Disputes: (none)
 
 ## Quality

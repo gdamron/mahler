@@ -68,10 +68,12 @@ areas. Standard grants by role:
 - **Reviewer:** read-only. It may run tests and checks to validate findings.
 - **Tester:** edit test files only, in its own worktree outside `repos/`, cut from the
   base branch, and commit to its tester branch. In issue mode the branch
-  stays local; it pushes only a project suite, or when it doesn't share the
-  local repository (see the acceptance-test skill). It does not read the
-  implementation diff, merge its branch, freeze tests, open PRs, or delegate.
-  Its parent merges the branch and records the freeze.
+  stays local and never joins the issue branch; it pushes only a project
+  suite, or when it doesn't share the local repository (see the
+  acceptance-test skill). It does not read the implementation diff, merge its
+  branch, freeze tests, open PRs, or delegate. Its parent records the freeze,
+  runs the suite from the tester's worktree, and promotes the tests worth
+  keeping.
 - **Conductor, issue mode (from a composer):** run the conduct skill for its
   one issue, including launching slice conductors and reviewers and opening
   PRs.

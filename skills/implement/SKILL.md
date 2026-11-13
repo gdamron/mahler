@@ -55,7 +55,10 @@ delegated by another conductor.
    it with the commit skill, and continue. If a change breaks tests, revert to
    the last commit and investigate rather than piling on fixes.
 4. Never edit frozen acceptance tests (the brief or `HANDOFF.md` names them,
-   and `mahler check` fails if they change). If one looks wrong, report it as
+   and `mahler check` fails if they change). They live in the tester's
+   worktree, not your branch: to run them, merge your branch into that
+   worktree and test there (see the verification policy), and don't copy them
+   into your branch. If one looks wrong, report it as
    a possible dispute with the test, the criterion, and your reasoning, and
    keep working on everything else.
 5. When addressing review findings, fix each accepted one in its own commit

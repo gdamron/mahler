@@ -1,12 +1,13 @@
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { basename, matchesGlob, resolve } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
 import { repoForDir } from "../repos.js";
-import { baseRef, frozenAcceptanceFindings } from "./acceptance.js";
+import { baseRef, frozenAcceptanceFindings, issueOwning, testerWorktreeFindings } from "./acceptance.js";
 import type { Finding, HarnessConfig, RepoChecks, RepoConfig } from "../types.js";
-import { abs, listDirectories } from "../util.js";
+import { abs, listDirectories, writeFileEnsured } from "../util.js";
 
 /** One working directory to run a repo's checks in. */
 interface CheckTarget {
@@ -79,6 +80,8 @@ export function check(flags: Flags): void {
     "Running configured checks — a local mirror of what CI (Tier 3) will run.\n",
   );
   let failures = 0;
+  const fresh = flags.fresh === true;
+  const cache = readPassCache(workspace);
   for (const { repo, cwd, label } of targets) {
     if (!existsSync(cwd)) {
       results.push({
@@ -112,7 +115,18 @@ export function check(flags: Flags): void {
       });
       continue;
     }
+    // One tree per target: a check that passes can't dirty it for the next.
+    const tree = cleanTree(cwd);
     for (const entry of entries) {
+      const key = tree ? passKey(repo, entry.command, tree) : undefined;
+      const passedAt = key && !fresh ? cache[key] : undefined;
+      if (passedAt) {
+        results.push({
+          level: "ok",
+          message: `${label}/${entry.name}: ${entry.command} (not rerun: passed on this exact tree at ${passedAt}; --fresh reruns it)`,
+        });
+        continue;
+      }
       console.log(
         `--- ${label}/${entry.name}: ${entry.command} (in ${cwd})`,
       );
@@ -122,6 +136,10 @@ export function check(flags: Flags): void {
         stdio: "inherit",
       });
       if (run.status === 0) {
+        if (key) {
+          cache[key] = new Date().toISOString();
+          writePassCache(workspace, cache);
+        }
         results.push({
           level: "ok",
           message: `${label}/${entry.name}: ${entry.command}`,
@@ -133,6 +151,14 @@ export function check(flags: Flags): void {
           message: `${label}/${entry.name}: ${entry.command} (exit ${run.status ?? "signal"})`,
         });
       }
+    }
+  }
+  const pathFlag = stringFlag(flags, "path");
+  const owner = issue ?? (pathFlag ? issueOwning(workspace, config, resolve(pathFlag)) : undefined);
+  if (owner) {
+    for (const finding of testerWorktreeFindings(workspace, config, owner, repos)) {
+      if (finding.level === "error") failures += 1;
+      results.push(finding);
     }
   }
   console.log("");
@@ -156,6 +182,48 @@ export function check(flags: Flags): void {
   console.log(
     "\nAll configured checks passed. This mirrors CI; the forge remains the authority.",
   );
+}
+
+/** Passing checks, keyed by repo, command, and tree: `key -> when it passed`. */
+type PassCache = Record<string, string>;
+
+const passCacheDays = 14;
+
+function passCachePath(workspace: string): string {
+  return resolve(workspace, ".harness", "tmp", "check-cache.json");
+}
+
+function readPassCache(workspace: string): PassCache {
+  try {
+    const parsed = JSON.parse(readFileSync(passCachePath(workspace), "utf8")) as PassCache;
+    const cutoff = Date.now() - passCacheDays * 24 * 60 * 60 * 1000;
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, at]) => typeof at === "string" && Date.parse(at) >= cutoff),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writePassCache(workspace: string, cache: PassCache): void {
+  writeFileEnsured(passCachePath(workspace), `${JSON.stringify(cache, null, 2)}\n`);
+}
+
+/**
+ * The tree id of HEAD when the worktree has nothing uncommitted or untracked,
+ * so the id says exactly what a check would run on. A rebase that leaves the
+ * content alone keeps the id; any change to a tracked file changes it.
+ */
+function cleanTree(cwd: string): string | undefined {
+  const tree = spawnSync("git", ["rev-parse", "--verify", "--quiet", "HEAD^{tree}"], { cwd, encoding: "utf8" });
+  if (tree.status !== 0) return undefined;
+  const status = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd, encoding: "utf8" });
+  if (status.status !== 0 || status.stdout.trim() !== "") return undefined;
+  return tree.stdout.trim();
+}
+
+function passKey(repo: RepoConfig, command: string, tree: string): string {
+  return createHash("sha256").update([repo.name, command, tree].join("\0")).digest("hex");
 }
 
 /**

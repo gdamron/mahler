@@ -399,3 +399,88 @@ test("re-freezing at a commit that deletes a frozen file fails unless the file i
   assert.deepEqual(record.frozen[0].files, ["tests/accept.txt"]);
   assert.deepEqual([...record.history[0].files].sort(), ["tests/accept.txt", "tests/extra.txt"]);
 });
+
+/** Adds MAH-1's tester worktree `tests/app` on the `tests` branch from setup(). */
+function testerWorktree(workspace: string, app: string): string {
+  const tests = resolve(workspace, "workspaces", "issues", "MAH-1", "tests", "app");
+  mkdirSync(resolve(tests, ".."), { recursive: true });
+  git(app, "worktree", "add", "-q", tests, "tests");
+  return tests;
+}
+
+test("a freeze defaults to the tester worktree, and check compares it there without the issue branch having it", () => {
+  const { workspace, app, worktree } = setup();
+  const tests = testerWorktree(workspace, app);
+  const frozen = run([
+    "acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1", "--repo", "app", "--commit", "tests",
+  ]);
+  assert.equal(frozen.status, 0, frozen.stderr);
+  assert.match(frozen.stdout, /now fails if tests\/app changes them/);
+  const [set] = readRecord(workspace).frozen;
+  assert.equal(set.worktree, "tests/app");
+  assert.equal(set.blobs["tests/accept.txt"], git(app, "rev-parse", "tests:tests/accept.txt"));
+
+  // The suite never joins the issue branch, and the issue worktree isn't failed for lacking it.
+  const passing = check(workspace);
+  assert.equal(passing.status, 0, passing.stdout);
+  assert.match(passing.stdout, /ok {3}app \(tests\/app\): 1 frozen acceptance file\(s\) for issue MAH-1 match/);
+  assert.doesNotMatch(passing.stdout, /were not compared here/);
+
+  // Running the suite against the implementation merges the issue branch into the tester's worktree.
+  writeFileSync(resolve(worktree, "feature.txt"), "implementation\n");
+  git(worktree, "add", ".");
+  git(worktree, "commit", "-qm", "implement");
+  git(tests, "merge", "-q", "--no-edit", "t/mah-1");
+  assert.equal(check(workspace).status, 0);
+  const byPath = run(["check", "--workspace", workspace, "--path", worktree]);
+  assert.match(byPath.stdout, /ok {3}app \(tests\/app\): 1 frozen acceptance file/);
+
+  writeFileSync(resolve(tests, "tests", "accept.txt"), "loosened, not committed\n");
+  const tampered = check(workspace);
+  assert.notEqual(tampered.status, 0);
+  assert.match(tampered.stdout, /fail app \(tests\/app\): frozen acceptance tests for issue MAH-1 differ .*tests\/accept\.txt/);
+});
+
+test("a frozen set survives a rebase that rewrites its commit, with no new freeze", () => {
+  const { workspace, app, worktree } = setup();
+  const args = ["acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1", "--repo", "app"];
+  git(worktree, "merge", "-q", "tests");
+  assert.equal(run([...args, "--commit", "tests"]).status, 0);
+  const frozenAt = readRecord(workspace).frozen[0].commit;
+
+  // main moves, the issue branch is rebased onto it, and the frozen commit is no longer in its history.
+  writeFileSync(resolve(app, "CHANGELOG.md"), "moved\n");
+  git(app, "add", ".");
+  git(app, "commit", "-qm", "main moves");
+  git(worktree, "rebase", "-q", "main");
+  assert.notEqual(spawnSync("git", ["merge-base", "--is-ancestor", frozenAt, "HEAD"], { cwd: worktree }).status, 0);
+
+  const checked = check(workspace);
+  assert.equal(checked.status, 0, checked.stdout);
+  assert.match(checked.stdout, /ok {3}app: 1 frozen acceptance file\(s\) for issue MAH-1 match/);
+
+  // Even an older record's content is read from the blob ids, not the commit.
+  const path = resolve(workspace, ".harness", "issues", "MAH-1", "acceptance.json");
+  const record = readRecord(workspace);
+  record.frozen[0].commit = "0".repeat(40);
+  writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
+  assert.equal(check(workspace).status, 0);
+  delete record.frozen[0].blobs;
+  writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
+  assert.match(check(workspace).stdout, /fail app: cannot compare frozen acceptance tests for issue MAH-1/);
+});
+
+test("an issue with a freeze in repos/ keeps it there when a tester worktree exists", () => {
+  const { workspace, app } = setup();
+  const args = ["acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1", "--repo", "app"];
+  assert.equal(run([...args, "--commit", "tests"]).status, 0);
+  testerWorktree(workspace, app);
+  git(resolve(workspace, "workspaces", "issues", "MAH-1", "tests", "app"), "commit", "-q", "--allow-empty", "-m", "dispute fix");
+  assert.equal(run([...args, "--commit", "tests", "--reason", "dispute"]).status, 0);
+  const record = readRecord(workspace);
+  assert.deepEqual(record.frozen.map((set: { worktree: string }) => set.worktree), ["app"]);
+
+  const explicit = run([...args, "--commit", "main..tests", "--worktree", "tests/app"]);
+  assert.equal(explicit.status, 0, explicit.stderr);
+  assert.deepEqual(readRecord(workspace).frozen.map((set: { worktree: string }) => set.worktree).sort(), ["app", "tests/app"]);
+});

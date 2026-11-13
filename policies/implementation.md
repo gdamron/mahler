@@ -65,9 +65,10 @@ to revert. Split before submitting, not after.
 ## Before stopping
 
 - Run focused tests when feasible.
-- Run `mahler check --workspace <workspace> --issue <ISSUE>` (or `--path <worktree>`
-  for a single slice) for touched repos —
-  it mirrors what CI will run, so failures here are failures there.
+- Commit, then run `mahler check --workspace <workspace> --issue <ISSUE>` (or
+  `--path <worktree>` for a single slice) for touched repos. It mirrors what
+  CI will run, so failures here are failures there. Once is enough: it skips
+  checks that already passed on the same committed tree.
 - Record what changed and what remains in `HANDOFF.md`.
 
 ### Change Summaries

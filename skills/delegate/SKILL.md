@@ -43,7 +43,7 @@ check, or a one-file fix almost never earns a sub-agent.
 | One issue, from a composer | `conductor`, issue mode |
 | One slice, from a conductor | `conductor`, slice mode |
 | Review of a finished diff | `reviewer` |
-| Acceptance tests from the spec (medium or high risk, or a project suite) | `tester` |
+| Acceptance tests from the spec, through the outermost surface (medium or high risk with a criterion reachable from outside, or a project suite) | `tester` |
 | Read-only lookup or codebase search | the runtime's built-in explore agent, or an ad hoc read-only brief |
 
 ## 3. Pick the tier

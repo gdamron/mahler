@@ -28,21 +28,8 @@ This pattern means you never lose more than one increment of work. If an agent
 goes off the rails, `git reset --hard HEAD` takes you back to the last successful
 state.
 
-### Commit Early, Commit Often
-
-Each successful increment gets its own commit. Don't accumulate large uncommitted
-changes.
-
-```text
-Work pattern:
-  Implement small slice → Test → Verify → Commit → Next small slice
-
-Not this:
-  Implement everything → Hope it works → Giant commit
-```
-
-Commits are save points. If the next change breaks something, you can revert to
-the last known-good state instantly.
+Each successful increment gets its own commit: implement a small step, test
+it, commit, continue. Don't accumulate large uncommitted changes.
 
 ## Pre-Commit Hygiene
 
@@ -86,14 +73,11 @@ nothing. It only remembers passes on committed work: commit first. Pass
 `--fresh` when something outside the repo changed (a toolchain, a sibling
 repo the checks build against).
 
-### Handling Generated Files
+### Generated Files
 
-- **Commit generated files** only if the project expects them (e.g.,
-  `package-lock.json`, Prisma migrations)
-- **Don't commit** build output (`dist/`, `.next/`), environment files (`.env`),
-  or IDE config (`.vscode/settings.json` unless shared)
-- **Have a `.gitignore`** that covers: `node_modules/`, `dist/`, `.env`,
-  `.env.local`, `*.pem`
+Commit generated files only when the project expects them (a lockfile, a
+migration). Never commit build output, environment files, or personal IDE
+config; the repo's `.gitignore` should cover them.
 
 ## Committing
 
@@ -142,23 +126,10 @@ notes to commits, "generate by" messages to PRs, or anything similar.
 
 ### Keep Concerns Separate
 
-Don't combine formatting changes with behavior changes. Don't combine refactors
-with features. Each type of change should be a separate commit — and ideally a
-separate PR:
-
-```text
-# Good: Separate concerns
-git commit -m "refactor: extract validation logic to shared utility"
-git commit -m "feat: add phone number validation to registration"
-
-# Bad: Mixed concerns
-git commit -m "refactor validation and add phone number field"
-```
-
-**Separate refactoring from feature work.** A refactoring change and a feature
-change are two different changes — submit them separately. This makes each
-change easier to review, revert, and understand in history. Small cleanups
-(renaming a variable) can be included in a feature commit at reviewer discretion.
+Don't combine formatting changes with behavior changes, or refactors with
+features. Each is its own commit, and a refactor and a feature are ideally
+separate PRs: each is then easier to review, revert, and find in history. A
+small cleanup (renaming a variable) can ride along in a feature commit.
 
 ### Size Your Changes
 
@@ -166,14 +137,3 @@ A commit is one logical step that leaves the tests passing, so it can be
 reverted or bisected on its own. Small commits are save points, not a review
 courtesy. PR size follows the pr policy: one deliverable per PR, with stacks
 for dependent parts.
-
-## Verification
-
-For every commit:
-
-- [ ] Commit does one logical thing
-- [ ] Message explains the why, follows type conventions
-- [ ] Focused tests pass before committing; `mahler check` passes before pushing
-- [ ] No secrets in the diff
-- [ ] No formatting-only changes mixed with behavior changes
-- [ ] `.gitignore` covers standard exclusions

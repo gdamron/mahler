@@ -46,8 +46,9 @@ description: Prepare or open a pull request for committed issue-scoped work.
 2. From the repo worktree, open the PR with `--body-file` and one `--attach`
    per image or video, using absolute paths (see the pr policy). If some
    uploads fail, retry them with `gh pr edit`; don't open the PR again.
-3. For a stack, open each PR against its predecessor's branch, then link them
-   bottom to top with `gh stack link`. Check that CI ran on each PR (see the
+3. For a stack, open each PR against its predecessor's branch, with the
+   verification record and proof on the top PR only and a link to it from the
+   others, then link them bottom to top with `gh stack link`. Check that CI ran on each PR (see the
    pr policy).
 4. Comment on the Linear issue with the PR link and the same proof. Skip this
    for a local task.

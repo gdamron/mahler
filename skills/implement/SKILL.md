@@ -17,13 +17,12 @@ delegated by another conductor.
 
 ## Required Policies
 
-- judgment
 - workspace-safety
 - implementation
-- branching
 - commit
-- definition-of-done
-- handoff
+
+When you own the issue, also: judgment, branching, definition-of-done, and
+handoff. In slice mode your parent owns those.
 
 ## Allowed Commands
 

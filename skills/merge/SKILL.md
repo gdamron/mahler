@@ -57,8 +57,8 @@ description: Decide whether a verified PR may be merged by an agent, then merge 
    since the conductor's run.
 4. When an agent merge is allowed, merge with the repo's merge method:
    - a single PR with `gh pr merge`;
-   - a linked stack whose PRs all pass steps 1–3 and show CI checks, in one
-     step with `gh stack merge` up to the top PR you may merge (see the merge
+   - a linked stack that passes steps 1–3 (routing per PR, verification
+     once for the stack) and shows CI checks on every PR, in one step with `gh stack merge` up to the top PR you may merge (see the merge
      policy's Stacks);
    - any other stacked PRs one at a time, bottom first, retargeting each
      next PR to the base branch.

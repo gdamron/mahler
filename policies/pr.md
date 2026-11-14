@@ -51,7 +51,8 @@ facts quickly.
 
 - **Summary:** one to three sentences on what changes for users or callers,
   and why.
-- **Verification:** the verification record. For a local task, add its
+- **Verification:** the verification record (in a stack, only the top PR
+  carries it; see Stacks). For a local task, add its
   acceptance criteria and the reason for its risk level: `.harness/` may not
   be versioned, so the PR is the lasting record.
 - **Proof:** evidence the change works (below).
@@ -135,8 +136,11 @@ rebasing between merges. This uses the `gh stack` extension
 installed).
 
 1. Open each PR with this policy, its base set to its predecessor's branch
-   (the bottom one targets the base branch). Each keeps its own description,
-   verification record, and proof, and says where it sits in the stack.
+   (the bottom one targets the base branch). The stack is verified as one
+   change (see the verification policy), so the top PR carries the issue's
+   verification record and proof. Each PR below has only a summary, where it
+   sits in the stack, and a link to the top PR. Add proof to a lower PR only
+   when it shows something the top PR's doesn't.
 2. Link them, bottom to top: `gh stack link <pr> <pr> ...`. Add `--base
    <branch>` when the base isn't the default branch. To add a PR on top of an
    existing stack: `gh stack link <stack-number> <pr>`. Record the stack's PR

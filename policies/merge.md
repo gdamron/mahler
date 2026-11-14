@@ -52,7 +52,8 @@ Every agent merge requires all of these, regardless of labels:
   promoted (see the verification policy).
 - No dispute is open.
 - The forge reports the PR mergeable with no conflicts.
-- For a stack, every PR up to the one being merged meets these items (see
+- A stack is verified as one change: the record on its top PR covers every
+  PR in it. CI must still be green on each PR up to the one being merged (see
   Stacks below).
 - The Definition of Done is satisfied and `HANDOFF.md` is current.
 
@@ -73,6 +74,7 @@ gh stack merge <stack-number | pr-number> --<method> --yes
   PR's base (`gh pr view <pr> --json baseRefName`).
 - Apply the routing rules to each PR in the stack. If one goes to the human,
   merge only the PRs below it, and hand the rest of the stack to the human.
+  The stack's one verification record still covers the part you merge.
 - `gh stack merge` checks only that each PR is open and not a draft, and
   branch protection applies to the base branch. Check readiness on every PR
   yourself, and confirm CI actually ran on each (`gh pr checks <pr>` lists
@@ -95,12 +97,12 @@ gh stack merge <stack-number | pr-number> --<method> --yes
 
 ## Verification Record
 
-A conductor reports the verification record (see the verification policy) for
-each PR, plus the merge routing, and the composer records its decision
-against it:
+A conductor reports one verification record per issue (see the verification
+policy), plus the merge routing for each PR, and the composer records its
+decision against it:
 
 ```md
-- PR: <url>
+- PR: <url, or the stack's PRs bottom to top>
 - Routing: human-review label <label> | human-review path <paths> | agent merge
 - Risk: <level>: <reasons>
 - Verification: <the verification record, or a link to it in HANDOFF.md>

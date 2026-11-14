@@ -4,47 +4,16 @@ These are norms, not rules (see the judgment policy): deviate when the task
 genuinely calls for it, and record the reason in `HANDOFF.md`. The principles
 below earn their place by making work reviewable and reversible.
 
-## Core Principles
+## Keep Changes Small
 
-### Keep Changes Small
+Large changes are harder to review, riskier to ship, and harder to revert.
 
-Remember that large changes are risky changes and are difficult to review. Avoid
-common rationalizations:
-
-> "I'll commit when the feature is done"
-
-**Reality**: One giant commit is impossible to review, debug, or revert. Commit
-each slice.
-
-> "The message doesn't matter"
-
-**Reality**: Messages are documentation. Future you (and future agents) will
-need to understand what changed and why.
-
-> "I'll squash it all later"
-
-**Reality**: Squashing destroys the development narrative. Prefer clean
-incremental commits from the start.
-
-> "Branches add overhead"
-
-**Reality**: Short-lived branches are free and prevent conflicting work from
-colliding. Long-lived branches are the problem — merge within 1-3 days.
-
-> "I'll split this change later"
-
-**Reality**: Large changes are harder to review, riskier to deploy, and harder
-to revert. Split before submitting, not after.
-
-### Red Flags
-
-- Large uncommitted changes accumulating
-- Commit messages like "fix", "update", "misc"
-- Formatting changes mixed with behavior changes
-- No `.gitignore` in the project
-- Committing `node_modules/`, `.env`, or build artifacts
-- Long-lived branches that diverge significantly from main
-- Force-pushing to shared branches
+- Commit each increment as it passes its tests (see the commit policy). Don't
+  save the commit for when the feature is done, and don't plan to squash or
+  split later.
+- Keep branches short-lived: merge within one to three days.
+- Keep formatting changes out of behavior changes.
+- Never force-push a shared branch.
 
 ## Before editing
 

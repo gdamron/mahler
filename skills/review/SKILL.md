@@ -13,10 +13,11 @@ description: Review an issue-scoped diff and report findings before handoff.
 
 ## Required Policies
 
-- judgment
 - workspace-safety
 - review
-- handoff
+
+Reviewing your own issue, also: judgment and handoff. A delegated reviewer
+reports to the conductor, which owns both.
 
 ## Allowed Commands
 
@@ -44,8 +45,7 @@ description: Review an issue-scoped diff and report findings before handoff.
   note, proposed in the report (title, description, scope) for the conductor
   to record
 - Updated `HANDOFF.md`, or, when delegated, findings reported to the
-  conductor that owns it (record your own workflow deviations in
-  `HANDOFF.md` either way)
+  conductor that owns it, with anything you did differently from this skill
 
 ## Stop Conditions
 

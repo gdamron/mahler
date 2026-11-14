@@ -13,11 +13,11 @@ description: Commit a tested increment of issue-scoped work as a save point, and
 
 ## Required Policies
 
-- judgment
 - workspace-safety
-- definition-of-done
 - commit
-- handoff
+
+When you own the issue, also: judgment, definition-of-done, and handoff. In
+slice mode your parent owns those.
 
 ## Allowed Commands
 

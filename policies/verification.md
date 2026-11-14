@@ -67,30 +67,18 @@ level includes everything in the levels before it.
 
 ## The Tester
 
-The tester profile follows the acceptance-test skill. In short:
+The acceptance-test skill is the tester's whole instruction set; it reads no
+other policy but workspace-safety. What its parent needs to know:
 
-- It works from the spec: `TASK.md`, the project's criteria, and public
-  interfaces (types, API docs, CLI help). It does not read the implementation
-  diff or the implementer's tests.
-- It works in its own worktree, cut from the base branch, at
-  `<issue root>/tests/<repo>`, and commits to its own branch. The worktree
-  stays outside `repos/` because its tests fail until the implementation
-  exists, and `mahler check --issue` runs every worktree under `repos/`.
-- Its branch is scratch work. In issue mode it is never pushed, never merged
-  into the issue branch, and never opened as a PR; `mahler cleanup` deletes
-  it. It pushes only a project suite, or when it doesn't share the local
-  repository (in the cloud or on another machine).
-- It puts its tests in new files rather than editing existing ones, so the
-  implementation never conflicts with them.
-- It tests only through the outermost surface: the running product, or a
-  library's public API when the library is what ships. It can't see the
-  implementer's tests, so a test at their level mostly repeats one. Unit
-  tests are the implementer's job.
-- It writes one test per criterion plus its failure edge, tests behavior
-  rather than shape, and doesn't guess at names it can't see.
-- It reads `.harness/custom/acceptance-priorities.md` when the workspace has
-  one: what this workspace most wants acceptance tests to protect.
-- Each test names the criterion it checks.
+- It works from the spec and public interfaces, in its own worktree at
+  `<issue root>/tests/<repo>`, cut from the base branch. The worktree stays
+  outside `repos/` because its tests fail until the implementation exists,
+  and `mahler check --issue` runs every worktree under `repos/`.
+- Its branch is scratch work: in issue mode never pushed, never merged into
+  the issue branch, never a PR. `mahler cleanup` deletes it.
+- It tests only through the outermost surface (the running product, or a
+  public API), to the bar in its skill, and adds new files rather than
+  editing existing ones.
 - It reports which criterion each test covers, and any criterion it could not
   test from outside, with the reason.
 
@@ -257,8 +245,9 @@ them into an acceptance suite that every issue in the project runs against.
 
 ## Verification Record
 
-The conductor keeps this in the `## Verification` section of `HANDOFF.md`,
-and the PR description carries it:
+There is one record per issue. The conductor keeps it in the `## Verification`
+section of `HANDOFF.md`, and the PR description carries it (for a stack, the
+top PR's):
 
 ```md
 - Risk: <level> (<source>; raised from <level> because <reason>, if raised)
@@ -272,6 +261,25 @@ and the PR description carries it:
 - Disputes: <none | decision>
 - Rollout (high risk): <plan>
 ```
+
+## Stacks
+
+An issue that lands as a stack of PRs is verified once, as one change:
+
+- One tester suite, run against the top branch of the stack.
+- One review of the whole stack (base branch to top branch) by one reviewer,
+  read PR by PR. Fixes go on the branch that owns the code, and the branches
+  above it are rebased (`git rebase --update-refs` moves them together).
+- One verification record and one proof, on the top PR. The PRs below link
+  to it.
+
+CI still runs on every PR, and each PR still has to stand on its own: the
+tests pass at every branch in the stack, not only the top. When only the
+lower part of a stack will merge (the merge policy routes an upper PR to the
+human), say in the record which PRs it covers.
+
+Slices in different repos are separate changes: each gets its own review and
+PR, under the one record in `HANDOFF.md`.
 
 ## What CI Must Do
 

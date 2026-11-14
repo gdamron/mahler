@@ -11,6 +11,10 @@ in more players only when the piece needs them. It reports to its parent: the
 composer that dispatched it, the conductor that delegated its slice, or the
 human who tasked it directly.
 
+**In slice mode** (your brief says so), read only the "Slice Mode" section
+below and the three policies it names. The rest of this skill is for the
+conductor that owns the issue.
+
 ## Triggers
 
 - "work on ISSUE-123" (when the active profile is `conductor`, or a composer
@@ -21,12 +25,17 @@ human who tasked it directly.
 
 ## Required Policies
 
-Issue mode: judgment, issue-selection, workspace-safety, branching,
-implementation, commit, sub-agent-delegation, review, risk, verification,
-definition-of-done, pr, merge, handoff.
+Issue mode: judgment, workspace-safety, branching, implementation, commit,
+sub-agent-delegation, review, risk, verification, definition-of-done, pr,
+handoff. Read these only when they apply:
 
-Slice mode reads only: judgment, workspace-safety, implementation, branching,
-commit, handoff. Skip the rest; your parent owns them.
+- issue-selection: when you are choosing an issue from a project.
+- merge: its "Who Decides" section, for the routing you report. The rest is
+  the composer's, unless the human asks you to merge.
+- verification's "Project Acceptance": when the issue's project has a suite.
+
+Slice mode reads only: workspace-safety, implementation, commit. Skip the
+rest; your parent owns them, and your brief names your branch.
 
 ## Allowed Commands
 
@@ -111,8 +120,9 @@ commit, handoff. Skip the rest; your parent owns them.
    keeps each one reviewable, but it doesn't make the whole change smaller.
 6. **Review and test.** Launch a reviewer that did not write the code, with a
    read-only brief covering the diff against its base branch; its tier
-   follows the risk level (see the delegate skill). For more than one slice,
-   review each slice's diff. At medium risk, launch a tester alongside the
+   follows the risk level (see the delegate skill). A stack gets one review
+   of the whole stack, base branch to top branch, read PR by PR; slices in
+   different repos get a review each. At medium risk, launch a tester alongside the
    reviewer, unless no criterion can be reached from outside (record why). It works from the spec, not the diff; freeze its commit and run
    its suite from its worktree as in step 3. At low risk, have the reviewer
    confirm the tests can fail (see the verification policy).
@@ -142,14 +152,15 @@ commit, handoff. Skip the rest; your parent owns them.
    acceptance test in the tester's worktree changed. When the issue's project has an acceptance suite,
    run `mahler acceptance run --project <slug> --issue <ISSUE>`. Walk the
    Definition of Done checklist.
-9. **Open PRs** with the pr skill: one PR per slice branch, each with proof
-   that it works. A stacked PR targets its predecessor's branch and says so
-   in its description; link dependent PRs into a GitHub stack with
+9. **Open PRs** with the pr skill: one PR per slice branch. A stack's top
+   PR carries the proof and the verification record; the PRs below carry a
+   summary and a link to it. A stacked PR targets its predecessor's branch
+   and says so in its description; link dependent PRs into a GitHub stack with
    `gh stack link` so they merge in one step (see the pr policy).
-10. **Record verification.** For each PR, write the verification record from
-    the verification policy into `HANDOFF.md` and the PR description, with
-    the merge routing (labels and any human-review paths `mahler check`
-    reported). Do not merge: the composer decides, or the human when you were
+10. **Record verification.** Write the issue's one verification record from
+    the verification policy into `HANDOFF.md` and the PR description (the
+    top PR's, for a stack), with each PR's merge routing (labels and any
+    human-review paths `mahler check` reported). Do not merge: the composer decides, or the human when you were
     tasked directly.
 11. **Record knowledge.** Write the notes this issue taught you, and the ones
     slice conductors, testers, and reviewers proposed, with `mahler learn`;
@@ -161,7 +172,8 @@ commit, handoff. Skip the rest; your parent owns them.
 ## Slice Mode
 
 When your brief says `slice mode`, you are one player in another conductor's
-issue:
+issue: Read the workspace-safety, implementation, and commit policies, and
+nothing else here.
 
 1. Confirm the worktree and branch match the brief; stop if they do not.
 2. Run the implement skill in your worktree only, committing save points.
@@ -177,10 +189,11 @@ Never edit frozen acceptance tests; report a test you think is wrong.
 
 - Issue brief and worktrees; the chosen shape and its reason in `HANDOFF.md`
 - A brief, with tier and reason, for every sub-agent launched
-- One open PR per slice, reviewed, with `mahler check` passing
+- One open PR per slice, with `mahler check` passing; one review per stack
+  or repo
 - Acceptance tests frozen when the risk level calls for them, passing from
   the tester's worktree, with the ones worth keeping promoted
-- A verification record per PR
+- One verification record for the issue
 - Updated `HANDOFF.md` and a synthesis reply to the parent
 
 ## Stop Conditions

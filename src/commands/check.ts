@@ -4,7 +4,8 @@ import { spawnSync } from "node:child_process";
 import { basename, matchesGlob, resolve } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
-import { repoForDir } from "../repos.js";
+import { recordEvent } from "../events.js";
+import { readGit, repoForDir } from "../repos.js";
 import { baseRef, frozenAcceptanceFindings, issueOwning, testerWorktreeFindings } from "./acceptance.js";
 import type { Finding, HarnessConfig, RepoChecks, RepoConfig } from "../types.js";
 import { abs, listDirectories, writeFileEnsured } from "../util.js";
@@ -80,6 +81,9 @@ export function check(flags: Flags): void {
     "Running configured checks — a local mirror of what CI (Tier 3) will run.\n",
   );
   let failures = 0;
+  const startedAt = Date.now();
+  const timed: Array<{ check: string; ms: number; ok: boolean; cached: boolean }> = [];
+  const branches: Array<{ repo: string; worktree: string; branch: string; head: string }> = [];
   const fresh = flags.fresh === true;
   const cache = readPassCache(workspace);
   for (const { repo, cwd, label } of targets) {
@@ -115,12 +119,19 @@ export function check(flags: Flags): void {
       });
       continue;
     }
+    branches.push({
+      repo: repo.name,
+      worktree: basename(cwd),
+      branch: readGit(cwd, ["branch", "--show-current"]),
+      head: readGit(cwd, ["rev-parse", "--short=12", "HEAD"]),
+    });
     // One tree per target: a check that passes can't dirty it for the next.
     const tree = cleanTree(cwd);
     for (const entry of entries) {
       const key = tree ? passKey(repo, entry.command, tree) : undefined;
       const passedAt = key && !fresh ? cache[key] : undefined;
       if (passedAt) {
+        timed.push({ check: `${label}/${entry.name}`, ms: 0, ok: true, cached: true });
         results.push({
           level: "ok",
           message: `${label}/${entry.name}: ${entry.command} (not rerun: passed on this exact tree at ${passedAt}; --fresh reruns it)`,
@@ -130,11 +141,13 @@ export function check(flags: Flags): void {
       console.log(
         `--- ${label}/${entry.name}: ${entry.command} (in ${cwd})`,
       );
+      const began = Date.now();
       const run = spawnSync(entry.command, {
         cwd,
         shell: true,
         stdio: "inherit",
       });
+      timed.push({ check: `${label}/${entry.name}`, ms: Date.now() - began, ok: run.status === 0, cached: false });
       if (run.status === 0) {
         if (key) {
           cache[key] = new Date().toISOString();
@@ -160,6 +173,14 @@ export function check(flags: Flags): void {
       if (finding.level === "error") failures += 1;
       results.push(finding);
     }
+  }
+  if (owner) {
+    recordEvent(workspace, config, owner, "check", {
+      ms: Date.now() - startedAt,
+      passed: failures === 0,
+      checks: timed,
+      branches,
+    });
   }
   console.log("");
   for (const result of results) {

@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, relative, resolve } from "node:path";
 import { type Flags, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
+import { recordEvent } from "../events.js";
 import { gitCommonDir, readGit } from "../repos.js";
 import type { Finding } from "../types.js";
 import { listDirectories } from "../util.js";
@@ -21,7 +22,8 @@ export function cleanup(identifier: string, flags: Flags): void {
   const workspace = workspaceFlag(flags);
   const dryRun = flags["dry-run"] === true;
   const remote = flags.remote === true;
-  const { worktreeRoot } = issuePaths(workspace, loadConfig(workspace), identifier);
+  const config = loadConfig(workspace);
+  const { worktreeRoot } = issuePaths(workspace, config, identifier);
   const reposDir = resolve(worktreeRoot, "repos");
   const testsDir = resolve(worktreeRoot, "tests");
   const issueDirs = listDirectories(reposDir).map((dir) => resolve(reposDir, dir));
@@ -40,6 +42,11 @@ export function cleanup(identifier: string, flags: Flags): void {
     });
   }
   if (!dryRun) {
+    const kept = findings.filter((finding) => finding.level === "error").length;
+    // Only an issue that has a brief gets a log: cleanup of a mistyped name records nothing.
+    if (existsSync(issuePaths(workspace, config, identifier).meta)) {
+      recordEvent(workspace, config, identifier, "cleanup", { worktrees: issueDirs.length, kept });
+    }
     removeIfEmpty(reposDir);
     removeIfEmpty(testsDir);
     removeIfEmpty(worktreeRoot);

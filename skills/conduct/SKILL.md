@@ -38,6 +38,7 @@ commit, handoff. Skip the rest; your parent owns them.
   suite against the implementation (never the other way round)
 - `mahler acceptance run --workspace <workspace> --project <slug> --issue <ISSUE>`
 - `mahler capacity --workspace <workspace>`
+- `mahler mark <ISSUE> <name> --workspace <workspace>` (see Timing Marks)
 - `mahler knowledge search`, `mahler learn`, and `mahler knowledge verify`
   (see the knowledge policy)
 - `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`
@@ -157,6 +158,23 @@ commit, handoff. Skip the rest; your parent owns them.
 12. **Report.** Update `HANDOFF.md` (you own it for this issue; phase
     `ready-to-merge`) and reply to your parent with PR URLs, verification
     records, checks, review status, risks, and deviations.
+
+## Timing Marks
+
+Mahler's commands record most of an issue's timeline on their own. Five
+boundaries have no command, so mark them as you pass them, in the same
+message as the launch or the reply you are acting on:
+
+```sh
+mahler mark <ISSUE> tester-start    # as you launch the tester
+mahler mark <ISSUE> tester-done     # when it reports
+mahler mark <ISSUE> review-start    # as you launch, or re-engage, the reviewer
+mahler mark <ISSUE> review-done     # when its findings arrive (once per round)
+mahler mark <ISSUE> promoted        # after the promotion commit
+```
+
+A missed mark is not a deviation and needs no record; `mahler timings` works
+with what it has. Don't mark in slice mode.
 
 ## Slice Mode
 

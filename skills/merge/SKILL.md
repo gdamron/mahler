@@ -40,13 +40,16 @@ description: Decide whether a verified PR may be merged by an agent, then merge 
 - The conductor's verification record
 - `merge` (`humanReviewLabels`, `humanReviewPaths`, `agentMergeLabels`) from
   `.harness/config.json`
+- `.harness/custom/merge-rules.md`, when the workspace has one
 
 ## Process
 
 1. For a Linear issue, confirm the issue and project labels with Linear MCP
    (they may have changed since the brief). A local task's brief is its
    record. Apply the merge policy's decision order, using `mahler check` to
-   list any changed human-review paths.
+   list any changed human-review paths. Then apply the workspace's
+   `merge-rules.md`, if it has one: it can send more PRs to the human and
+   add readiness checks, here and in the steps below.
 2. Check the PR against the risk policy's signals and raise the level if one
    matches. Then confirm that level's verification is complete (see the
    verification policy): tester results, frozen tests, promotion, the

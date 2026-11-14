@@ -61,6 +61,7 @@ other roles pick one.
   human. A PR that changes a path in `merge.humanReviewPaths` goes to the
   human unless a label in `merge.agentMergeLabels` (default `agent-merge`)
   pre-approves it. Otherwise the composer merges, at any risk level.
+  A workspace adds its own merge rules in `.harness/custom/merge-rules.md`.
 - Sub-agent delegation uses native/runtime agent capabilities plus the installed
   `sub-agent-delegation` policy and brief template. Sub-agents are read-only by
   default unless their brief explicitly grants scoped edit authority.

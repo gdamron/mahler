@@ -333,7 +333,8 @@ function minutesBetween(from: string, to: string): number {
 }
 
 function round(value: number): number {
-  return Math.round(value * 10) / 10;
+  // Hundredths of a minute: a two-second check still shows as 2s.
+  return Math.round(value * 100) / 100;
 }
 
 function median(values: number[]): number {

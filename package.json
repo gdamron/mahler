@@ -1,6 +1,6 @@
 {
   "name": "mahler",
-  "version": "2026.11.3",
+  "version": "2026.11.4",
   "private": true,
   "description": "Human-orchestrated multi-agent workflow tool for issue-scoped workspaces.",
   "type": "module",

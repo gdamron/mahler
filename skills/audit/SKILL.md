@@ -33,6 +33,8 @@ Removing a rule is usually a better result than adding one.
   duplicates and related notes
 - forge PR inspection (`gh pr list`, `gh pr view`, `gh pr diff`) to sample
   merged work
+- `mahler timings --workspace <workspace> --since <last audit date>` (add
+  `--json` for the data)
 - after the human approves:
   - `mahler knowledge import <ledger-note> --title "<claim>" --description
     "<sentences>" [--tags a,b] [--repos r] [--paths glob,glob] --archive` to
@@ -101,6 +103,12 @@ Use judgment about depth: a quick pass over a small workspace is fine.
   criteria they claim, frozen tests stayed frozen, and no bug has turned up
   since. A pattern (say, migrations keep arriving as medium) becomes a
   proposal: a risk signal, a human-review path, or a policy change.
+- **Where the time goes:** run `mahler timings --since <last audit date>`.
+  Look at the medians from brief to first PR and to merge, the time spent
+  inside `mahler check` and how much of it the pass cache saved, tester time
+  and review rounds where conductors marked them, and re-freezes. Read the slowest issues' `HANDOFF.md` before drawing a
+  conclusion: spans are wall-clock and include waiting on a human or on CI.
+  A step that keeps costing more than it catches becomes a proposal.
 - **Disputes:** read the dispute decisions in `COMPOSITION.md` files and
   freeze histories. Repeated disputes about one kind of criterion usually
   mean issues are being written too loosely.

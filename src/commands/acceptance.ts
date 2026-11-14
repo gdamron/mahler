@@ -4,6 +4,7 @@ import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
 import type { Finding, HarnessConfig, RepoConfig } from "../types.js";
+import { recordEvent } from "../events.js";
 import { repoForDir } from "../repos.js";
 import { abs, listDirectories, slugify, writeFileEnsured } from "../util.js";
 
@@ -122,6 +123,14 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
     frozenAt: now,
   });
   writeFileEnsured(resolve(scope.dir, recordFile), `${JSON.stringify(record, null, 2)}\n`);
+  if (scope.kind === "issue") {
+    recordEvent(workspace, config, scope.name, "freeze", {
+      repo: repo.name,
+      files: files.length,
+      refreeze: existing.length > 0,
+      ...(reason ? { reason } : {}),
+    });
+  }
   console.log(
     `Froze ${files.length} acceptance file(s) in ${repo.name} at ${commit.slice(0, 12)} for ${scope.kind} ${scope.name}${worktree && worktree !== repo.name ? ` (worktree ${worktree})` : ""}:`,
   );
@@ -353,7 +362,15 @@ function run(workspace: string, config: HarnessConfig, flags: Flags): void {
     .replaceAll("<manifest>", shellQuote(manifest))
     .replaceAll("<project>", shellQuote(slugify(project ?? "")));
   console.log(`--- acceptance: ${filled} (in ${cwd})`);
+  const began = Date.now();
   const result = spawnSync(filled, { cwd, shell: true, stdio: "inherit" });
+  if (issue) {
+    recordEvent(workspace, config, issue, "acceptance-run", {
+      ms: Date.now() - began,
+      passed: result.status === 0,
+      ...(project ? { project: slugify(project) } : {}),
+    });
+  }
   if (result.status !== 0) {
     console.log(`\nAcceptance suite failed (exit ${result.status ?? "signal"}).`);
     process.exit(1);

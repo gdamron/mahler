@@ -20,6 +20,7 @@ import { createIssue, createProject, createTask, handoff } from "./commands/issu
 import { printLinearTemplate } from "./commands/linear-template.js";
 import { canUseSkill, printProfile } from "./commands/profile.js";
 import { status } from "./commands/status.js";
+import { mark, timings } from "./commands/timings.js";
 import { mahlerVersion } from "./util.js";
 
 interface Command extends ArgSpec {
@@ -221,6 +222,28 @@ const commands: Record<string, Command> = {
     positionals: 0,
     flags: workspace,
     run: (args) => capacity(workspaceFlag(args.flags)),
+  },
+  mark: {
+    usage:
+      'mahler mark <ISSUE> tester-start|tester-done|review-start|review-done|promoted --workspace <path> [--note "<text>"]',
+    summary:
+      "Record a boundary no command sees (a tester or reviewer starting or reporting back, promotion) in the issue's event log, for mahler timings.",
+    positionals: 2,
+    flags: { ...workspace, note: "string" },
+    run: (args) =>
+      mark(
+        required(args.rest[0], "issue identifier is required"),
+        required(args.rest[1], "mark name is required"),
+        args.flags,
+      ),
+  },
+  timings: {
+    usage: "mahler timings --workspace <path> [--issue <ISSUE>] [--since <YYYY-MM-DD>] [--no-prs] [--json]",
+    summary:
+      "Report where issues' time went, from the events Mahler's commands record and the PRs opened from their branches. --no-prs skips the forge; --json prints the data.",
+    positionals: 0,
+    flags: { ...workspace, issue: "string", since: "string", "no-prs": "boolean", json: "boolean" },
+    run: (args) => timings(args.flags),
   },
   cleanup: {
     usage: "mahler cleanup <ISSUE> --workspace <path> [--dry-run] [--remote]",

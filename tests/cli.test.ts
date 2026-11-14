@@ -10,7 +10,7 @@ const run = (args: string[], cwd?: string) =>
 
 const commands = [
   "install", "issue", "project", "status", "profile", "can", "handoff",
-  "decide", "check", "capacity", "cleanup", "doctor", "linear-template",
+  "decide", "check", "capacity", "cleanup", "doctor", "linear-template", "timings", "mark",
 ];
 
 for (const command of commands) {

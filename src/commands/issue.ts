@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
+import { recordEvent } from "../events.js";
 import {
   normalizeIssue,
   readIssueFile,
@@ -143,6 +144,7 @@ function writeBrief(
   );
   writeFileEnsured(resolve(paths.meta, "HANDOFF.md"), handoffMarkdown(issue));
   writeJson(resolve(paths.meta, jsonName), issue);
+  recordEvent(workspace, config, issue.identifier, "brief", { agent });
   console.log(`${issue.source === "local" ? "Task" : "Issue"} brief ready: ${paths.meta}`);
   for (const gap of briefGaps(issue, config.risk)) console.log(`warn: ${gap}`);
   console.log(`Recommended worktree root: ${paths.worktreeRoot}`);

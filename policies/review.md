@@ -36,7 +36,11 @@ down into smaller sections if the diff is large.
 
 The review should assess the following criteria:
 
-- Code quality: Is the code clean, well-structured, and maintainable?
+- Code quality: Is the code clean, well-structured, and maintainable? This
+  includes the code the change goes through, not only the lines it adds: a
+  problem the author worked around and left in place is a finding, usually
+  minor. Cleanup commits in that code are expected, not scope creep; check
+  that each is separate from behavior changes and changes no behavior.
 - Functionality: Does the code work as intended and meet the requirements?
 - Performance: Is the code efficient and performant?
 - Security: Are there any security vulnerabilities or concerns?
@@ -76,8 +80,9 @@ responses:
   When several findings share a cause, fix the cause.
 - **Acknowledge** a rare edge case as not covered, with the reasoning, in the
   PR or `HANDOFF.md`.
-- **Set aside for triage** a finding that is real but outside this change. List
-  it in `HANDOFF.md` so the human can decide what becomes new work.
+- **Set aside for triage** a finding that is real but outside the code this
+  change goes through. List it in `HANDOFF.md` so the human can decide what
+  becomes new work.
 - **Rebut** a finding you disagree with, saying why.
 
 Multiple rounds are fine, but each one should earn its place. Stop when nothing

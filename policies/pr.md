@@ -24,8 +24,11 @@ most PRs, but size still costs: reviewers miss more in a large diff, a large
 PR is harder to revert cleanly, it collides with parallel work, and it widens
 what the tester must cover.
 
-- Split by deliverable, not by line count. A refactor and a feature are two
-  PRs (see the commit policy).
+- Split by deliverable, not by line count. Cleanup of the code a change
+  goes through is part of its deliverable, in its own commits. A refactor
+  that is larger than the change, or reaches beyond it, is its own PR,
+  usually at the bottom of a stack (see "When cleanup gets its own branch"
+  in the implementation policy).
 - Past roughly 300 lines of non-test changes, the risk level is at least
   medium (see the risk policy). Look for a split before accepting that.
 - When parts depend on each other, land them as a stack (below), which merges

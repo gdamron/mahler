@@ -127,9 +127,10 @@ notes to commits, "generate by" messages to PRs, or anything similar.
 ### Keep Concerns Separate
 
 Don't combine formatting changes with behavior changes, or refactors with
-features. Each is its own commit, and a refactor and a feature are ideally
-separate PRs: each is then easier to review, revert, and find in history. A
-small cleanup (renaming a variable) can ride along in a feature commit.
+features. Each is its own commit: each is then easier to review, revert, and
+find in history. A small cleanup (renaming a variable) can ride along in a
+feature commit. Cleanup commits normally share the feature's branch and PR;
+the implementation policy says when cleanup gets its own.
 
 ### Size Your Changes
 

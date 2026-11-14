@@ -113,6 +113,9 @@ rest; your parent owns them, and your brief names your branch.
    `concurrency.maxSliceAgents` and check `mahler capacity --workspace <workspace>` before launching.
 5. **Monitor.** Answer slice questions within the issue scope. If a slice
    stalls or drifts out of scope, stop it and re-brief, or take it over.
+   Cleanup commits in the code a slice touches are not drift (see the
+   implementation policy); cleanup a slice reports as outside its paths is
+   yours to do, stack, or propose.
    Escalate scope changes and Tier 2 actions to your parent; do not approve
    them yourself. When the work clearly outgrows its estimate (more PRs than
    planned, or new kinds of gaps turning up), check in with your parent before

@@ -22,6 +22,9 @@ On install, Mahler writes its canonical defaults, then overlays this directory:
   protect (for example: the paths users depend on, failures that are hard to notice). It adds
   to the verification policy instead of replacing it: the tester weights its tests toward it,
   and the conductor never drops a test that covers it. Plain prose or a short list.
+- `merge-rules.md` — optional. This workspace's own merge rules: more PRs that go to the
+  human, extra readiness checks, what to report after merging. It adds to the merge policy
+  instead of replacing it, and where the two disagree the stricter one applies.
 
 `mahler doctor` validates the overlay: malformed sources fail `install`, and a profile that
 allows a skill which is not installed is reported as a warning.

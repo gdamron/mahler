@@ -28,7 +28,7 @@ Removing a rule is usually a better result than adding one.
 - read files under `.harness/`, the workspace instruction files, and the
   Mahler package's own `policies/` and `skills/` (beside its `dist/`:
   `$(dirname "$(realpath "$(command -v mahler)")")/../..`)
-- `mahler doctor --workspace <workspace>`
+- `mahler doctor <workspace>`
 - `mahler knowledge search <terms>` (or `--paths <repo>/<file>`) to find
   duplicates and related notes
 - forge PR inspection (`gh pr list`, `gh pr view`, `gh pr diff`) to sample
@@ -83,7 +83,10 @@ Use judgment about depth: a quick pass over a small workspace is fine.
   Mahler default with the current default. Look for:
   - upstream changes the overlay is missing
   - overlays that no longer differ in substance
-  - overlays that could be a short addition instead of a full replacement
+  - overlays that could be a short addition instead of a full replacement:
+    `acceptance-priorities.md` adds to the verification policy and
+    `merge-rules.md` to the merge policy, so an overlay of either that only
+    adds rules should move there
 - **Instruction files** (`CLAUDE.md` and `AGENTS.md`, outside the
   `<!-- HARNESS:START -->` … `<!-- HARNESS:END -->` block that install
   rewrites): rules that duplicate or conflict with policies or the ledger. If

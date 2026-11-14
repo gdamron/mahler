@@ -5,6 +5,13 @@ Merging a PR into a base branch is a Tier 2 action with a designated approver
 Conductors stop at a PR that is ready to merge and report its verification
 record; they merge only when the human explicitly asks for that specific PR.
 
+## Workspace Rules
+
+If `.harness/custom/merge-rules.md` exists, read it with this policy. It
+holds the workspace's own merge rules: more PRs that go to the human, extra
+readiness checks, and what to report after merging. It adds to this policy
+and does not replace it. Where the two disagree, the stricter one applies.
+
 ## Who Decides
 
 Risk decides how much verification a PR needs (see the risk and verification

@@ -51,7 +51,11 @@ handoff. In slice mode your parent owns those.
    Before working in an unfamiliar area, search the knowledge store for it
    (see the knowledge policy).
 3. Work in save points: implement a small increment, run focused tests, commit
-   it with the commit skill, and continue. If a change breaks tests, revert to
+   it with the commit skill, and continue. Fix problems you find in the code
+   you touch as you go, each cleanup in its own commit (see "Leave Code
+   Better Than You Found It" in the implementation policy). In slice mode,
+   cleanup that needs files outside your allowed paths goes in your report,
+   not your branch. If a change breaks tests, revert to
    the last commit and investigate rather than piling on fixes.
 4. Never edit frozen acceptance tests (the brief or `HANDOFF.md` names them,
    and `mahler check` fails if they change). They live in the tester's
@@ -65,8 +69,9 @@ handoff. In slice mode your parent owns those.
    instead of silently skipping it.
 6. Run `mahler check --path <worktree>` for your worktree, then push the branch
    (`git push -u origin <branch>`).
-7. Report the implementation policy's change summary (changes made, things
-   intentionally not touched, potential concerns), the commit list, checks run,
+7. Report the implementation policy's change summary (changes made, what
+   you cleaned up, what you left for later and why, potential concerns), the
+   commit list, checks run,
    and the pushed branch, plus any fact worth a knowledge note (see the
    knowledge policy).
 

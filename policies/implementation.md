@@ -12,8 +12,53 @@ Large changes are harder to review, riskier to ship, and harder to revert.
   save the commit for when the feature is done, and don't plan to squash or
   split later.
 - Keep branches short-lived: merge within one to three days.
-- Keep formatting changes out of behavior changes.
 - Never force-push a shared branch.
+
+## Leave Code Better Than You Found It
+
+When you find a problem in the code you are working in, fix it as part of the
+work. Don't note it for later: cleanup set aside for a follow-up rarely
+happens, and the next agent pays for it again.
+
+- **What counts:** formatting, unclear names, duplication, dead code, stale
+  comments, a function doing too much, a missing test, a pattern the rest of
+  the repo has moved away from.
+- **Where:** the code your change goes through, meaning the files and
+  functions you edit or had to read closely to make it. This is not a hunt
+  through the rest of the repo.
+- **Formatting:** run the repo's formatter and linter on the files you touch,
+  and match the surrounding style where there is no tool. If that reformats
+  lines your change didn't need, commit the reformat on its own.
+- **Its own commit:** each cleanup is a separate commit from the behavior
+  change (see the commit policy), with tests passing before and after. Put
+  it first when it makes the change easier: tidy the code, then make the
+  change in the tidy code.
+- **Covered by tests:** refactor only what tests cover. If nothing covers it,
+  add a test that pins the current behavior first, or leave the code alone
+  and say so.
+- **No behavior change:** a cleanup that changes what users or callers see is
+  not a cleanup. Treat it as part of the issue or raise it.
+
+### When cleanup gets its own branch
+
+Cleanup rides in the same branch and PR as the work by default. Give it its
+own branch and PR when any of these holds:
+
+- it is larger than the change it rides with, or would push the PR past the
+  size where the risk level rises (see the pr policy)
+- it is mechanical and wide: a formatter run or a rename across many files
+- it reaches outside the area the issue works in: another module, another
+  repo, or code another active issue is changing
+- it raises the risk level on its own, or touches a path the merge policy
+  routes to the human
+- reverting the feature should not revert it, or the other way around
+
+Prefer doing that branch now over deferring it. When the work builds on the
+cleanup, put the cleanup at the bottom of a stack with the work on top (see
+the pr policy); a stack is verified once, so the extra PR costs little. When
+it is independent, a conductor proposes it to its parent as a separate
+issue, and a slice agent reports it to its conductor. Defer only cleanup
+that needs its own planning, and record it in `HANDOFF.md` with the reason.
 
 ## Before editing
 
@@ -25,7 +70,8 @@ Large changes are harder to review, riskier to ship, and harder to revert.
 ## While editing
 
 - Prefer existing patterns.
-- Keep unrelated refactors out of scope.
+- Clean up problems you find in the code you touch (above). Leave unrelated
+  code alone.
 - Preserve user changes.
 - Performance is important, but readability and maintainability are more
   important. Don't optimize prematurely.
@@ -50,9 +96,13 @@ CHANGES MADE:
 - src/routes/tasks.ts: Added validation middleware to POST endpoint
 - src/lib/validation.ts: Added TaskCreateSchema using Zod
 
-THINGS I DIDN'T TOUCH (intentionally):
-- src/routes/auth.ts: Has similar validation gap but out of scope
-- src/middleware/error.ts: Error format could be improved (separate task)
+CLEANED UP ALONG THE WAY:
+- src/routes/tasks.ts: Split the 80-line handler into parse and save steps
+  (own commit, covered by existing tests)
+
+LEFT FOR LATER (and why):
+- src/routes/auth.ts: Has a similar validation gap; outside this issue's area
+- src/middleware/error.ts: Error format change would alter responses
 
 POTENTIAL CONCERNS:
 - The Zod schema is strict — rejects extra fields. Confirm this is desired.
@@ -60,5 +110,6 @@ POTENTIAL CONCERNS:
 ```
 
 This pattern catches wrong assumptions early and gives reviewers a clear map of
-the change. The "DIDN'T TOUCH" section is especially important — it shows you
-exercised scope discipline and didn't go on an unsolicited renovation.
+the change. Keep "LEFT FOR LATER" short and honest: each entry is a problem
+you saw and chose not to fix, with the reason from the list above. An empty
+section is the goal.

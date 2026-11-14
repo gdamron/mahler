@@ -107,6 +107,8 @@ mahler acceptance manifest --workspace /path/to/product-workspace --issue DEV-12
 mahler acceptance run --workspace /path/to/product-workspace --project <slug> [--issue DEV-123]
 mahler capacity --workspace /path/to/product-workspace
 mahler cleanup DEV-123 --workspace /path/to/product-workspace [--dry-run] [--remote]
+mahler timings --workspace /path/to/product-workspace [--issue DEV-123] [--since YYYY-MM-DD] [--no-prs] [--json]
+mahler mark DEV-123 tester-start|tester-done|review-start|review-done|promoted --workspace /path/to/product-workspace [--note "<text>"]
 mahler doctor /path/to/product-workspace
 mahler linear-template issue
 mahler linear-template project
@@ -160,6 +162,19 @@ the history.
 `mahler acceptance run` writes a revision manifest (each repo's issue
 worktree, or its base branch) and runs `acceptance.run` with `<manifest>` and
 `<project>` filled in.
+
+`mahler timings` reports where issues' time went. Mahler's own commands
+record events as they run (`issue` and `task`, `check`, `acceptance freeze`
+and `run`, `cleanup`) in `.harness/issues/<ISSUE>/events.jsonl`, so agents log
+nothing themselves. The report gives each issue's time from its brief to its
+first check, tester freeze, first PR, last merge, and cleanup; the time spent
+inside `mahler check` and how many checks the pass cache skipped; and
+re-freezes. PR times come from `gh`, for the branches `mahler check` saw
+(`--no-prs` skips that). `mahler mark` records the boundaries no command sees:
+a tester or reviewer starting and reporting back, and promotion. The
+conductor marks them, and the report turns them into tester time and review
+rounds; a missed mark only leaves that line out. Spans are wall-clock, so they include time waiting
+on a human or on CI.
 
 `mahler capacity` prints CPU cores, load average, and the `concurrency` caps
 from `.harness/config.json`, with an ok/busy verdict. Agents run it before

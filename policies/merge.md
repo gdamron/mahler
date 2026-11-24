@@ -54,9 +54,11 @@ Every agent merge requires all of these, regardless of labels:
 - Reviewer sub-agent findings that matter have a response, such as a fix, an
   acknowledgement with a reason, a note for triage, or a rebuttal (see the
   review policy), and no human review comment is left unanswered.
-- `mahler check` passed for the touched repo, including the frozen
-  acceptance tests in the tester's worktree, and the tests worth keeping were
-  promoted (see the verification policy).
+- `mahler check` passed for the touched repo, which includes finding the
+  frozen acceptance tests in the tester's worktree unchanged. The check
+  compares those files and does not run them: that they pass comes from the
+  verification record. The tests worth keeping were promoted (see the
+  verification policy).
 - No dispute is open.
 - The forge reports the PR mergeable with no conflicts.
 - A stack is verified as one change: the record on its top PR covers every

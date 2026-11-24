@@ -423,7 +423,7 @@ test("a freeze defaults to the tester worktree, and check compares it there with
   // The suite never joins the issue branch, and the issue worktree isn't failed for lacking it.
   const passing = check(workspace);
   assert.equal(passing.status, 0, passing.stdout);
-  assert.match(passing.stdout, /ok {3}app \(tests\/app\): 1 frozen acceptance file\(s\) for issue MAH-1 match/);
+  assert.match(passing.stdout, /ok {3}app \(tests\/app\): 1 frozen acceptance file\(s\) for issue MAH-1 match \w+ \(compared, not run\)/);
   assert.doesNotMatch(passing.stdout, /were not compared here/);
 
   // Running the suite against the implementation merges the issue branch into the tester's worktree.
@@ -439,6 +439,15 @@ test("a freeze defaults to the tester worktree, and check compares it there with
   const tampered = check(workspace);
   assert.notEqual(tampered.status, 0);
   assert.match(tampered.stdout, /fail app \(tests\/app\): frozen acceptance tests for issue MAH-1 differ .*tests\/accept\.txt/);
+  assert.match(tampered.stdout, /only the tester changes them, after a dispute decision/);
+  assert.doesNotMatch(tampered.stdout, /freeze again/);
+
+  // A committed change is most often the tester's fix after a dispute decision, waiting to be frozen.
+  git(tests, "commit", "-qam", "fix the test after a dispute decision");
+  const waiting = check(workspace);
+  assert.notEqual(waiting.status, 0);
+  const head = git(tests, "rev-parse", "--short=12", "HEAD");
+  assert.match(waiting.stdout, new RegExp(`differ .*the change is committed at ${head}, so if it follows a dispute decision, freeze again`));
 });
 
 test("a frozen set survives a rebase that rewrites its commit, with no new freeze", () => {

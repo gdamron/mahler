@@ -94,8 +94,9 @@ mahler acceptance freeze --issue <ISSUE> --repo <repo> --commit <sha>
 The freeze records each file's content. With a tester worktree at
 `<issue root>/tests/<repo>`, it applies there, and `mahler check --issue
 <ISSUE>` (or `--path` on any of the issue's worktrees) fails if a frozen file
-in that worktree is missing or differs, committed or not. For a second tester
-worktree, pass `--worktree tests/<dir>`. A range freeze counts only the
+in that worktree is missing or differs, committed or not. The check compares
+the files and does not run them, so its `ok` line says "compared, not run".
+For a second tester worktree, pass `--worktree tests/<dir>`. A range freeze counts only the
 range's own commits, so base-branch changes made after the tester branched
 are not frozen.
 

@@ -140,6 +140,9 @@ is reachable from outside, write nothing and report that.
   found and did not start; don't stop it
 - Anything you did differently from this skill, and why, so your parent can
   record it
+- Your full report written to the file the brief names as its results
+  destination, and a reply of a few lines with its path (see "Reports" in
+  the sub-agent delegation policy)
 
 ## Disputes
 

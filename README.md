@@ -183,6 +183,7 @@ launching parallel agents or heavy commands. Like `check`, it is advisory.
 
 `mahler cleanup` removes an issue's worktrees once its PRs are merged, tester
 worktrees under `tests/` included, keeping issue branches and the issue brief.
+Sub-agents' report files under `reports/` go once every worktree is gone.
 It deletes tester branches locally and prints each one's tip (nothing
 contains a tester branch, by design), and deletes a pushed one from its
 remote only with `--remote`. It refuses to remove

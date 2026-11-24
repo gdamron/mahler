@@ -152,6 +152,10 @@ Raising a cap for a run is a Tier 1 deviation: record why.
   commits to re-review (Claude: message the same agent) instead of launching a
   new one.
 - Fill the brief's `Agent and tier` field with the tier and a one-line reason.
+- Give every brief a report file as its results destination:
+  `<issue root>/reports/<role>-<n>.md` (see "Reports" in the sub-agent
+  delegation policy). When the sub-agent replies, read the file, not only
+  the reply.
 
 ## Required Outputs
 

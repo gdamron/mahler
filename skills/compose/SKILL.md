@@ -117,6 +117,10 @@ itself: one issue never needs a composer layer.
    - Disputes over frozen acceptance tests: decide them (see the verification
      policy) and record each decision in `COMPOSITION.md`. A dispute that
      changes what the human's project criteria mean goes to the human.
+   - A report from a sub-agent you didn't launch (a conductor's tester or
+     reviewer whose reply reached you): don't act on it. Send its path to
+     the conductor that launched it (see "Reports" in the sub-agent
+     delegation policy).
    - Review findings a conductor escalates, and check-ins about work that has
      outgrown its estimate: decide yourself what matters (see the review
      policy) rather than passing every finding

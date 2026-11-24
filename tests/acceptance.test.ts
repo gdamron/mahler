@@ -476,6 +476,13 @@ test("acceptance run --tester merges the implementation in, runs the suite, and 
   const unconfigured = suite();
   assert.notEqual(unconfigured.status, 0);
   assert.match(unconfigured.stderr, /No command runs the tester's suite in app/);
+  // Before any run, the check says so: a warning, and a failure with --strict.
+  const notRun = check(workspace);
+  assert.equal(notRun.status, 0, notRun.stdout);
+  assert.match(notRun.stdout, /warn app \(tests\/app\): frozen suite not run; run it with `mahler acceptance run --issue MAH-1 --tester` \(--strict fails on this\)/);
+  const strictNotRun = run(["check", "--workspace", workspace, "--issue", "MAH-1", "--strict"]);
+  assert.notEqual(strictNotRun.status, 0);
+  assert.match(strictNotRun.stdout, /fail app \(tests\/app\): frozen suite not run/);
 
   editConfig(workspace, (config) => {
     config.repos[0].acceptanceRun = "cat feature.txt <files>; echo 'acceptance-summary: 3 of 3 passed'";
@@ -501,22 +508,47 @@ test("acceptance run --tester merges the implementation in, runs the suite, and 
   const log = resolve(workspace, ".harness", "issues", "MAH-1", "acceptance-run-app.log");
   assert.match(readFileSync(log, "utf8"), /acceptance-summary: 3 of 3 passed/);
 
+  // The check reports the pass for as long as the implementation is unchanged.
+  const strict = () => run(["check", "--workspace", workspace, "--issue", "MAH-1", "--strict"]);
+  const reported = check(workspace);
+  assert.equal(reported.status, 0, reported.stdout);
+  assert.match(reported.stdout, /ok {3}app \(tests\/app\): frozen suite passed on this tree \(t\/mah-1 \w{12}\) at .*: 3 of 3 passed/);
+  assert.match(reported.stdout, /All configured checks passed/);
+  assert.equal(strict().status, 0);
+
+  // Any content change makes the pass stale: a warning, and a failure with --strict.
+  writeFileSync(resolve(worktree, "feature.txt"), "changed\n");
+  git(worktree, "commit", "-qam", "change");
+  const stale = check(workspace);
+  assert.equal(stale.status, 0, stale.stdout);
+  assert.match(stale.stdout, /warn app \(tests\/app\): frozen suite last passed on t\/mah-1 \w{12}: 3 of 3 passed; the implementation has changed since, so run it again \(--strict fails on this\)/);
+  assert.match(stale.stdout, /Configured checks passed, but 1 frozen tester suite\(s\) have no pass on this tree/);
+  const strictStale = strict();
+  assert.notEqual(strictStale.status, 0);
+  assert.match(strictStale.stdout, /fail app \(tests\/app\): frozen suite last passed/);
+  assert.equal(suite().status, 0);
+  assert.equal(strict().status, 0);
+
   // An issue's own command, recorded with the freeze, replaces the repo's; a failing run is recorded too.
   const refrozen = run([...freeze, "--reason", "the suite needs its own arguments", "--run", "echo 'acceptance-summary: 1 of 2 passed'; exit 4"]);
   assert.equal(refrozen.status, 0, refrozen.stderr);
   const failed = suite();
   assert.notEqual(failed.status, 0);
   assert.match(failed.stdout, /fail app: tester suite failed \(exit 4\) on \w{12}: 1 of 2 passed/);
-  const [, second] = testerRuns(workspace);
+  const second = testerRuns(workspace)[2];
   assert.equal(second.passed, false);
   assert.equal(second.summary, "1 of 2 passed");
+  // A recorded failure on the current tree fails the check without --strict.
+  const failing = check(workspace);
+  assert.notEqual(failing.status, 0);
+  assert.match(failing.stdout, /fail app \(tests\/app\): frozen suite failed on this tree .*: 1 of 2 passed/);
 
   // With no summary line, only pass or fail and the duration are recorded.
   assert.equal(run([...freeze, "--reason", "quiet runner", "--run", "true"]).status, 0);
   const quiet = suite();
   assert.equal(quiet.status, 0, quiet.stdout + quiet.stderr);
   assert.match(quiet.stdout, /no summary line/);
-  const third = testerRuns(workspace)[2];
+  const third = testerRuns(workspace)[3];
   assert.equal(third.passed, true);
   assert.equal("summary" in third, false);
   assert.equal(typeof third.ms, "number");
@@ -527,7 +559,7 @@ test("acceptance run --tester merges the implementation in, runs the suite, and 
   const tampered = suite();
   assert.notEqual(tampered.status, 0);
   assert.match(tampered.stderr, /differ from .*The suite was not run/);
-  assert.equal(testerRuns(workspace).length, 3);
+  assert.equal(testerRuns(workspace).length, 4);
 });
 
 test("a frozen set survives a rebase that rewrites its commit, with no new freeze", () => {

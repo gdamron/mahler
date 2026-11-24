@@ -187,10 +187,10 @@ const commands: Record<string, Command> = {
   },
   check: {
     usage:
-      "mahler check --workspace <path> [--repo <name>] [--issue <ISSUE> | --path <worktree>] [--fresh]",
-    summary: "Run the configured checks. A check that already passed on the same clean tree is not rerun; --fresh reruns everything.",
+      "mahler check --workspace <path> [--repo <name>] [--issue <ISSUE> | --path <worktree>] [--fresh] [--strict]",
+    summary: "Run the configured checks. A check that already passed on the same clean tree is not rerun; --fresh reruns everything. --strict also fails when an issue's frozen tester suite has no recorded pass on the current tree.",
     positionals: 0,
-    flags: { ...workspace, repo: "string", issue: "string", path: "string", fresh: "boolean" },
+    flags: { ...workspace, repo: "string", issue: "string", path: "string", fresh: "boolean", strict: "boolean" },
     run: (args) => check(args.flags),
   },
   acceptance: {

@@ -5,7 +5,7 @@ import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
 import type { Finding, HarnessConfig, RepoConfig } from "../types.js";
-import { recordEvent } from "../events.js";
+import { readEvents, recordEvent } from "../events.js";
 import { repoForDir } from "../repos.js";
 import { abs, listDirectories, slugify, writeFileEnsured } from "../util.js";
 
@@ -523,6 +523,81 @@ function runTester(workspace: string, config: HarnessConfig, flags: Flags): void
     }
   }
   if (failures > 0) process.exit(1);
+}
+
+/**
+ * What is known about each of an issue's tester suites, for `mahler check`:
+ * the latest recorded run, set against the implementation as it is now. A
+ * pass counts only for the tree it ran on and the freeze it ran: any content
+ * change, or a new freeze, makes it stale. "Not run" and "stale" are
+ * warnings, and errors with `strict` (the merge gates use it); a recorded
+ * failure on the current tree is always an error.
+ */
+export function testerSuiteFindings(
+  workspace: string,
+  config: HarnessConfig,
+  issue: string,
+  repos: RepoConfig[],
+  strict: boolean,
+): Finding[] {
+  const reposRoot = issueReposRoot(workspace, config, issue);
+  const meta = issuePaths(workspace, config, issue).meta;
+  const runs = readEvents(meta).filter((event) => event.event === "acceptance-run" && event.suite === "tester");
+  const findings: Finding[] = [];
+  const unmet = strict ? "error" : "warn";
+  const gate = strict ? "" : " (--strict fails on this)";
+  for (const set of readRecord(meta).frozen) {
+    const repo = repos.find((candidate) => candidate.name === set.repo);
+    if (!repo) continue;
+    const key = storedWorktreeKey(reposRoot, set, repo);
+    if (!key.startsWith(testsPrefix)) continue;
+    const label = `${repo.name} (${key})`;
+    const rerun = `mahler acceptance run --issue ${issue} --tester`;
+    const latest = [...runs].reverse().find((event) => event.repo === repo.name && event.worktree === key) as
+      | (TesterRun & { at: string })
+      | undefined;
+    if (!latest) {
+      findings.push({ level: unmet, message: `${label}: frozen suite not run; run it with \`${rerun}\`${gate}` });
+      continue;
+    }
+    const ran = `${latest.branch ? `${latest.branch} ` : ""}${latest.commit.slice(0, 12)}`;
+    const summary = latest.summary ? `: ${latest.summary}` : "";
+    const outcome = latest.passed ? "passed" : "failed";
+    if (latest.frozen !== set.commit) {
+      findings.push({
+        level: unmet,
+        message: `${label}: frozen suite last ${outcome} on ${ran}, before the freeze at ${set.commit.slice(0, 12)}; run it again${gate}`,
+      });
+      continue;
+    }
+    const current = implementationTree(abs(workspace, repo.path), resolve(reposRoot, repo.name), latest.branch);
+    if (current !== latest.tree) {
+      findings.push({
+        level: unmet,
+        message: `${label}: frozen suite last ${outcome} on ${ran}${summary}; ${
+          current ? "the implementation has changed since" : "the implementation it ran on can't be found now"
+        }, so run it again${gate}`,
+      });
+      continue;
+    }
+    findings.push(
+      latest.passed
+        ? { level: "ok", message: `${label}: frozen suite passed on this tree (${ran}) at ${latest.at}${summary}` }
+        : { level: "error", message: `${label}: frozen suite failed on this tree (${ran}) at ${latest.at}${summary}` },
+    );
+  }
+  return findings;
+}
+
+/**
+ * The tree id of the implementation as it is now: the tip of the branch a run
+ * named, else what the issue's `repos/<repo>` worktree has checked out.
+ */
+function implementationTree(source: string, worktree: string, branch: string | undefined): string | undefined {
+  const [cwd, ref] = branch ? [source, branch] : [worktree, "HEAD"];
+  if (!existsSync(cwd)) return undefined;
+  const tree = spawnSync("git", ["rev-parse", "--verify", "--quiet", `${ref}^{tree}`], { cwd, encoding: "utf8" });
+  return tree.status === 0 ? tree.stdout.trim() : undefined;
 }
 
 /**

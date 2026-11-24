@@ -89,3 +89,19 @@ issue briefs (Mahler's defaults plus the workspace's `guardrails` changes in
 actual enforcement lives in the forge and CI — do not attempt to bypass it, and
 do not waste a PR cycle discovering it: run the checks CI will run before
 declaring work ready.
+
+## When an Action Is Refused
+
+A permission prompt the human declines, a permission check that denies a
+command, a sandbox, or a hook that blocks a tool call is a guardrail doing its
+job, like a merge the forge refuses. The refusal covers the action, not only
+the agent that tried it.
+
+- Stop and report it to your parent: the exact action, what refused it, and
+  why you wanted it. The human decides what happens next.
+- Don't get it done another way: not with a different command that has the
+  same effect, and not by asking, or letting, another agent do it.
+- When you hand related work to another agent after a refusal, say what was
+  refused, so that agent leaves it alone too.
+- An action you know another agent was refused is refused for you as well,
+  until the human says otherwise.

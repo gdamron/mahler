@@ -200,7 +200,8 @@ nothing else here.
 2. Run the implement skill in your worktree only, committing save points.
 3. Run `mahler check --path <worktree>`, then push your slice branch.
 4. Report the implementation policy's change summary, commit list, checks run,
-   pushed branch, and any proposed knowledge notes to your parent. Your parent owns `HANDOFF.md`; record only
+   pushed branch, each process you started and that it is stopped, and any
+   proposed knowledge notes to your parent. Your parent owns `HANDOFF.md`; record only
    your own workflow deviations there.
 
 Do not set up the issue, open PRs, write verification records, or delegate.
@@ -223,6 +224,9 @@ Never edit frozen acceptance tests; report a test you think is wrong.
   inconsistent
 - a Tier 2 action has no go-ahead from the parent (composer or human)
 - the next step crosses a Tier 3 boundary
+- an action is refused (a declined permission prompt, a denied command):
+  report it to your parent, and never hand it to a sub-agent instead (see the
+  judgment policy)
 - the work requires scope beyond the issue or slice
 - a slice still has open review findings after about three rounds
 - a dispute over a frozen test is waiting for a decision

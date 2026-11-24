@@ -158,6 +158,23 @@ warnings, and failures with `--strict`, which the merge policy requires
 before PRs are reported ready and before a merge. A recorded failure on the
 current tree always fails the check.
 
+**Carrying a pass forward.** When the implementation changes in a way that
+can't affect what the suite tests (docs only, a version bump, a comment),
+the composer may carry the last pass to the new commit instead of paying for
+another run:
+
+```sh
+mahler acceptance carry --issue <ISSUE> --reason "<why the change can't affect the suite>"
+```
+
+The check then prints "passed at X, carried to Y: <reason>" and `--strict`
+accepts it. The command lists the files the suite was not run on. Only the
+composer carries a pass (the human, when there is none), and records it in
+`COMPOSITION.md`. A conductor asks its parent and never carries its own
+pass. A carry covers one change: the next content change makes the pass
+stale again. Don't carry across a change to code the suite exercises,
+however small; run the suite.
+
 With no command configured, run the suite by hand the same way (`git merge
 --no-edit <issue branch>` in the tester's worktree, then the repo's test
 command for the tester's files) and say in the verification record that the

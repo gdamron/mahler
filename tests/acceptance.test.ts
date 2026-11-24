@@ -526,6 +526,29 @@ test("acceptance run --tester merges the implementation in, runs the suite, and 
   const strictStale = strict();
   assert.notEqual(strictStale.status, 0);
   assert.match(strictStale.stdout, /fail app \(tests\/app\): frozen suite last passed/);
+
+  // The composer may carry the pass across a change that can't affect the suite, with a reason the check prints.
+  const carry = (...extra: string[]) => run(["acceptance", "carry", "--workspace", workspace, "--issue", "MAH-1", ...extra]);
+  const noReason = carry();
+  assert.notEqual(noReason.status, 0);
+  assert.match(noReason.stderr, /--reason .* is required/);
+  const carried = carry("--reason", "docs only");
+  assert.equal(carried.status, 0, carried.stderr);
+  assert.match(carried.stdout, /app \(tests\/app\): pass at \w{12} carried to \w{12}: docs only/);
+  assert.match(carried.stdout, /feature\.txt/);
+  const afterCarry = strict();
+  assert.equal(afterCarry.status, 0, afterCarry.stdout);
+  assert.match(afterCarry.stdout, /ok {3}app \(tests\/app\): frozen suite passed at t\/mah-1 \w{12}: 3 of 3 passed, carried to \w{12}: docs only/);
+  assert.match(carry("--reason", "again").stdout, /nothing to carry/);
+  // A carry covers one change: the next one makes the pass stale again, and a second carry chains from the first.
+  writeFileSync(resolve(worktree, "feature.txt"), "changed again\n");
+  git(worktree, "commit", "-qam", "change again");
+  assert.notEqual(strict().status, 0);
+  assert.equal(carry("--reason", "version bump").status, 0);
+  assert.match(strict().stdout, /carried to \w{12}: version bump/);
+  writeFileSync(resolve(worktree, "feature.txt"), "and again\n");
+  git(worktree, "commit", "-qam", "and again");
+  assert.notEqual(strict().status, 0);
   assert.equal(suite().status, 0);
   assert.equal(strict().status, 0);
 
@@ -538,6 +561,9 @@ test("acceptance run --tester merges the implementation in, runs the suite, and 
   const second = testerRuns(workspace)[2];
   assert.equal(second.passed, false);
   assert.equal(second.summary, "1 of 2 passed");
+  const noPass = carry("--reason", "docs only");
+  assert.notEqual(noPass.status, 0);
+  assert.match(noPass.stderr, /no pass to carry \(its last run failed\)/);
   // A recorded failure on the current tree fails the check without --strict.
   const failing = check(workspace);
   assert.notEqual(failing.status, 0);

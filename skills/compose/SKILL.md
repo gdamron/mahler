@@ -128,7 +128,12 @@ itself: one issue never needs a composer layer.
    verification, then readiness. Merge what the merge policy allows
    (a stack in one step with `gh stack merge`, or predecessors first
    without it); hand everything else to the human
-   with its verification record. After each wave merges, run the project
+   with its verification record. Read the record's `Promoted` line first:
+   acceptance tests are dropped by default, so don't accept "kept all" or a
+   keep over the size budget without the reason behind each kept test (see
+   "Promoting Acceptance Tests" in the verification policy), and record any
+   over-budget approval you give in `COMPOSITION.md`. The kept tests are in
+   test-only PRs that merge after the feature. After each wave merges, run the project
    suite on the base branches (`mahler acceptance run --project <slug>`) and
    update the traceability table; a failing criterion becomes new work. Start
    dependent issues once their blockers merge, or stack them on an open PR when

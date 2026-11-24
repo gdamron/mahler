@@ -232,12 +232,39 @@ function comparison(cwd: string, label: string, set: FrozenSet, scope: string): 
       message: `${label}: cannot compare frozen acceptance tests for ${scope} (commit ${short} not found)`,
     };
   }
-  return changed.length === 0
-    ? { level: "ok", message: `${label}: ${set.files.length} frozen acceptance file(s) for ${scope} match ${short}` }
-    : {
-        level: "error",
-        message: `${label}: frozen acceptance tests for ${scope} differ from ${short} (missing or changed: ${changed.join(", ")}); only the tester changes them, after a dispute decision`,
-      };
+  if (changed.length === 0) {
+    // The files are compared, never run: a match says nothing about whether the tests pass.
+    return {
+      level: "ok",
+      message: `${label}: ${set.files.length} frozen acceptance file(s) for ${scope} match ${short} (compared, not run)`,
+    };
+  }
+  const head = committedAt(cwd, changed);
+  return {
+    level: "error",
+    message: `${label}: frozen acceptance tests for ${scope} differ from ${short} (missing or changed: ${changed.join(", ")}); ${
+      head
+        ? `the change is committed at ${head}, so if it follows a dispute decision, freeze again at that commit with --reason; otherwise only the tester changes them`
+        : "only the tester changes them, after a dispute decision"
+    }`,
+  };
+}
+
+/**
+ * The short HEAD of the worktree at `cwd` when every one of `files` there is
+ * exactly what HEAD has: the difference from the freeze is a commit, such as
+ * a tester's fix waiting to be frozen, and not a loose edit or a missing file.
+ */
+function committedAt(cwd: string, files: string[]): string | undefined {
+  const top = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8" }).stdout.trim() || cwd;
+  for (const file of files) {
+    if (!existsSync(resolve(top, file))) return undefined;
+    const committed = spawnSync("git", ["rev-parse", "--verify", "--quiet", `HEAD:${file}`], { cwd: top, encoding: "utf8" });
+    const actual = spawnSync("git", ["hash-object", "--", file], { cwd: top, encoding: "utf8" });
+    if (committed.status !== 0 || committed.stdout.trim() !== actual.stdout.trim()) return undefined;
+  }
+  const head = spawnSync("git", ["rev-parse", "--short=12", "HEAD"], { cwd: top, encoding: "utf8" });
+  return head.status === 0 ? head.stdout.trim() : undefined;
 }
 
 /**

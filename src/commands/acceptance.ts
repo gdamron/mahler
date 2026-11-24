@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
@@ -32,6 +33,12 @@ export interface FrozenSet {
    * worktree under `repos/`.
    */
   worktree?: string;
+  /**
+   * Issue scope only: this issue's own command for running the suite, used
+   * instead of the repo's `acceptanceRun` (an issue's suite often needs its
+   * own arguments). Carried over by a re-freeze unless it gives another.
+   */
+  run?: string;
   frozenAt: string;
 }
 
@@ -62,7 +69,7 @@ export function acceptance(action: string, flags: Flags): void {
     console.log(`Revision manifest written: ${path}`);
     return;
   }
-  if (action === "run") return run(workspace, config, flags);
+  if (action === "run") return flags.tester === true ? runTester(workspace, config, flags) : run(workspace, config, flags);
   throw new Error(
     `Unknown acceptance action "${action}". Expected freeze, manifest, or run.`,
   );
@@ -75,6 +82,10 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
   if (!commitArg) throw new Error("--commit <sha> or --commit <base>..<sha> is required");
   if (scope.kind === "project" && stringFlag(flags, "worktree")) {
     throw new Error("--worktree applies to issue freezes only; a project freeze applies to every worktree that contains its commit.");
+  }
+  const runFlag = stringFlag(flags, "run");
+  if (scope.kind === "project" && runFlag) {
+    throw new Error("--run applies to issue freezes only; a project suite runs with `acceptance.run` from .harness/config.json.");
   }
   const source = abs(workspace, repo.path);
   const commit = frozenCommit(source, commitArg);
@@ -110,6 +121,7 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
   if (files.length === 0) {
     throw new Error(`Nothing left to freeze in ${repo.name} at ${commit.slice(0, 12)}.`);
   }
+  const suiteCommand = runFlag ?? existing.find((set) => set.run)?.run;
   for (const set of existing) {
     record.history.push({ ...set, replacedAt: now, reason: reason ?? "", supersededBy: commit });
   }
@@ -120,6 +132,7 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
     files,
     blobs: Object.fromEntries(files.map((file) => [file, gitOrThrow(source, ["rev-parse", "--verify", `${commit}:${file}`])])),
     ...(worktree ? { worktree } : {}),
+    ...(suiteCommand ? { run: suiteCommand } : {}),
     frozenAt: now,
   });
   writeFileEnsured(resolve(scope.dir, recordFile), `${JSON.stringify(record, null, 2)}\n`);
@@ -140,6 +153,7 @@ function freeze(workspace: string, config: HarnessConfig, flags: Flags): void {
   if (existing.length > 0) {
     console.log(`Replaced the freeze at ${existing.map((set) => set.commit.slice(0, 12)).join(", ")}; it is kept in history.`);
   }
+  if (suiteCommand) console.log(`This issue's suite runs with: ${suiteCommand}`);
   console.log(
     worktree
       ? `\`mahler check --issue ${scope.name}\` now fails if ${worktreeLabel(worktree)} changes them.`
@@ -403,6 +417,168 @@ function run(workspace: string, config: HarnessConfig, flags: Flags): void {
     process.exit(1);
   }
   console.log("\nAcceptance suite passed.");
+}
+
+/** Starts the one line of a suite's output that Mahler keeps as its result. */
+export const summaryPrefix = "acceptance-summary:";
+
+/** A recorded run of a tester's suite: one `acceptance-run` event with `suite: "tester"`. */
+export interface TesterRun {
+  repo: string;
+  /** The tester worktree's key, `tests/<dir>`. */
+  worktree: string;
+  /** The implementation the suite ran against: its commit, tree id, and branch when it was named by one. */
+  commit: string;
+  tree: string;
+  branch?: string;
+  /** The commit the suite was frozen at. */
+  frozen: string;
+  passed: boolean;
+  ms: number;
+  /** The suite's own summary line, when it printed one. */
+  summary?: string;
+}
+
+/**
+ * Runs an issue's frozen tester suites against the implementation and records
+ * each result. For each freeze in a tester worktree: merge the implementation
+ * into that worktree (one way, as the verification policy describes), confirm
+ * the frozen files are unchanged, run the suite's command there, and record
+ * what it ran against. Pass and fail come from the command's exit status, and
+ * counts from the summary line it prints, never from the agent.
+ */
+function runTester(workspace: string, config: HarnessConfig, flags: Flags): void {
+  const issue = stringFlag(flags, "issue");
+  if (!issue) throw new Error("--tester runs an issue's suite: pass --issue <ISSUE>.");
+  if (stringFlag(flags, "project")) throw new Error("--tester runs an issue's suite; leave out --project, or leave out --tester for the project suite.");
+  const repoFilter = stringFlag(flags, "repo");
+  if (repoFilter) repoNamed(config, repoFilter);
+  const branchFlag = stringFlag(flags, "branch");
+  const reposRoot = issueReposRoot(workspace, config, issue);
+  const meta = issuePaths(workspace, config, issue).meta;
+  const suites = readRecord(meta).frozen.flatMap((set) => {
+    const repo = config.repos.find((candidate) => candidate.name === set.repo);
+    if (!repo || (repoFilter && repo.name !== repoFilter)) return [];
+    const key = storedWorktreeKey(reposRoot, set, repo);
+    return key.startsWith(testsPrefix) ? [{ set, repo, key }] : [];
+  });
+  if (suites.length === 0) {
+    throw new Error(
+      `Issue ${issue} has no acceptance tests frozen in a tester worktree${repoFilter ? ` for ${repoFilter}` : ""}. Freeze the tester's commit first (see the verification policy).`,
+    );
+  }
+  if (branchFlag && suites.length > 1) {
+    throw new Error(`--branch names one repo's implementation, and issue ${issue} has ${suites.length} tester suites. Pass --repo <name> too.`);
+  }
+  let failures = 0;
+  for (const { set, repo, key } of suites) {
+    const cwd = resolve(reposRoot, "..", key);
+    if (!existsSync(cwd)) throw new Error(`The tester worktree ${key} is gone, so its suite can't run.`);
+    const command = set.run ?? repo.acceptanceRun;
+    if (!command) {
+      throw new Error(
+        `No command runs the tester's suite in ${repo.name}. Set \`acceptanceRun\` on the repo in .harness/config.json, or give this issue its own with \`mahler acceptance freeze ... --run "<command>"\`.`,
+      );
+    }
+    const target = implementation(reposRoot, repo, cwd, branchFlag);
+    if (gitOrThrow(cwd, ["status", "--porcelain", "--untracked-files=all"])) {
+      throw new Error(`${key} has uncommitted or untracked changes. The suite runs on committed files: have the tester commit them, or remove them.`);
+    }
+    const merged = spawnSync("git", ["merge", "--no-edit", "--quiet", target.commit], { cwd, encoding: "utf8" });
+    if (merged.status !== 0) {
+      spawnSync("git", ["merge", "--abort"], { cwd });
+      throw new Error(
+        `Merging ${target.branch ?? target.commit.slice(0, 12)} into ${key} failed, and the merge was undone: ${(merged.stderr || merged.stdout).trim().split("\n")[0]}. A conflict means the tester edited a file the implementation also changed; have the tester move its tests into new files, and freeze that commit with the reason.`,
+      );
+    }
+    const finding = comparison(cwd, `${repo.name} (${key})`, set, `issue ${issue}`);
+    if (finding.level !== "ok") throw new Error(`${finding.message}. The suite was not run.`);
+    const filled = command.replaceAll("<files>", set.files.map(shellQuote).join(" "));
+    const log = resolve(meta, `acceptance-run-${key.slice(testsPrefix.length)}.log`);
+    writeFileEnsured(log, "");
+    console.log(`--- tester suite for ${repo.name}: ${filled} (in ${cwd}, against ${target.branch ?? "commit"} ${target.commit.slice(0, 12)})`);
+    const began = Date.now();
+    const exit = runLogged(filled, cwd, log);
+    const passed = exit === 0;
+    const summary = summaryLine(readFileSync(log, "utf8"));
+    const result: TesterRun = {
+      repo: repo.name,
+      worktree: key,
+      commit: target.commit,
+      tree: target.tree,
+      ...(target.branch ? { branch: target.branch } : {}),
+      frozen: set.commit,
+      passed,
+      ms: Date.now() - began,
+      ...(summary ? { summary } : {}),
+    };
+    recordEvent(workspace, config, issue, "acceptance-run", { suite: "tester", ...result });
+    if (!passed) failures += 1;
+    console.log(
+      `\n${passed ? "ok  " : "fail"} ${repo.name}: tester suite ${passed ? "passed" : `failed (exit ${exit ?? "unknown"})`} on ${target.commit.slice(0, 12)}${summary ? `: ${summary}` : ""}`,
+    );
+    console.log(`     output kept in ${relative(workspace, log)}`);
+    if (!summary) {
+      console.log(`     no summary line; to record counts, have the suite's command print one line starting "${summaryPrefix}"`);
+    }
+  }
+  if (failures > 0) process.exit(1);
+}
+
+/**
+ * The implementation a tester's suite runs against: `--branch <ref>` when
+ * given (the top branch, for a stack), else whatever the issue's
+ * `repos/<repo>` worktree has checked out.
+ */
+function implementation(
+  reposRoot: string,
+  repo: RepoConfig,
+  testerCwd: string,
+  branchFlag: string | undefined,
+): { commit: string; tree: string; branch?: string } {
+  let commit: string;
+  let branch: string | undefined;
+  if (branchFlag) {
+    commit = gitOrThrow(testerCwd, ["rev-parse", "--verify", `${branchFlag}^{commit}`]);
+    branch = branchFlag;
+  } else {
+    const worktree = resolve(reposRoot, repo.name);
+    if (!existsSync(worktree)) {
+      throw new Error(`No issue worktree at ${worktree}. Pass --branch <ref> to name the implementation to test (the top branch, for a stack).`);
+    }
+    commit = gitOrThrow(worktree, ["rev-parse", "HEAD"]);
+    branch = gitOrThrow(worktree, ["branch", "--show-current"]) || undefined;
+  }
+  return { commit, tree: gitOrThrow(testerCwd, ["rev-parse", "--verify", `${commit}^{tree}`]), ...(branch ? { branch } : {}) };
+}
+
+/**
+ * Runs `command` in `cwd`, showing its output as it comes and keeping a copy
+ * in `log`. Returns its exit status, or `undefined` when it never reported
+ * one (killed by a signal).
+ */
+function runLogged(command: string, cwd: string, log: string): number | undefined {
+  const dir = mkdtempSync(resolve(tmpdir(), "mahler-suite-"));
+  const status = resolve(dir, "status");
+  try {
+    // The subshell keeps an `exit` in the command from skipping the status line.
+    spawnSync(`{ ( ${command}\n); echo $? > ${shellQuote(status)}; } 2>&1 | tee ${shellQuote(log)}`, {
+      cwd,
+      shell: true,
+      stdio: "inherit",
+    });
+    const reported = existsSync(status) ? Number.parseInt(readFileSync(status, "utf8").trim(), 10) : Number.NaN;
+    return Number.isNaN(reported) ? undefined : reported;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** The text of the last summary line in a suite's output, without its prefix. */
+export function summaryLine(output: string): string | undefined {
+  const line = output.split("\n").reverse().find((candidate) => candidate.trimStart().startsWith(summaryPrefix));
+  const text = line?.trimStart().slice(summaryPrefix.length).trim().slice(0, 200);
+  return text || undefined;
 }
 
 /**

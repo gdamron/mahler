@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -448,6 +448,86 @@ test("a freeze defaults to the tester worktree, and check compares it there with
   assert.notEqual(waiting.status, 0);
   const head = git(tests, "rev-parse", "--short=12", "HEAD");
   assert.match(waiting.stdout, new RegExp(`differ .*the change is committed at ${head}, so if it follows a dispute decision, freeze again`));
+});
+
+/** The issue's recorded runs of the tester's suite, oldest first. */
+function testerRuns(workspace: string): Array<Record<string, unknown>> {
+  const path = resolve(workspace, ".harness", "issues", "MAH-1", "events.jsonl");
+  return readFileSync(path, "utf8").split("\n").filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+    .filter((event) => event.event === "acceptance-run" && event.suite === "tester");
+}
+
+test("acceptance run --tester merges the implementation in, runs the suite, and records what it ran against", () => {
+  const { workspace, app, worktree } = setup();
+  const tests = testerWorktree(workspace, app);
+  const freeze = ["acceptance", "freeze", "--workspace", workspace, "--issue", "MAH-1", "--repo", "app", "--commit", "tests"];
+  assert.equal(run(freeze).status, 0);
+  const frozenAt = git(app, "rev-parse", "tests");
+  // The merge into the tester's worktree makes a commit, which needs an identity.
+  const suite = (...extra: string[]) => {
+    const result = spawnSync(cli[0], [cli[1], "acceptance", "run", "--workspace", workspace, "--issue", "MAH-1", "--tester", ...extra], {
+      encoding: "utf8",
+      env: gitEnv,
+    });
+    return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+  };
+
+  const unconfigured = suite();
+  assert.notEqual(unconfigured.status, 0);
+  assert.match(unconfigured.stderr, /No command runs the tester's suite in app/);
+
+  editConfig(workspace, (config) => {
+    config.repos[0].acceptanceRun = "cat feature.txt <files>; echo 'acceptance-summary: 3 of 3 passed'";
+  });
+  writeFileSync(resolve(worktree, "feature.txt"), "implementation\n");
+  git(worktree, "add", ".");
+  git(worktree, "commit", "-qm", "implement");
+
+  const passed = suite();
+  assert.equal(passed.status, 0, passed.stdout + passed.stderr);
+  // The suite saw the implementation and its own frozen file.
+  assert.match(passed.stdout, /implementation\nfrozen\n/);
+  assert.match(passed.stdout, /ok {3}app: tester suite passed on \w{12}: 3 of 3 passed/);
+  assert.equal(existsSync(resolve(tests, "feature.txt")), true);
+  const [first] = testerRuns(workspace);
+  assert.equal(first.passed, true);
+  assert.equal(first.worktree, "tests/app");
+  assert.equal(first.branch, "t/mah-1");
+  assert.equal(first.commit, git(worktree, "rev-parse", "HEAD"));
+  assert.equal(first.tree, git(worktree, "rev-parse", "HEAD^{tree}"));
+  assert.equal(first.frozen, frozenAt);
+  assert.equal(first.summary, "3 of 3 passed");
+  const log = resolve(workspace, ".harness", "issues", "MAH-1", "acceptance-run-app.log");
+  assert.match(readFileSync(log, "utf8"), /acceptance-summary: 3 of 3 passed/);
+
+  // An issue's own command, recorded with the freeze, replaces the repo's; a failing run is recorded too.
+  const refrozen = run([...freeze, "--reason", "the suite needs its own arguments", "--run", "echo 'acceptance-summary: 1 of 2 passed'; exit 4"]);
+  assert.equal(refrozen.status, 0, refrozen.stderr);
+  const failed = suite();
+  assert.notEqual(failed.status, 0);
+  assert.match(failed.stdout, /fail app: tester suite failed \(exit 4\) on \w{12}: 1 of 2 passed/);
+  const [, second] = testerRuns(workspace);
+  assert.equal(second.passed, false);
+  assert.equal(second.summary, "1 of 2 passed");
+
+  // With no summary line, only pass or fail and the duration are recorded.
+  assert.equal(run([...freeze, "--reason", "quiet runner", "--run", "true"]).status, 0);
+  const quiet = suite();
+  assert.equal(quiet.status, 0, quiet.stdout + quiet.stderr);
+  assert.match(quiet.stdout, /no summary line/);
+  const third = testerRuns(workspace)[2];
+  assert.equal(third.passed, true);
+  assert.equal("summary" in third, false);
+  assert.equal(typeof third.ms, "number");
+
+  // The run is refused, not recorded, when the frozen files have changed.
+  writeFileSync(resolve(tests, "tests", "accept.txt"), "loosened\n");
+  git(tests, "commit", "-qam", "loosen");
+  const tampered = suite();
+  assert.notEqual(tampered.status, 0);
+  assert.match(tampered.stderr, /differ from .*The suite was not run/);
+  assert.equal(testerRuns(workspace).length, 3);
 });
 
 test("a frozen set survives a rebase that rewrites its commit, with no new freeze", () => {

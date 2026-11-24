@@ -102,7 +102,7 @@ mahler profile codex --workspace /path/to/product-workspace
 mahler can codex commit --workspace /path/to/product-workspace
 mahler handoff DEV-123 --workspace /path/to/product-workspace --agent codex
 mahler decide --rule scope --description "Fixed an adjacent bug in scope" --reason "expanded to fix adjacent bug" --issue DEV-123 --agent codex --workspace /path/to/product-workspace
-mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue DEV-123 | --path <worktree>] [--fresh] [--strict]
+mahler check --workspace /path/to/product-workspace [--repo <name>] [--issue DEV-123 | --path <worktree>] [--fresh] [--strict] [--guarded]
 mahler acceptance freeze --workspace /path/to/product-workspace --issue DEV-123 --repo <name> --commit <sha|base..sha> [--reason "<dispute decision>"]
 mahler acceptance freeze --workspace /path/to/product-workspace --project <slug> --repo <name> --commit <sha>
 mahler acceptance manifest --workspace /path/to/product-workspace --issue DEV-123 | --project <slug>
@@ -147,7 +147,10 @@ worktree under the issue's `repos/` dir, including slice worktrees such as
 single worktree; otherwise it checks each source repo. It also fails when
 frozen acceptance tests changed, in the tester's worktree or wherever the
 freeze names, reports the tester suite's last recorded run (passed on this
-tree, stale, not run, or failed; `--strict` fails on stale and not run), and notes changes to
+tree, stale, not run, or failed; `--strict` fails on stale and not run),
+asks for a repo's `guardedSuites` (heavy suites kept out of CI) when the
+change touches the paths they guard (`--guarded` runs them and records the
+pass), and notes changes to
 `merge.humanReviewPaths`. A check that already passed on the same clean, committed tree is not rerun
 (passes are remembered for 14 days in `.harness/tmp/check-cache.json`);
 `--fresh` reruns everything. It is local feedback — the forge/CI remains the

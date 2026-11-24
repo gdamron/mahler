@@ -358,9 +358,42 @@ human), say in the record which PRs it covers.
 Slices in different repos are separate changes: each gets its own review and
 PR, under the one record in `HANDOFF.md`.
 
+## Guarded Suites
+
+A heavy suite that is kept runs locally, not in CI, and a guard makes sure it
+is run when it matters. The suite declares the paths it guards, per repo in
+`.harness/config.json`, beside `checks`:
+
+```json
+"guardedSuites": [
+  { "name": "<name>", "paths": ["<glob>", "..."], "run": "<command>" }
+]
+```
+
+- `mahler check` asks for a guarded suite only when the change touches one
+  of its paths. Changes elsewhere don't pay for it.
+- It needs a pass on the exact tree being checked. Run it with `mahler check
+  --path <worktree> --guarded` (or `--issue <ISSUE> --guarded`); the pass is
+  recorded for that tree, and any content change asks for it again.
+- Without a pass the check warns, and fails with `--strict`, which the merge
+  policy requires before PRs are reported ready and before a merge. So a
+  change to guarded code can't merge without a local pass.
+- Add the entry in the PR that promotes the suite, with paths narrow enough
+  that unrelated changes don't trigger it and wide enough to cover the code
+  it exercises. Only the human changes or removes an entry later.
+
+Before merge, the same strict check covers the tester's suite for the issue
+(see "Running the Tester's Suite"). After merge, the guard takes over for
+whatever part of that suite was kept as a heavy suite.
+
 ## What CI Must Do
 
 `mahler check` runs locally and is a Tier 1 control. The implementer's tests
 land in the PR and the promoted acceptance tests land in their own, so the
 repo's CI runs them on every later change. That makes CI the regression guardrail: each repo's CI
 should run its full test suite on every PR. Name any gap in `guardrails`.
+
+A heavy suite is the exception: one too slow or too demanding for CI (a
+browser, audio, a built binary). It is not required in CI when it has a
+local guard (see "Guarded Suites"). Name each such suite in `guardrails` as
+running locally, so the gap is stated and not silent.

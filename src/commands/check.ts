@@ -86,6 +86,7 @@ export function check(flags: Flags): void {
   const branches: Array<{ repo: string; worktree: string; branch: string; head: string }> = [];
   const fresh = flags.fresh === true;
   const cache = readPassCache(workspace);
+  let guardedUnmet = 0;
   for (const { repo, cwd, label } of targets) {
     if (!existsSync(cwd)) {
       results.push({
@@ -111,6 +112,14 @@ export function check(flags: Flags): void {
         level: "info",
         message: `${label}: changes paths in merge.humanReviewPaths, so a human merges this PR unless an agent-merge label pre-approves it: ${humanPaths.join(", ")}`,
       });
+    }
+    for (const finding of guardedSuiteFindings(workspace, repo, cwd, label, cache, {
+      run: flags.guarded === true,
+      strict: flags.strict === true,
+    })) {
+      if (finding.level === "error") failures += 1;
+      if (finding.level === "warn") guardedUnmet += 1;
+      results.push(finding);
     }
     if (entries.length === 0) {
       results.push({
@@ -204,10 +213,68 @@ export function check(flags: Flags): void {
     process.exit(1);
   }
   console.log(
-    suiteUnmet > 0
-      ? `\nConfigured checks passed, but ${suiteUnmet} frozen tester suite(s) have no pass on this tree (see the warnings above); that blocks reporting PRs ready and merging. This mirrors CI; the forge remains the authority.`
+    suiteUnmet + guardedUnmet > 0
+      ? `\nConfigured checks passed, but ${suiteUnmet + guardedUnmet} suite(s) that run only locally have no pass on this tree (see the warnings above); that blocks reporting PRs ready and merging. This mirrors CI; the forge remains the authority.`
       : "\nAll configured checks passed. This mirrors CI; the forge remains the authority.",
   );
+}
+
+/**
+ * Findings for a repo's guarded suites: heavy suites that stay out of CI and
+ * out of the everyday check. A suite is asked for only when the change in
+ * `cwd` touches a path it guards; changes elsewhere don't pay for it. It
+ * needs a pass on this exact tree, which `--guarded` runs and records.
+ * Without one the finding is a warning, and an error with `--strict`.
+ */
+function guardedSuiteFindings(
+  workspace: string,
+  repo: RepoConfig,
+  cwd: string,
+  label: string,
+  cache: PassCache,
+  options: { run: boolean; strict: boolean },
+): Finding[] {
+  const suites = repo.guardedSuites ?? [];
+  if (suites.length === 0) return [];
+  const changed = changedFiles(workspace, repo, cwd);
+  const findings: Finding[] = [];
+  for (const suite of suites) {
+    const touched = changed.filter((file) => suite.paths.some((pattern) => matchesGlob(file, pattern)));
+    if (touched.length === 0) continue;
+    const name = `${label}/${suite.name}`;
+    const why = `this change touches ${touched.length} path(s) it guards (${touched.slice(0, 3).join(", ")}${touched.length > 3 ? ", ..." : ""})`;
+    const tree = cleanTree(cwd);
+    // Keyed apart from the everyday checks, so the same command passing as a check is not this suite's pass.
+    const key = tree ? passKey(repo, `guarded:${suite.name}\0${suite.run}`, tree) : undefined;
+    if (key && cache[key]) {
+      findings.push({ level: "ok", message: `${name}: guarded suite passed on this exact tree at ${cache[key]}; ${why}` });
+      continue;
+    }
+    if (!options.run) {
+      findings.push({
+        level: options.strict ? "error" : "warn",
+        message: `${name}: guarded suite has no pass on this tree, and ${why}; ${
+          tree ? "" : "commit your changes, then "
+        }run it with \`mahler check --path ${cwd} --guarded\`${options.strict ? "" : " (--strict fails on this)"}`,
+      });
+      continue;
+    }
+    console.log(`--- ${name}: ${suite.run} (in ${cwd})`);
+    const run = spawnSync(suite.run, { cwd, shell: true, stdio: "inherit" });
+    if (run.status !== 0) {
+      findings.push({ level: "error", message: `${name}: ${suite.run} (exit ${run.status ?? "signal"}); ${why}` });
+    } else if (key) {
+      cache[key] = new Date().toISOString();
+      writePassCache(workspace, cache);
+      findings.push({ level: "ok", message: `${name}: ${suite.run}; ${why}` });
+    } else {
+      findings.push({
+        level: options.strict ? "error" : "warn",
+        message: `${name}: passed, but not recorded: the worktree has uncommitted or untracked changes. Commit them and run it again`,
+      });
+    }
+  }
+  return findings;
 }
 
 /** Passing checks, keyed by repo, command, and tree: `key -> when it passed`. */

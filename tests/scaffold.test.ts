@@ -70,6 +70,7 @@ test("reinstall preserves human-set per-repo checks that detection cannot infer"
   // Human adds cargo checks by hand.
   repo.checks = { test: "cargo test --lib --tests", build: "cargo build --lib" };
   repo.acceptanceRun = "cargo test --test acceptance";
+  repo.guardedSuites = [{ name: "e2e", paths: ["src/**"], run: "cargo test --test e2e" }];
   writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
 
   assert.equal(install(workspace).status, 0);
@@ -81,6 +82,7 @@ test("reinstall preserves human-set per-repo checks that detection cannot infer"
     "reinstall must not wipe human-set checks"
   );
   assert.equal(repoAfter.acceptanceRun, "cargo test --test acceptance", "nor the tester suite's command");
+  assert.deepEqual(repoAfter.guardedSuites, [{ name: "e2e", paths: ["src/**"], run: "cargo test --test e2e" }], "nor its guarded suites");
 });
 
 test("reinstall preserves human-set risk labels and acceptance suite", () => {

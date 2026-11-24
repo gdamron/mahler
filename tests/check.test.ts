@@ -267,6 +267,55 @@ function countingWorkspace(): { workspace: string; app: string; runs: () => numb
   return { workspace, app, runs: () => (existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean).length : 0) };
 }
 
+test("a guarded suite is asked for only when the change touches its paths, and passes with a recorded local run", () => {
+  const { workspace, repos } = workspaceWithSlices();
+  const config = loadConfig(workspace);
+  config.repos[0].guardedSuites = [{ name: "audio", paths: ["src/audio/**"], run: markerCheck }];
+  saveConfig(workspace, config);
+  const api = resolve(repos, "app");
+  const commit = (file: string) => {
+    mkdirSync(resolve(api, file, ".."), { recursive: true });
+    writeFileSync(resolve(api, file), "x\n");
+    spawnSync("git", ["-C", api, "add", "."], { env: gitEnv });
+    spawnSync("git", ["-C", api, "commit", "-q", "-m", file], { env: gitEnv });
+  };
+  const checkApi = (...extra: string[]) => runCheck(workspace, ["--path", api, ...extra]);
+
+  // A change elsewhere doesn't pay for the suite, even with --strict.
+  commit("docs/notes.md");
+  const elsewhere = checkApi("--strict");
+  assert.equal(elsewhere.status, 0, elsewhere.stdout);
+  assert.doesNotMatch(elsewhere.stdout, /guarded suite/);
+
+  // A change to a guarded path asks for it: a warning, and a failure with --strict.
+  commit("src/audio/mixer.ts");
+  const asked = checkApi();
+  assert.equal(asked.status, 0, asked.stdout);
+  assert.match(asked.stdout, /warn app\/audio: guarded suite has no pass on this tree, and this change touches 1 path\(s\) it guards \(src\/audio\/mixer\.ts\); run it with `mahler check --path .* --guarded` \(--strict fails on this\)/);
+  assert.match(asked.stdout, /1 suite\(s\) that run only locally have no pass on this tree/);
+  const strict = checkApi("--strict");
+  assert.notEqual(strict.status, 0);
+  assert.match(strict.stdout, /fail app\/audio: guarded suite has no pass on this tree/);
+
+  // --guarded runs it and records the pass for this exact tree.
+  const ran = checkApi("--guarded");
+  assert.equal(ran.status, 0, ran.stdout);
+  assert.match(ran.stdout, /ok {3}app\/audio: /);
+  const passed = checkApi("--strict");
+  assert.equal(passed.status, 0, passed.stdout);
+  assert.match(passed.stdout, /ok {3}app\/audio: guarded suite passed on this exact tree at /);
+
+  // The pass doesn't outlive a change, and a failing run is a failure.
+  commit("src/audio/reverb.ts");
+  assert.notEqual(checkApi("--strict").status, 0);
+  writeFileSync(resolve(api, "FAIL"), "");
+  spawnSync("git", ["-C", api, "add", "."], { env: gitEnv });
+  spawnSync("git", ["-C", api, "commit", "-q", "-m", "break"], { env: gitEnv });
+  const failed = checkApi("--guarded");
+  assert.notEqual(failed.status, 0);
+  assert.match(failed.stdout, /fail app\/audio: .*\(exit 1\)/);
+});
+
 test("check does not rerun a check that passed on the same clean tree, unless --fresh", () => {
   const { workspace, runs } = countingWorkspace();
   assert.equal(runCheck(workspace).status, 0);

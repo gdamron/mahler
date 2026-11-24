@@ -522,7 +522,7 @@ test("acceptance run --tester merges the implementation in, runs the suite, and 
   const stale = check(workspace);
   assert.equal(stale.status, 0, stale.stdout);
   assert.match(stale.stdout, /warn app \(tests\/app\): frozen suite last passed on t\/mah-1 \w{12}: 3 of 3 passed; the implementation has changed since, so run it again \(--strict fails on this\)/);
-  assert.match(stale.stdout, /Configured checks passed, but 1 frozen tester suite\(s\) have no pass on this tree/);
+  assert.match(stale.stdout, /Configured checks passed, but 1 suite\(s\) that run only locally have no pass on this tree/);
   const strictStale = strict();
   assert.notEqual(strictStale.status, 0);
   assert.match(strictStale.stdout, /fail app \(tests\/app\): frozen suite last passed/);

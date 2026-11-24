@@ -168,7 +168,9 @@ rest; your parent owns them, and your brief names your branch.
    --issue <ISSUE> --tester` after the last implementation change. If that
    change can't affect the suite (docs only, a version bump), you may ask
    your parent to carry the pass forward instead; never run `mahler
-   acceptance carry` yourself. When the issue's project has an acceptance suite,
+   acceptance carry` yourself. When the check reports a guarded suite (a
+   heavy suite kept out of CI whose paths this change touches), run it with
+   `mahler check --issue <ISSUE> --guarded` before the strict check. When the issue's project has an acceptance suite,
    run `mahler acceptance run --project <slug> --issue <ISSUE>`. Walk the
    Definition of Done checklist.
 9. **Open PRs** with the pr skill: one PR per slice branch. A stack's top

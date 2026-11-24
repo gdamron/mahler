@@ -27,7 +27,8 @@ export function discoverRepos(workspace: string): HarnessConfig["repos"] {
  * knows about npm. Preserve any per-repo `checks` a human has set in the
  * existing config (e.g. cargo commands) so a reinstall does not wipe them.
  * Discovered checks win only when the existing config has none for that repo.
- * A repo's `acceptanceRun` is human-set too, and is kept the same way.
+ * A repo's `acceptanceRun` and `guardedSuites` are human-set too, and are
+ * kept the same way.
  */
 export function withPreservedChecks(
   workspace: string,
@@ -43,6 +44,7 @@ export function withPreservedChecks(
       ...repo,
       ...(checks && Object.keys(checks).length > 0 ? { checks } : {}),
       ...(existing?.acceptanceRun ? { acceptanceRun: existing.acceptanceRun } : {}),
+      ...(existing?.guardedSuites?.length ? { guardedSuites: existing.guardedSuites } : {}),
     };
   });
 }

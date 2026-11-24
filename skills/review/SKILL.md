@@ -44,6 +44,8 @@ reports to the conductor, which owns both.
 - Knowledge notes the diff contradicts, as findings; and facts worth a new
   note, proposed in the report (title, description, scope) for the conductor
   to record
+- Each server, browser, or other process you started, and that it is stopped
+  (see "Processes" in the workspace-safety policy)
 - Updated `HANDOFF.md`, or, when delegated, findings reported to the
   conductor that owns it, with anything you did differently from this skill
 

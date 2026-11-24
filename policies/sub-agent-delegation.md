@@ -158,7 +158,26 @@ Every delegated task should start from a written brief with these fields:
 - If a tool, model, or service you need is unavailable (missing, out of
   usage, rate-limited, or not returning), use its fallback (see the delegate
   skill) or report back. Don't wait on it.
+- If an action is refused (a declined permission prompt, a denied command, a
+  blocked tool call), stop and report it. Don't do it another way, and don't
+  take an action you know another agent was refused.
+- Leave nothing running. Stop the servers, browsers, and other processes you
+  started, and list them in your report. Stop only what you started; report
+  any other process you find and leave it alone.
 ```
+
+## Refusals and Cleanup
+
+A refused action stays refused across the whole tree (see "When an Action Is
+Refused" in the judgment policy). A parent whose own action was refused, or
+that hears of a refusal from a sub-agent, passes it up and never briefs
+another agent to take that action. When a later brief touches the same
+ground, it says what was refused.
+
+A brief that wants cleanup says so in its objective: which processes or files,
+who started them, and who approved stopping or removing them. Without that, a
+sub-agent stops only what it started itself (see "Processes" in the
+workspace-safety policy) and reports the rest.
 
 ## Synthesizing Results
 

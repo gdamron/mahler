@@ -31,6 +31,21 @@ Spotlight indexing that can keep `mds_stores` busy for hours.
 - `mahler doctor` reports whether Spotlight is indexing the worktree root. The
   fix (System Settings → Spotlight → Search Privacy) is the human's to make.
 
+## Processes
+
+Test servers, dev servers, browsers, tunnels, and watchers outlive the agent
+that started them unless it stops them.
+
+- Before you report, stop what you started, and list in the report each
+  process you started and whether it is stopped. If one has to stay up (a
+  server the human is using), give its PID, its port, and how to stop it.
+- Stop only processes you started yourself. A process you find and did not
+  start belongs to someone else, even when it looks orphaned: report its PID,
+  port, and command to your parent and leave it running.
+- A request to confirm that nothing of yours is still running asks for a
+  check, not a cleanup. Stop another agent's process only when your brief
+  names that process and says to stop it.
+
 ## Work Trees
 
 For parallel AI agent work, use git worktrees to run multiple branches simultaneously. Choose branch names using the branching policy and create only the repo worktrees needed for the task.

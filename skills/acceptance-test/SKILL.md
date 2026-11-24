@@ -135,6 +135,9 @@ is reachable from outside, write nothing and report that.
 - Possible spec gaps, with the reading you chose
 - Test results, and for any failure your view of whether the code, the test,
   or the spec is at fault
+- Each server, browser, or other process you started, and that it is stopped
+  (see "Processes" in the workspace-safety policy). Report a process you
+  found and did not start; don't stop it
 - Anything you did differently from this skill, and why, so your parent can
   record it
 
@@ -155,3 +158,6 @@ and still don't read the implementation.
 - writing a test would need changes outside test files
 - you would need to read the implementation to continue
 - the next step is merging, freezing, or opening a PR: report back instead
+- an action is refused (a declined permission prompt, a denied command):
+  report it, and don't do it another way. The same holds for an action you
+  know another agent was refused

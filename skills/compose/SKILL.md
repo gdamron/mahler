@@ -108,7 +108,9 @@ itself: one issue never needs a composer layer.
      skill per issue, launching slice conductors and reviewers directly and keeping
      each issue's state in its own `HANDOFF.md`.
 6. **Monitor.** Track each conductor through its replies and
-   `.harness/issues/<ISSUE>/HANDOFF.md`. Answer escalations:
+   `.harness/issues/<ISSUE>/HANDOFF.md`. A reply that starts with `Interim:`
+   is progress, not a result: the conductor still has sub-agents running, so
+   don't merge or advance a wave on it. Answer escalations:
    - Tier 2 requests from conductors: the composer may approve or deny them
      (see the judgment policy); log each approval in `COMPOSITION.md`.
    - Scope changes that affect other issues or the project goal, conflicts

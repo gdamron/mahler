@@ -171,7 +171,10 @@ rest; your parent owns them, and your brief names your branch.
     update or verify existing notes the work confirmed or corrected.
 12. **Report.** Update `HANDOFF.md` (you own it for this issue; phase
     `ready-to-merge`) and reply to your parent with PR URLs, verification
-    records, checks, review status, risks, and deviations.
+    records, checks, review status, risks, and deviations. If you must
+    reply before a sub-agent of yours has finished, start the reply with
+    `Interim:` and name what is still running (see the delegate skill);
+    don't report PRs ready until every sub-agent has reported.
 
 ## Timing Marks
 

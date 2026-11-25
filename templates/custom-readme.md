@@ -21,7 +21,7 @@ On install, Mahler writes its canonical defaults, then overlays this directory:
 - `acceptance-priorities.md` — optional. What this workspace most wants acceptance tests to
   protect (for example: the paths users depend on, failures that are hard to notice). It adds
   to the verification policy instead of replacing it: the tester weights its tests toward it,
-  and the conductor never drops a test that covers it. Plain prose or a short list.
+  and guarding a risk it names is one of the reasons a conductor may keep a test. Plain prose or a short list.
 - `merge-rules.md` — optional. This workspace's own merge rules: more PRs that go to the
   human, extra readiness checks, what to report after merging. It adds to the merge policy
   instead of replacing it, and where the two disagree the stricter one applies.

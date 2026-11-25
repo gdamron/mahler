@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, realpathSync, rmdirSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, rmSync, rmdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, relative, resolve } from "node:path";
 import { type Flags, workspaceFlag } from "../args.js";
@@ -16,7 +16,9 @@ import { listDirectories } from "../util.js";
  * keeping were promoted into it), so the branch is deleted whether or not
  * anything contains it, and its tip is printed for recovery. A worktree with
  * uncommitted or untracked changes is kept: only the human may discard work.
- * A tester branch's remote copy is deleted only with `--remote`.
+ * A tester branch's remote copy is deleted only with `--remote`. The issue's
+ * `reports/` dir (sub-agents' report files, working copies of what
+ * `HANDOFF.md` records) goes once every worktree is gone.
  */
 export function cleanup(identifier: string, flags: Flags): void {
   const workspace = workspaceFlag(flags);
@@ -26,6 +28,7 @@ export function cleanup(identifier: string, flags: Flags): void {
   const { worktreeRoot } = issuePaths(workspace, config, identifier);
   const reposDir = resolve(worktreeRoot, "repos");
   const testsDir = resolve(worktreeRoot, "tests");
+  const reportsDir = resolve(worktreeRoot, "reports");
   const issueDirs = listDirectories(reposDir).map((dir) => resolve(reposDir, dir));
   // Testers first: their branches are merged into the issue branches, which
   // the issue worktrees still have checked out.
@@ -41,6 +44,18 @@ export function cleanup(identifier: string, flags: Flags): void {
       message: `no worktrees under ${relative(workspace, reposDir)} or ${relative(workspace, testsDir)}`,
     });
   }
+  const reports = reportFiles(reportsDir);
+  if (reports > 0) {
+    const label = `${relative(workspace, reportsDir)}: ${reports} sub-agent report file(s)`;
+    if (dryRun) {
+      findings.push({ level: "info", message: `${label} would be removed` });
+    } else if (findings.some((finding) => finding.level === "error")) {
+      findings.push({ level: "info", message: `${label} kept, with the worktree(s) kept above` });
+    } else {
+      rmSync(reportsDir, { recursive: true, force: true });
+      findings.push({ level: "ok", message: `${label} removed` });
+    }
+  }
   if (!dryRun) {
     const kept = findings.filter((finding) => finding.level === "error").length;
     // Only an issue that has a brief gets a log: cleanup of a mistyped name records nothing.
@@ -49,12 +64,19 @@ export function cleanup(identifier: string, flags: Flags): void {
     }
     removeIfEmpty(reposDir);
     removeIfEmpty(testsDir);
+    removeIfEmpty(reportsDir);
     removeIfEmpty(worktreeRoot);
   }
   for (const finding of findings) {
     console.log(`${finding.level.padEnd(5)}${finding.message}`);
   }
   if (findings.some((finding) => finding.level === "error")) process.exitCode = 1;
+}
+
+/** How many files the issue's `reports/` dir holds, at any depth. */
+function reportFiles(dir: string): number {
+  if (!existsSync(dir)) return 0;
+  return readdirSync(dir, { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile()).length;
 }
 
 /**

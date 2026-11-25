@@ -176,7 +176,10 @@ rest; your parent owns them, and your brief names your branch.
     update or verify existing notes the work confirmed or corrected.
 12. **Report.** Update `HANDOFF.md` (you own it for this issue; phase
     `ready-to-merge`) and reply to your parent with PR URLs, verification
-    records, checks, review status, risks, and deviations.
+    records, checks, review status, risks, and deviations. When your launch
+    brief names a report file, write the full report there and keep the
+    reply to a few lines and the path (see "Reports" in the sub-agent
+    delegation policy).
 
 ## Timing Marks
 
@@ -206,8 +209,9 @@ nothing else here.
 3. Run `mahler check --path <worktree>`, then push your slice branch.
 4. Report the implementation policy's change summary, commit list, checks run,
    pushed branch, each process you started and that it is stopped, and any
-   proposed knowledge notes to your parent. Your parent owns `HANDOFF.md`; record only
-   your own workflow deviations there.
+   proposed knowledge notes to your parent: the full report in the file your
+   brief names, and a reply of a few lines with its path. Your parent owns
+   `HANDOFF.md`; record only your own workflow deviations there.
 
 Do not set up the issue, open PRs, write verification records, or delegate.
 Never edit frozen acceptance tests; report a test you think is wrong.

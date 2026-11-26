@@ -61,10 +61,12 @@ Every agent merge requires all of these, regardless of labels:
   or that last passed before the implementation changed, is only a warning;
   with it, the check fails. `--strict` is required at two gates: when a
   conductor reports PRs ready, and when the composer (or the human's agent)
-  decides to merge. Slice conductors and everyday checks leave it out. Any
-  acceptance tests kept are in test-only PRs above this change, each with a
-  stated reason; they merge after it (see "Promoting Acceptance Tests" in
-  the verification policy).
+  decides to merge. Slice conductors and everyday checks leave it out. It
+  also fails when the change touches paths a guarded suite covers and that
+  suite has no pass on this tree (see "Guarded Suites" in the verification
+  policy); run it with `--guarded`. Any acceptance tests kept are in
+  test-only PRs above this change, each with a stated reason; they merge
+  after it (see "Promoting Acceptance Tests" in the verification policy).
 - No dispute is open.
 - The forge reports the PR mergeable with no conflicts.
 - A stack is verified as one change: the record on its top PR covers every

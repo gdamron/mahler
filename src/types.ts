@@ -13,6 +13,19 @@ export interface RepoConfig {
    * frozen files. An issue's freeze can carry its own command instead.
    */
   acceptanceRun?: string;
+  /**
+   * Heavy suites kept out of CI and run locally. `mahler check` asks for a
+   * pass of each one only when a change touches the paths it guards.
+   */
+  guardedSuites?: GuardedSuite[];
+}
+
+export interface GuardedSuite {
+  name: string;
+  /** Repo-relative globs. A change that touches any of them needs the suite to pass. */
+  paths: string[];
+  /** Shell command that runs the suite, from the worktree being checked. */
+  run: string;
 }
 
 /**

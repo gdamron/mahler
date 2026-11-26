@@ -195,7 +195,7 @@ const commands: Record<string, Command> = {
   },
   acceptance: {
     usage:
-      "mahler acceptance freeze|manifest|run --workspace <path> (--issue <ISSUE> | --project <slug>) [--repo <name> --commit <sha|base..sha> [--worktree <dir>] [--reason <why>] [--drop <file>[,<file>...]] [--run <command>]] [--tester [--branch <ref>]] [--out <file>]",
+      "mahler acceptance freeze|manifest|run|carry --workspace <path> (--issue <ISSUE> | --project <slug>) [--repo <name> --commit <sha|base..sha> [--worktree <dir>] [--reason <why>] [--drop <file>[,<file>...]] [--run <command>]] [--tester [--branch <ref>]] [--out <file>]; carry: --issue <ISSUE> --reason <why> [--repo <name>]",
     summary:
       "Freeze a tester's acceptance tests, write the revision manifest, or run the project acceptance suite (with --tester: an issue's frozen tester suite, recording the result).",
     positionals: 1,
@@ -215,7 +215,7 @@ const commands: Record<string, Command> = {
     },
     run: (args) =>
       acceptance(
-        required(args.rest[0], "action is required: freeze, manifest, or run"),
+        required(args.rest[0], "action is required: freeze, manifest, run, or carry"),
         args.flags,
       ),
   },

@@ -35,6 +35,10 @@ itself: one issue never needs a composer layer.
 - `mahler linear-template project` and `mahler linear-template task`
 - `mahler task <slug> --agent <agent> --task-file <task.json>`
 - `mahler acceptance freeze|manifest|run --workspace <workspace> --project <slug> ...`
+- `mahler acceptance carry --workspace <workspace> --issue <ISSUE> --reason "<why>"`,
+  to carry a tester suite's last pass across a change that can't affect it
+  (see "Running the Tester's Suite" in the verification policy). Only you
+  run it; record each carry in `COMPOSITION.md`
 - `mahler decide --rule <rule> --description "<one line>" --reason "<why>" --issue <ISSUE> --agent <agent>`
 - Linear MCP project and issue lookup, and creating the issues in a plan the
   human approved (see the write-issue skill)

@@ -5,7 +5,7 @@ import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
 import type { Finding, HarnessConfig, RepoConfig } from "../types.js";
-import { readEvents, recordEvent } from "../events.js";
+import { type IssueEvent, readEvents, recordEvent } from "../events.js";
 import { repoForDir } from "../repos.js";
 import { abs, listDirectories, slugify, writeFileEnsured } from "../util.js";
 
@@ -70,8 +70,9 @@ export function acceptance(action: string, flags: Flags): void {
     return;
   }
   if (action === "run") return flags.tester === true ? runTester(workspace, config, flags) : run(workspace, config, flags);
+  if (action === "carry") return carry(workspace, config, flags);
   throw new Error(
-    `Unknown acceptance action "${action}". Expected freeze, manifest, or run.`,
+    `Unknown acceptance action "${action}". Expected freeze, manifest, run, or carry.`,
   );
 }
 
@@ -542,7 +543,7 @@ export function testerSuiteFindings(
 ): Finding[] {
   const reposRoot = issueReposRoot(workspace, config, issue);
   const meta = issuePaths(workspace, config, issue).meta;
-  const runs = readEvents(meta).filter((event) => event.event === "acceptance-run" && event.suite === "tester");
+  const events = readEvents(meta);
   const findings: Finding[] = [];
   const unmet = strict ? "error" : "warn";
   const gate = strict ? "" : " (--strict fails on this)";
@@ -553,9 +554,7 @@ export function testerSuiteFindings(
     if (!key.startsWith(testsPrefix)) continue;
     const label = `${repo.name} (${key})`;
     const rerun = `mahler acceptance run --issue ${issue} --tester`;
-    const latest = [...runs].reverse().find((event) => event.repo === repo.name && event.worktree === key) as
-      | (TesterRun & { at: string })
-      | undefined;
+    const latest = latestRun(events, repo.name, key);
     if (!latest) {
       findings.push({ level: unmet, message: `${label}: frozen suite not run; run it with \`${rerun}\`${gate}` });
       continue;
@@ -571,6 +570,14 @@ export function testerSuiteFindings(
       continue;
     }
     const current = implementationTree(abs(workspace, repo.path), resolve(reposRoot, repo.name), latest.branch);
+    const carried = latest.passed ? carriedTo(events, latest) : undefined;
+    if (carried && current === carried.tree) {
+      findings.push({
+        level: "ok",
+        message: `${label}: frozen suite passed at ${ran}${summary}, carried to ${carried.commit.slice(0, 12)}: ${carried.reason}`,
+      });
+      continue;
+    }
     if (current !== latest.tree) {
       findings.push({
         level: unmet,
@@ -587,6 +594,88 @@ export function testerSuiteFindings(
     );
   }
   return findings;
+}
+
+type RecordedRun = TesterRun & { at: string };
+
+/** The latest recorded run of the tester suite in `worktree`. */
+function latestRun(events: IssueEvent[], repo: string, worktree: string): RecordedRun | undefined {
+  return [...events].reverse().find(
+    (event) => event.event === "acceptance-run" && event.suite === "tester" && event.repo === repo && event.worktree === worktree,
+  ) as RecordedRun | undefined;
+}
+
+/**
+ * Where a pass now stands after any carries recorded since: each carry moves
+ * it from the tree it stood on to a new one, with a reason. `undefined` when
+ * the pass was never carried.
+ */
+function carriedTo(events: IssueEvent[], run: RecordedRun): { commit: string; tree: string; reason: string } | undefined {
+  let standing: { commit: string; tree: string; reason: string } | undefined;
+  for (const event of events) {
+    if (event.event !== "acceptance-carry" || event.repo !== run.repo || event.worktree !== run.worktree) continue;
+    if (event.at < run.at || event.fromTree !== (standing?.tree ?? run.tree)) continue;
+    standing = { commit: String(event.commit), tree: String(event.tree), reason: String(event.reason) };
+  }
+  return standing;
+}
+
+/**
+ * Carries a recorded pass of an issue's tester suite forward to the
+ * implementation as it is now, without running the suite again, for a change
+ * that can't affect what the suite tests (docs only, a version bump). The
+ * reason is required and `mahler check` prints it. Only the composer decides
+ * this (the human, when there is none): see the verification policy.
+ */
+function carry(workspace: string, config: HarnessConfig, flags: Flags): void {
+  const issue = stringFlag(flags, "issue");
+  if (!issue) throw new Error("--issue <ISSUE> is required");
+  const reason = stringFlag(flags, "reason")?.trim();
+  if (!reason) throw new Error("--reason \"<why the change can't affect the suite>\" is required; `mahler check` prints it.");
+  const repoFilter = stringFlag(flags, "repo");
+  if (repoFilter) repoNamed(config, repoFilter);
+  const reposRoot = issueReposRoot(workspace, config, issue);
+  const meta = issuePaths(workspace, config, issue).meta;
+  const events = readEvents(meta);
+  let carriedAny = false;
+  for (const set of readRecord(meta).frozen) {
+    const repo = config.repos.find((candidate) => candidate.name === set.repo);
+    if (!repo || (repoFilter && repo.name !== repoFilter)) continue;
+    const key = storedWorktreeKey(reposRoot, set, repo);
+    if (!key.startsWith(testsPrefix)) continue;
+    const label = `${repo.name} (${key})`;
+    const latest = latestRun(events, repo.name, key);
+    if (!latest || !latest.passed || latest.frozen !== set.commit) {
+      throw new Error(
+        `${label}: there is no pass to carry (${!latest ? "the suite has not run" : !latest.passed ? "its last run failed" : "the suite was frozen again since its last run"}). Run it with \`mahler acceptance run --issue ${issue} --tester\`.`,
+      );
+    }
+    const source = abs(workspace, repo.path);
+    const worktree = resolve(reposRoot, repo.name);
+    const tree = implementationTree(source, worktree, latest.branch);
+    if (!tree) throw new Error(`${label}: can't find the implementation the suite ran on (${latest.branch ?? worktree}).`);
+    const standing = carriedTo(events, latest) ?? latest;
+    if (tree === standing.tree) {
+      console.log(`${label}: the pass already stands on this tree; nothing to carry.`);
+      continue;
+    }
+    const [cwd, ref] = latest.branch ? [source, latest.branch] : [worktree, "HEAD"];
+    const commit = gitOrThrow(cwd, ["rev-parse", "--verify", `${ref}^{commit}`]);
+    recordEvent(workspace, config, issue, "acceptance-carry", {
+      repo: repo.name,
+      worktree: key,
+      fromCommit: standing.commit,
+      fromTree: standing.tree,
+      commit,
+      tree,
+      reason,
+    });
+    carriedAny = true;
+    console.log(`${label}: pass at ${standing.commit.slice(0, 12)} carried to ${commit.slice(0, 12)}: ${reason}`);
+    const changed = spawnSync("git", ["diff", "--stat", standing.tree, tree], { cwd, encoding: "utf8" }).stdout.trimEnd();
+    if (changed) console.log(`The suite was not run on these changes:\n${changed}`);
+  }
+  if (carriedAny) console.log("Only the composer carries a pass forward (the human, when there is none). Record the decision in COMPOSITION.md.");
 }
 
 /**

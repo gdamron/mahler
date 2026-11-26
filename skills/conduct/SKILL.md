@@ -165,7 +165,10 @@ rest; your parent owns them, and your brief names your branch.
    tester suite's last recorded run: passed on this tree, stale, not run, or
    failed. Before you report PRs ready, run it with `--strict`, which fails
    on "not run" and "stale"; run the suite again with `mahler acceptance run
-   --issue <ISSUE> --tester` after the last implementation change. When the issue's project has an acceptance suite,
+   --issue <ISSUE> --tester` after the last implementation change. If that
+   change can't affect the suite (docs only, a version bump), you may ask
+   your parent to carry the pass forward instead; never run `mahler
+   acceptance carry` yourself. When the issue's project has an acceptance suite,
    run `mahler acceptance run --project <slug> --issue <ISSUE>`. Walk the
    Definition of Done checklist.
 9. **Open PRs** with the pr skill: one PR per slice branch. A stack's top

@@ -108,6 +108,7 @@ mahler acceptance freeze --workspace /path/to/product-workspace --project <slug>
 mahler acceptance manifest --workspace /path/to/product-workspace --issue DEV-123 | --project <slug>
 mahler acceptance run --workspace /path/to/product-workspace --project <slug> [--issue DEV-123]
 mahler acceptance run --workspace /path/to/product-workspace --issue DEV-123 --tester [--repo <name>] [--branch <ref>]
+mahler acceptance carry --workspace /path/to/product-workspace --issue DEV-123 --reason "<why>" [--repo <name>]
 mahler capacity --workspace /path/to/product-workspace
 mahler cleanup DEV-123 --workspace /path/to/product-workspace [--dry-run] [--remote]
 mahler timings --workspace /path/to/product-workspace [--issue DEV-123] [--since YYYY-MM-DD] [--no-prs] [--json]
@@ -170,7 +171,10 @@ instead: it merges the implementation into the tester's worktree, runs the
 repo's `acceptanceRun` command there (or the issue's own, recorded with
 `acceptance freeze --run`), and records the commit and tree it ran against,
 pass or fail, the duration, and the suite's `acceptance-summary:` line when it
-prints one.
+prints one. `mahler acceptance carry --issue DEV-123 --reason "<why>"` carries
+the last pass to the implementation as it is now without another run, for a
+change that can't affect the suite; the check prints the reason, and only the
+composer uses it.
 
 `mahler timings` reports where issues' time went. Mahler's own commands
 record events as they run (`issue` and `task`, `check`, `acceptance freeze`

@@ -11,7 +11,7 @@ import type { HarnessConfig } from "./types.js";
 export interface IssueEvent {
   /** ISO time the event was recorded (for a timed event, when it ended). */
   at: string;
-  event: "brief" | "check" | "freeze" | "acceptance-run" | "cleanup" | "mark";
+  event: "brief" | "check" | "freeze" | "acceptance-run" | "acceptance-carry" | "cleanup" | "mark";
   [key: string]: unknown;
 }
 

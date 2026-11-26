@@ -57,8 +57,9 @@ Every agent merge requires all of these, regardless of labels:
 - `mahler check` passed for the touched repo, which includes finding the
   frozen acceptance tests in the tester's worktree unchanged. The check
   compares those files and does not run them: that they pass comes from the
-  verification record. The tests worth keeping were promoted (see the
-  verification policy).
+  verification record. Any acceptance tests kept are in test-only PRs
+  above this change, each with a stated reason; they merge after it (see
+  "Promoting Acceptance Tests" in the verification policy).
 - No dispute is open.
 - The forge reports the PR mergeable with no conflicts.
 - A stack is verified as one change: the record on its top PR covers every

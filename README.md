@@ -39,7 +39,8 @@ other roles pick one.
   else changes them, and disputes go to the composer. A tester's suite runs
   from its own worktree and never joins the issue branch. It tests only
   through the outermost surface (the running product or a public API), and
-  the tests that add lasting coverage are promoted into the PR. A workspace
+  it is discarded after the change merges; the few tests with a stated
+  reason to keep land in test-only PRs of their own. A workspace
   names what it most wants protected in
   `.harness/custom/acceptance-priorities.md`.
 - A project's acceptance suite lives in a repo of its own or in a directory
@@ -183,6 +184,7 @@ launching parallel agents or heavy commands. Like `check`, it is advisory.
 
 `mahler cleanup` removes an issue's worktrees once its PRs are merged, tester
 worktrees under `tests/` included, keeping issue branches and the issue brief.
+Sub-agents' report files under `reports/` go once every worktree is gone.
 It deletes tester branches locally and prints each one's tip (nothing
 contains a tester branch, by design), and deletes a pushed one from its
 remote only with `--remote`. It refuses to remove

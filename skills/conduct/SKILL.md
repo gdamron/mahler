@@ -146,11 +146,16 @@ rest; your parent owns them, and your brief names your branch.
    the tester changes them and you freeze again with `--reason`. A rebase or
    restack needs no new freeze: the comparison is by content.
 7a. **Promote (medium and high risk).** Once every frozen test passes on the
-   final implementation and the findings are handled, write the tests worth
-   keeping into the issue branch as ordinary tests, in one commit, and have
-   the same reviewer check that commit against the originals (see "Promoting
-   Acceptance Tests" in the verification policy). Keep a test unless a drop
-   rule applies, and say which you dropped and why.
+   final implementation and the findings are handled, decide which of the
+   tester's tests to keep (see "Promoting Acceptance Tests" in the
+   verification policy). Drop a test unless you can state a reason to keep
+   it: it caught a real bug, it guards a risk the workspace names, or it
+   covers a surface no other test reaches. Keeping nothing is normal. Write
+   what you keep as ordinary tests on a test-only branch above the feature's
+   top branch, never in the feature's PRs, within the size budget, and have
+   the same reviewer check it against the originals. The test-only PRs merge
+   after the feature: rebase them onto the base branch first, and only then
+   link them as a stack.
 8. **Verify.** Run `mahler check --issue <ISSUE>`, which checks every worktree
    under the issue's `repos/` dir, slices included, and fails if a frozen
    acceptance test in the tester's worktree changed. When the issue's project has an acceptance suite,
@@ -204,8 +209,9 @@ nothing else here.
 3. Run `mahler check --path <worktree>`, then push your slice branch.
 4. Report the implementation policy's change summary, commit list, checks run,
    pushed branch, each process you started and that it is stopped, and any
-   proposed knowledge notes to your parent. Your parent owns `HANDOFF.md`; record only
-   your own workflow deviations there.
+   proposed knowledge notes to your parent: the full report in the file your
+   brief names, and a reply of a few lines with its path. Your parent owns
+   `HANDOFF.md`; record only your own workflow deviations there.
 
 Do not set up the issue, open PRs, write verification records, or delegate.
 Never edit frozen acceptance tests; report a test you think is wrong.
@@ -217,7 +223,8 @@ Never edit frozen acceptance tests; report a test you think is wrong.
 - One open PR per slice, with `mahler check` passing; one review per stack
   or repo
 - Acceptance tests frozen when the risk level calls for them, passing from
-  the tester's worktree, with the ones worth keeping promoted
+  the tester's worktree; any kept, each with a stated reason, in test-only
+  PRs above the feature
 - One verification record for the issue
 - Updated `HANDOFF.md` and a synthesis reply to the parent
 

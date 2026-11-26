@@ -26,6 +26,7 @@ export const EARLIER_README_HASHES: Record<string, string[]> = {
   "custom-readme": [
     "c06d6e480ce7424b536fbdd8e4c85d8a984e9ee53d5ecefa85f023f2e870120c",
     "43135aa619b15a362ff2c7ec9c230f632a209ec39a6d9fbee57caa966f4ddf26",
+    "0467f18fc1984eb2cbcb0ed6b0c82abb0b12c501cdece1a572e0a68065fa36e0",
   ],
 };
 

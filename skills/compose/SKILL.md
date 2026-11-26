@@ -107,6 +107,37 @@ itself: one issue never needs a composer layer.
    - act as the conductor for each issue yourself: follow the conduct
      skill per issue, launching slice conductors and reviewers directly and keeping
      each issue's state in its own `HANDOFF.md`.
+
+   **Composer as conductor for forced hand-backs.** Nesting can work and
+   still cost too much: a conductor is handed back control while its own
+   tester or reviewer is still running, replies early, and the sub-agent's
+   report then reaches you instead of it. Acting as the conductor yourself
+   removes that layer, at the price of every sub-agent report landing in
+   your context. Choose it only inside these limits:
+
+   - **The trigger:** a conductor in this composition has been handed back
+     control while its sub-agents were still running at least twice, or the
+     same runtime did so in the previous composition and nothing about it
+     has changed. Don't choose this mode on a guess.
+   - **Size:** one issue, or a batch of at most three issues.
+   - **One at a time:** you conduct one issue to open, reviewed PRs before
+     starting the next. Waves of parallel issues need conductors.
+   - **Each issue is small enough:** no slice conductors, a stack of at most
+     five PRs, and no more than about six sub-agent reports expected (a
+     tester, a reviewer, and their follow-ups).
+   - **Never for a larger project:** with four or more issues, or any issue
+     past those sizes, keep conductors and work from their report files
+     (see "Reports" in the sub-agent delegation policy), even when
+     hand-backs are frequent.
+   - **When to switch back:** once you have taken twelve sub-agent reports
+     in this composition, or an issue outgrows the sizes above, finish the
+     issue in hand and give the rest to conductors.
+
+   In this mode you still keep one `HANDOFF.md` per issue, read each
+   sub-agent's short reply first and open its report file only for what you
+   need, and never review your own implementation: the reviewer and tester
+   stay separate sub-agents. Record the mode, the trigger you saw, and the
+   issues it covers in `COMPOSITION.md`.
 6. **Monitor.** Track each conductor through its replies and
    `.harness/issues/<ISSUE>/HANDOFF.md`. A reply that starts with `Interim:`
    is progress, not a result: the conductor still has sub-agents running, so
@@ -119,6 +150,10 @@ itself: one issue never needs a composer layer.
    - Disputes over frozen acceptance tests: decide them (see the verification
      policy) and record each decision in `COMPOSITION.md`. A dispute that
      changes what the human's project criteria mean goes to the human.
+   - A report from a sub-agent you didn't launch (a conductor's tester or
+     reviewer whose reply reached you): don't act on it. Send its path to
+     the conductor that launched it (see "Reports" in the sub-agent
+     delegation policy).
    - Review findings a conductor escalates, and check-ins about work that has
      outgrown its estimate: decide yourself what matters (see the review
      policy) rather than passing every finding
@@ -130,7 +165,12 @@ itself: one issue never needs a composer layer.
    verification, then readiness. Merge what the merge policy allows
    (a stack in one step with `gh stack merge`, or predecessors first
    without it); hand everything else to the human
-   with its verification record. After each wave merges, run the project
+   with its verification record. Read the record's `Promoted` line first:
+   acceptance tests are dropped by default, so don't accept "kept all" or a
+   keep over the size budget without the reason behind each kept test (see
+   "Promoting Acceptance Tests" in the verification policy), and record any
+   over-budget approval you give in `COMPOSITION.md`. The kept tests are in
+   test-only PRs that merge after the feature. After each wave merges, run the project
    suite on the base branches (`mahler acceptance run --project <slug>`) and
    update the traceability table; a failing criterion becomes new work. Start
    dependent issues once their blockers merge, or stack them on an open PR when

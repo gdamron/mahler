@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -44,6 +44,29 @@ test("cleanup removes clean worktrees, ignored installs included, and keeps bran
   assert.match(git(app, ["branch", "--list", "mah-1-*"]).stdout, /mah-1-core[\s\S]*mah-1-docs/);
   // The brief is history, not a worktree.
   assert.equal(existsSync(resolve(workspace, ".harness")), true);
+});
+
+test("cleanup removes the issue's report files once every worktree is gone, and keeps them otherwise", () => {
+  const { workspace, repos } = workspaceWithWorktrees();
+  const reports = resolve(repos, "..", "reports");
+  mkdirSync(reports);
+  writeFileSync(resolve(reports, "reviewer-1.md"), "findings\n");
+
+  const preview = runCleanup(workspace, ["--dry-run"]);
+  assert.match(preview.stdout, /reports: 1 sub-agent report file\(s\) would be removed/);
+  assert.equal(existsSync(resolve(reports, "reviewer-1.md")), true);
+
+  writeFileSync(resolve(repos, "app", "scratch.txt"), "uncommitted\n");
+  const kept = runCleanup(workspace);
+  assert.notEqual(kept.status, 0);
+  assert.match(kept.stdout, /reports: 1 sub-agent report file\(s\) kept/);
+  assert.equal(existsSync(resolve(reports, "reviewer-1.md")), true);
+
+  rmSync(resolve(repos, "app", "scratch.txt"));
+  const removed = runCleanup(workspace);
+  assert.equal(removed.status, 0, removed.stdout + removed.stderr);
+  assert.match(removed.stdout, /reports: 1 sub-agent report file\(s\) removed/);
+  assert.equal(existsSync(resolve(workspace, "workspaces", "issues", "MAH-1")), false);
 });
 
 test("cleanup keeps a worktree with uncommitted changes and exits non-zero", () => {

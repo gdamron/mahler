@@ -123,8 +123,9 @@ Every delegated task should start from a written brief with these fields:
 - Authority mode: `read-only` or `edit`; default is `read-only`.
 - Expected output format: findings, patch summary, test results, risks, open
   questions, or another explicit format.
-- Results destination: where to report results, such as a reply to the
-  delegating agent, `HANDOFF.md`, or `COMPOSITION.md`.
+- Results destination: the report file the sub-agent writes (see "Reports"),
+  and where its short reply goes: the delegating agent, `HANDOFF.md`, or
+  `COMPOSITION.md`.
 
 ## Sub-Agent Brief Template
 
@@ -142,7 +143,7 @@ Every delegated task should start from a written brief with these fields:
 - Expected size:
 - Authority mode: read-only
 - Expected output format:
-- Results destination:
+- Results destination: <issue root>/reports/<role>-<n>.md
 
 ## Instructions
 
@@ -164,6 +165,9 @@ Every delegated task should start from a written brief with these fields:
 - Leave nothing running. Stop the servers, browsers, and other processes you
   started, and list them in your report. Stop only what you started; report
   any other process you find and leave it alone.
+- Write your full final report to the results destination before you reply,
+  then reply with a summary of a few lines and that path. Writing that one
+  file is allowed under read-only authority.
 ```
 
 ## Refusals and Cleanup
@@ -178,6 +182,33 @@ A brief that wants cleanup says so in its objective: which processes or files,
 who started them, and who approved stopping or removing them. Without that, a
 sub-agent stops only what it started itself (see "Processes" in the
 workspace-safety policy) and reports the rest.
+
+## Reports
+
+A sub-agent's final report goes in a file, and its reply is a short summary
+with the file's path. A reply can arrive late, be cut short, or reach an
+agent that didn't ask for it; the file is always where the parent looks.
+
+- **Where:** `<issue root>/reports/<role>-<n>.md`, beside the issue's
+  `repos/` and `tests/` dirs, for example `reports/reviewer-2.md` for a
+  second review. The parent picks the name and puts the full path in the
+  brief's results destination. Outside an issue, the brief names another
+  folder.
+- **What:** everything the role's skill lists under its required outputs. A
+  later report from the same sub-agent (a re-review, a dispute fix) is a new
+  file, not an edit to the old one.
+- **The reply:** the outcome in a few lines, anything that needs the parent
+  now (a blocker, a refusal, a question), and the path.
+- **Which one counts:** the file is the report of record. If a reply and its
+  file disagree, go by the file and say so in `HANDOFF.md`.
+- **No file:** a sub-agent that could not write its report says so in its
+  reply and gives the full report there. The parent saves it to the path.
+- **A report that isn't yours:** if a reply reaches you from a sub-agent you
+  didn't launch, don't act on it. Pass its path to the agent that launched
+  it, or to your parent.
+- **Lifetime:** reports are working files. The parent carries what matters
+  into `HANDOFF.md` (see below), and `mahler cleanup <ISSUE>` removes the
+  folder with the issue's worktrees.
 
 ## Synthesizing Results
 

@@ -83,6 +83,9 @@ the issue, update `HANDOFF.md` yourself.
 
 - Save-point commits on the assigned branch, pushed
 - A change summary, commit list, and checks run
+- Your full report written to the file the brief names as its results
+  destination, and a reply of a few lines with its path (see "Reports" in
+  the sub-agent delegation policy)
 - Workflow deviations recorded in `HANDOFF.md`
 
 ## Stop Conditions

@@ -7,8 +7,8 @@ grow with risk, and a record of what was verified.
 
 A tester's suite verifies one change, through the outermost surface the
 criteria are stated against. It never joins the issue branch: it runs from
-the tester's own worktree, and the tests that add lasting coverage are
-promoted into the codebase (see "Promoting Acceptance Tests").
+the tester's own worktree and is discarded after the change merges. A test
+is kept only with a stated reason (see "Promoting Acceptance Tests").
 
 The work's risk level (see the risk policy) picks the section below. Each
 level includes everything in the levels before it.
@@ -42,8 +42,9 @@ level includes everything in the levels before it.
   the tester and record why in the verification record; the implementer's
   tests and the reviewer cover it. At high risk that is a Tier 1 deviation.
 - The tester's tests must pass before merge. This blocks the merge.
-- Once they pass on the final implementation, the conductor promotes the ones
-  worth keeping before opening the PR (see "Promoting Acceptance Tests").
+- Once they pass on the final implementation, the conductor decides which,
+  if any, to keep, before reporting the PRs ready (see "Promoting Acceptance
+  Tests").
 - A standard-tier reviewer.
 - When a tester's test fails, the conductor decides what failed:
   - **Implementation bug:** fix the code.
@@ -130,56 +131,80 @@ tests into new files, and freeze that commit with the reason.
 
 ## Promoting Acceptance Tests
 
-A tester's suite proves one change met its spec. It is written to a bar (see
-the acceptance-test skill) so that most of it is worth keeping, but it was
-still written without seeing the code: a test may repeat one the implementer
-wrote, bring its own helpers, or cite criterion numbers from a task file the
-repo doesn't have. So the whole suite verifies the change, and the tests that
-add lasting coverage land, as ordinary tests.
+A tester's suite proves one change met its spec. That is a short-term job,
+and the suite is discarded once the change has merged. It was written without
+seeing the code, so it tends to repeat the implementer's tests, bring its own
+helpers, and grow far larger than the change. Promotion is the exception: a
+few tests that earn a lasting place land as ordinary tests, in PRs of their
+own.
 
 **When:** after every frozen test passes on the final implementation and the
-review findings are handled, before the PR opens. Promotion never hides a
-failing test: a test that fails is a fix or a dispute, not a drop.
+review findings are handled, before the issue's PRs are reported ready.
+Promotion never hides a failing test: a test that fails is a fix or a
+dispute, not a drop.
 
-**Who:** the conductor. Finding duplicates means reading the implementer's
-tests, and independence has already done its job once the frozen suite passed
-unchanged.
+**Who:** the conductor. Choosing means reading the implementer's tests, and
+independence has already done its job once the frozen suite passed unchanged.
 
-**Keep** a test unless a rule below drops it. **Drop** a test when:
+**Drop** a test unless you can state one of these reasons to keep it:
 
-- An existing test checks the same behavior at the same level. Keep the
-  stronger of the two, or fold the extra cases into one.
-- It misses the tester's bar: it tests below the outermost surface, restates
-  the spec's shape (field lists, ordering, names, message wording), or
-  hedges against code the tester couldn't see. If the behavior matters and
-  nothing else covers it, write the direct test instead.
+- **It caught a real bug during the work.** Name the bug.
+- **It guards a risk the workspace names** in
+  `.harness/custom/acceptance-priorities.md`. Name the risk.
+- **It covers a surface no other test reaches.** Name the surface, having
+  looked for an existing test of it.
 
-Never drop a test that caught a bug, or one that covers what
-`.harness/custom/acceptance-priorities.md` names, unless a stronger test of
-the same thing stays. Say in the PR which tests you dropped and under which
-rule. If you are dropping most of the suite, the tester missed its bar: note
-that in `HANDOFF.md` so an audit can see it.
+A reason is stated per test or per small group of tests that share it, never
+for the suite as a whole. Even with a reason, drop a test when a stronger
+test of the same thing already exists, or when it misses the tester's bar
+(it tests below the outermost surface, restates the spec's shape, or hedges
+against code the tester couldn't see). If that behavior matters and nothing
+else covers it, write the direct test instead.
+
+**Size budget:** the kept tests are no larger than the change's own tests,
+counted in lines added. A larger keep needs the composer's approval (the
+human's, when there is no composer), recorded in the verification record
+with its reason. A composer does not accept "kept all" or "kept most" for a
+large suite: it asks for the reason behind each kept test first.
+
+Keeping nothing is a normal result and needs no explanation.
 
 **How:**
 
-1. In one commit on the issue branch, write each kept test into the repo's
-   ordinary tests, beside the tests for the code it covers. Rewrite it against
-   the real interface: the repo's shared test helpers instead of a private
-   rig, a name that says the behavior, and no criterion numbers. Keep its
-   inputs, tolerances and assertions. Tightening them is fine; loosening them
-   is not. For a stack, each test goes in the PR whose code it covers.
-2. The reviewer re-reviews that commit against the frozen originals in the
+1. Promoted tests never go into the feature's PRs. Put them on a test-only
+   branch above the feature's top branch, and open a PR for it whose base is
+   that top branch. Split a large keep into several test-only PRs, each on
+   the one below.
+2. Write each kept test into the repo's ordinary tests, beside the tests for
+   the code it covers. Rewrite it against the real interface: the repo's
+   shared test helpers instead of a private rig, a name that says the
+   behavior, and no criterion numbers. Keep its inputs, tolerances and
+   assertions. Tightening them is fine; loosening them is not.
+3. The PR description lists each kept test or group with its reason, the
+   size against the budget, and how many tests were dropped.
+4. The reviewer checks the test-only PRs against the frozen originals in the
    tester's worktree. It confirms each kept test asserts at least what its
-   original did, and each drop fits a rule above.
-3. The verification record gives the frozen commit, the count kept, and the
-   count dropped under each rule. No new
-   freeze is needed: the tester's files haven't changed, and the promoted
-   tests are ordinary tests that CI runs from now on.
+   original did, and that each has a stated reason that holds.
+5. The feature merges first. The test-only PRs are not linked into the
+   feature's stack, so the feature never waits on them. Once the feature has
+   merged, in this order:
+   1. Rebase the test branches onto the base branch. After a squash merge
+      they still carry the feature's old commits, so use
+      `git rebase --onto <base> <old feature top> <test branch>` (with
+      `--update-refs` for several), then push and retarget the bottom test
+      PR to the base branch.
+   2. Only then link the test PRs as their own stack, when there are two or
+      more (see the pr policy). A stack's bottom PR has to target the base
+      branch, so linking before the rebase fails.
+   3. Merge them under the merge policy, like any other PR.
+6. The verification record gives the frozen commit, the count kept with the
+   reasons, and the count dropped. No new freeze is needed: the tester's
+   files haven't changed.
 
-The tester's branch and worktree stay until the issue's PRs merge, for
-disputes and review. `mahler cleanup <ISSUE>` then removes the worktree and
-deletes the branch, printing its tip. The suite is not kept after that; what
-was worth keeping is in the repo.
+The tester's branch and worktree stay until the issue's PRs and its test-only
+PRs merge, for disputes and review. `mahler cleanup <ISSUE>` then removes the
+worktree and deletes the branch, printing its tip. The suite is not kept
+after that; what was worth keeping is in the repo.
 
 Project suites are not promoted. They stay in the acceptance repo for the
 life of the project.
@@ -255,7 +280,7 @@ top PR's):
 - Implementer tests: <what they cover>; mahler check <status>
 - Acceptance tests: frozen at <sha> (<n> files) | not required (low risk) | skipped (no criterion reachable from outside: <why>)
 - Tester results: <n> pass; <failures and how each was classified>
-- Promoted: <k> of <n> tests, to <paths>; dropped <d> (<rule>: <count>, ...) | not required
+- Promoted: none (<n> dropped) | <k> of <n> tests in <test-only PRs>, <lines> lines against a budget of <lines> (<reason>: <count>, ...); over budget approved by <who>: <why> | not required
 - Project suite: <pass | fail | none>
 - Reviewer: <tier>; findings handled
 - Proof: <what shows it working, and where: PR body, PR comment, Linear comment>
@@ -285,6 +310,6 @@ PR, under the one record in `HANDOFF.md`.
 ## What CI Must Do
 
 `mahler check` runs locally and is a Tier 1 control. The implementer's tests
-and the promoted acceptance tests land in the PR, so the repo's CI runs them
-on every later change. That makes CI the regression guardrail: each repo's CI
+land in the PR and the promoted acceptance tests land in their own, so the
+repo's CI runs them on every later change. That makes CI the regression guardrail: each repo's CI
 should run its full test suite on every PR. Name any gap in `guardrails`.

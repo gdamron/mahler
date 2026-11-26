@@ -48,6 +48,9 @@ reports to the conductor, which owns both.
   (see "Processes" in the workspace-safety policy)
 - Updated `HANDOFF.md`, or, when delegated, findings reported to the
   conductor that owns it, with anything you did differently from this skill
+- When delegated: the full report written to the file the brief names as its
+  results destination, and a reply of a few lines with its path (see
+  "Reports" in the sub-agent delegation policy)
 
 ## Stop Conditions
 

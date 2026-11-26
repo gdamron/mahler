@@ -6,7 +6,7 @@ import { type Flags, stringFlag, workspaceFlag } from "../args.js";
 import { issuePaths, loadConfig } from "../config.js";
 import { recordEvent } from "../events.js";
 import { readGit, repoForDir } from "../repos.js";
-import { baseRef, frozenAcceptanceFindings, issueOwning, testerWorktreeFindings } from "./acceptance.js";
+import { baseRef, frozenAcceptanceFindings, issueOwning, testerSuiteFindings, testerWorktreeFindings } from "./acceptance.js";
 import type { Finding, HarnessConfig, RepoChecks, RepoConfig } from "../types.js";
 import { abs, listDirectories, writeFileEnsured } from "../util.js";
 
@@ -168,8 +168,11 @@ export function check(flags: Flags): void {
   }
   const pathFlag = stringFlag(flags, "path");
   const owner = issue ?? (pathFlag ? issueOwning(workspace, config, resolve(pathFlag)) : undefined);
+  let suiteUnmet = 0;
   if (owner) {
-    for (const finding of testerWorktreeFindings(workspace, config, owner, repos)) {
+    const suite = testerSuiteFindings(workspace, config, owner, repos, flags.strict === true);
+    suiteUnmet = suite.filter((finding) => finding.level === "warn").length;
+    for (const finding of [...testerWorktreeFindings(workspace, config, owner, repos), ...suite]) {
       if (finding.level === "error") failures += 1;
       results.push(finding);
     }
@@ -201,7 +204,9 @@ export function check(flags: Flags): void {
     process.exit(1);
   }
   console.log(
-    "\nAll configured checks passed. This mirrors CI; the forge remains the authority.",
+    suiteUnmet > 0
+      ? `\nConfigured checks passed, but ${suiteUnmet} frozen tester suite(s) have no pass on this tree (see the warnings above); that blocks reporting PRs ready and merging. This mirrors CI; the forge remains the authority.`
+      : "\nAll configured checks passed. This mirrors CI; the forge remains the authority.",
   );
 }
 

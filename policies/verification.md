@@ -149,6 +149,15 @@ changed, and the command undoes the merge and stops. Don't resolve it by
 changing a frozen file: have the tester move its tests into new files, and
 freeze that commit with the reason.
 
+`mahler check --issue <ISSUE>` then reports the suite beside the file
+comparison: passed on this tree, stale, not run, or failed. A pass counts
+only for the exact content it ran on (the implementation's tree) and the
+freeze it ran: any content change, or a new freeze, makes it stale. A rebase
+or restack that changes no content keeps it. "Not run" and "stale" are
+warnings, and failures with `--strict`, which the merge policy requires
+before PRs are reported ready and before a merge. A recorded failure on the
+current tree always fails the check.
+
 With no command configured, run the suite by hand the same way (`git merge
 --no-edit <issue branch>` in the tester's worktree, then the repo's test
 command for the tester's files) and say in the verification record that the

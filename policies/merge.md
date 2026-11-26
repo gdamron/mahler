@@ -54,12 +54,17 @@ Every agent merge requires all of these, regardless of labels:
 - Reviewer sub-agent findings that matter have a response, such as a fix, an
   acknowledgement with a reason, a note for triage, or a rebuttal (see the
   review policy), and no human review comment is left unanswered.
-- `mahler check` passed for the touched repo, which includes finding the
-  frozen acceptance tests in the tester's worktree unchanged. The check
-  compares those files and does not run them: that they pass comes from the
-  verification record. Any acceptance tests kept are in test-only PRs
-  above this change, each with a stated reason; they merge after it (see
-  "Promoting Acceptance Tests" in the verification policy).
+- `mahler check --issue <ISSUE> --strict` passed. The check finds the frozen
+  acceptance tests in the tester's worktree unchanged, and reports the
+  tester suite's last recorded run against the implementation as it is now.
+  It does not run the suite. Without `--strict`, a suite that was never run,
+  or that last passed before the implementation changed, is only a warning;
+  with it, the check fails. `--strict` is required at two gates: when a
+  conductor reports PRs ready, and when the composer (or the human's agent)
+  decides to merge. Slice conductors and everyday checks leave it out. Any
+  acceptance tests kept are in test-only PRs above this change, each with a
+  stated reason; they merge after it (see "Promoting Acceptance Tests" in
+  the verification policy).
 - No dispute is open.
 - The forge reports the PR mergeable with no conflicts.
 - A stack is verified as one change: the record on its top PR covers every

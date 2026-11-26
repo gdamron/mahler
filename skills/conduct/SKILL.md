@@ -161,7 +161,11 @@ rest; your parent owns them, and your brief names your branch.
    link them as a stack.
 8. **Verify.** Run `mahler check --issue <ISSUE>`, which checks every worktree
    under the issue's `repos/` dir, slices included, and fails if a frozen
-   acceptance test in the tester's worktree changed. When the issue's project has an acceptance suite,
+   acceptance test in the tester's worktree changed. It also reports the
+   tester suite's last recorded run: passed on this tree, stale, not run, or
+   failed. Before you report PRs ready, run it with `--strict`, which fails
+   on "not run" and "stale"; run the suite again with `mahler acceptance run
+   --issue <ISSUE> --tester` after the last implementation change. When the issue's project has an acceptance suite,
    run `mahler acceptance run --project <slug> --issue <ISSUE>`. Walk the
    Definition of Done checklist.
 9. **Open PRs** with the pr skill: one PR per slice branch. A stack's top

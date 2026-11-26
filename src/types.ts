@@ -7,6 +7,12 @@ export interface RepoConfig {
   remote?: string;
   /** Semantic check names mapped to shell commands; the local mirror of what CI runs. */
   checks?: RepoChecks;
+  /**
+   * Command that runs a tester's frozen suite, from the tester's worktree
+   * (`mahler acceptance run --issue <ISSUE> --tester`). `<files>` is the
+   * frozen files. An issue's freeze can carry its own command instead.
+   */
+  acceptanceRun?: string;
 }
 
 /**

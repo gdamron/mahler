@@ -46,6 +46,8 @@ export interface IssueTimings {
   tester?: { runs: number; minutes: number };
   review?: { rounds: number; minutes: number };
   acceptanceRuns: { runs: number; passed: number; minutes: number };
+  /** Runs of the tester's frozen suite (`mahler acceptance run --tester`). */
+  testerSuiteRuns: { runs: number; passed: number; minutes: number };
   prs?: { count: number; merged: number; additions: number; deletions: number; numbers: string[] };
 }
 
@@ -150,7 +152,9 @@ export function summarize(issue: string, events: IssueEvent[]): IssueTimings {
   const checks = events.filter((event) => event.event === "check");
   const each = checks.flatMap((event) => (Array.isArray(event.checks) ? (event.checks as Array<{ cached?: boolean }>) : []));
   const freezes = events.filter((event) => event.event === "freeze");
-  const runs = events.filter((event) => event.event === "acceptance-run");
+  const suiteRuns = events.filter((event) => event.event === "acceptance-run");
+  const runs = suiteRuns.filter((event) => event.suite !== "tester");
+  const testerRuns = suiteRuns.filter((event) => event.suite === "tester");
   const cleanupAt = [...events].reverse().find((event) => event.event === "cleanup")?.at;
   const tester = paired(events, "tester");
   const review = paired(events, "review");
@@ -180,6 +184,11 @@ export function summarize(issue: string, events: IssueEvent[]): IssueTimings {
       runs: runs.length,
       passed: runs.filter((event) => event.passed === true).length,
       minutes: round(ms(runs) / 60000),
+    },
+    testerSuiteRuns: {
+      runs: testerRuns.length,
+      passed: testerRuns.filter((event) => event.passed === true).length,
+      minutes: round(ms(testerRuns) / 60000),
     },
   };
 }
@@ -295,7 +304,7 @@ function printIssue(row: IssueTimings): void {
     const value = row.minutes[key];
     if (value !== undefined) console.log(`  brief → ${labels[key].padEnd(20)} ${duration(value)}`);
   }
-  const { checks, freezes, acceptanceRuns, prs, tester, review } = row;
+  const { checks, freezes, acceptanceRuns, testerSuiteRuns, prs, tester, review } = row;
   if (tester) console.log(`  tester: ${tester.runs} run(s), ${duration(tester.minutes)}`);
   if (review) console.log(`  review: ${review.rounds} round(s), ${duration(review.minutes)}`);
   if (checks.runs > 0) {
@@ -304,6 +313,9 @@ function printIssue(row: IssueTimings): void {
     );
   }
   if (freezes.total > 0) console.log(`  freezes: ${freezes.total} (${freezes.refreezes} re-freeze(s))`);
+  if (testerSuiteRuns.runs > 0) {
+    console.log(`  tester suite: ${testerSuiteRuns.runs} run(s), ${testerSuiteRuns.passed} passed, ${duration(testerSuiteRuns.minutes)} running`);
+  }
   if (acceptanceRuns.runs > 0) {
     console.log(`  project suite: ${acceptanceRuns.runs} run(s), ${acceptanceRuns.passed} passed, ${duration(acceptanceRuns.minutes)} running`);
   }

@@ -43,8 +43,10 @@ rest; your parent owns them, and your brief names your branch.
 - `mahler check --workspace <workspace> --issue <ISSUE>` (or `--path <worktree>`)
 - `mahler task <slug> --agent <agent> --task-file <task.json>` for a local task
 - `mahler acceptance freeze --workspace <workspace> --issue <ISSUE> --repo <repo> --commit <sha>`
-- `git merge --no-edit <issue branch>` in the tester's worktree, to run its
-  suite against the implementation (never the other way round)
+- `mahler acceptance run --workspace <workspace> --issue <ISSUE> --tester`,
+  to run the tester's suite against the implementation and record the
+  result; without a configured command, `git merge --no-edit <issue branch>`
+  in the tester's worktree (never the other way round) and the suite by hand
 - `mahler acceptance run --workspace <workspace> --project <slug> --issue <ISSUE>`
 - `mahler capacity --workspace <workspace>`
 - `mahler mark <ISSUE> <name> --workspace <workspace>` (see Timing Marks)
@@ -100,9 +102,10 @@ rest; your parent owns them, and your brief names your branch.
    at `<issue root>/tests/<repo>`, cut from the base branch. Freeze its
    commit with `mahler acceptance freeze --issue <ISSUE> --repo <repo>
    --commit <sha>`. The tester's branch never joins the issue branch and is
-   never pushed. To run the suite, merge the issue branch into the tester's
-   worktree and test there (see "Running the Tester's Suite" in the
-   verification policy). The implementer makes those tests pass without
+   never pushed. To run the suite, use `mahler acceptance run --issue
+   <ISSUE> --tester`, which merges the issue branch into the tester's
+   worktree, runs the suite there, and records the result (see "Running the
+   Tester's Suite" in the verification policy). The implementer makes those tests pass without
    changing them.
 4. **Implement.** Do your own slice with the implement skill. For each
    delegated slice, use the delegate skill to pick the tier and write the

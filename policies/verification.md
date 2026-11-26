@@ -111,23 +111,48 @@ Only the tester changes frozen tests, and only after a dispute decision.
 ## Running the Tester's Suite
 
 The suite runs in the tester's worktree, against the implementation, once the
-tester has reported:
+tester has reported. One command does it and records the result:
 
 ```sh
-cd <issue root>/tests/<repo>
-git merge --no-edit <issue branch>   # the top branch, for a stack
-<the repo's test command for the tester's files>
+mahler acceptance run --issue <ISSUE> --tester
+# for a stack, name the top branch: --repo <repo> --branch <top branch>
 ```
+
+For each of the issue's freezes in a tester worktree, it merges the
+implementation into that worktree, confirms the frozen files are unchanged,
+runs the suite's command there, and records what it ran against: the
+implementation's commit and tree, the frozen commit, pass or fail, and how
+long it took. The output is kept in `.harness/issues/<ISSUE>/`.
+
+- **The command** is the repo's `acceptanceRun` in `.harness/config.json`,
+  beside its `checks`. `<files>` is replaced by the frozen files. When an
+  issue's suite needs its own arguments (a binary path, a port), record them
+  with the freeze: `mahler acceptance freeze ... --run "<command>"`. A
+  re-freeze keeps that command unless it gives another.
+- **Counts come from the run.** Pass or fail is the command's exit status.
+  For counts, have the command print one line starting
+  `acceptance-summary:`, such as `acceptance-summary: 272 of 273 passed`;
+  Mahler records the last such line as it is. With no such line it records
+  pass or fail and the duration only. Copy the verification record's "Tester
+  results" from what the command printed. Never type a count from memory.
+- **The implementation** is what the issue's `repos/<repo>` worktree has
+  checked out, or `--branch <ref>`.
 
 The merge goes one way only: the issue branch into the tester's branch, never
 the reverse. The worktrees share one repository, so the issue branch is
-already there without a fetch. Merge again after each implementation change
+already there without a fetch. Run again after each implementation change
 you want to test. At high risk the implementer works this way from the
 start: the tests fail first, and it makes them pass without touching them.
 
 If the merge conflicts, the tester edited a file the implementation also
-changed. Don't resolve it by changing a frozen file: have the tester move its
-tests into new files, and freeze that commit with the reason.
+changed, and the command undoes the merge and stops. Don't resolve it by
+changing a frozen file: have the tester move its tests into new files, and
+freeze that commit with the reason.
+
+With no command configured, run the suite by hand the same way (`git merge
+--no-edit <issue branch>` in the tester's worktree, then the repo's test
+command for the tester's files) and say in the verification record that the
+run was not recorded.
 
 ## Promoting Acceptance Tests
 
@@ -279,7 +304,7 @@ top PR's):
 - Risk: <level> (<source>; raised from <level> because <reason>, if raised)
 - Implementer tests: <what they cover>; mahler check <status>
 - Acceptance tests: frozen at <sha> (<n> files) | not required (low risk) | skipped (no criterion reachable from outside: <why>)
-- Tester results: <n> pass; <failures and how each was classified>
+- Tester results: <the recorded run: pass or fail, its summary line, the commit it ran on>; <failures and how each was classified>
 - Promoted: none (<n> dropped) | <k> of <n> tests in <test-only PRs>, <lines> lines against a budget of <lines> (<reason>: <count>, ...); over budget approved by <who>: <why> | not required
 - Project suite: <pass | fail | none>
 - Reviewer: <tier>; findings handled

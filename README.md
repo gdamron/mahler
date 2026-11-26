@@ -107,6 +107,7 @@ mahler acceptance freeze --workspace /path/to/product-workspace --issue DEV-123 
 mahler acceptance freeze --workspace /path/to/product-workspace --project <slug> --repo <name> --commit <sha>
 mahler acceptance manifest --workspace /path/to/product-workspace --issue DEV-123 | --project <slug>
 mahler acceptance run --workspace /path/to/product-workspace --project <slug> [--issue DEV-123]
+mahler acceptance run --workspace /path/to/product-workspace --issue DEV-123 --tester [--repo <name>] [--branch <ref>]
 mahler capacity --workspace /path/to/product-workspace
 mahler cleanup DEV-123 --workspace /path/to/product-workspace [--dry-run] [--remote]
 mahler timings --workspace /path/to/product-workspace [--issue DEV-123] [--since YYYY-MM-DD] [--no-prs] [--json]
@@ -163,7 +164,12 @@ new commit (`--drop <file>` removes a deleted test), and the old set stays in
 the history.
 `mahler acceptance run` writes a revision manifest (each repo's issue
 worktree, or its base branch) and runs `acceptance.run` with `<manifest>` and
-`<project>` filled in.
+`<project>` filled in. With `--tester` it runs an issue's frozen tester suite
+instead: it merges the implementation into the tester's worktree, runs the
+repo's `acceptanceRun` command there (or the issue's own, recorded with
+`acceptance freeze --run`), and records the commit and tree it ran against,
+pass or fail, the duration, and the suite's `acceptance-summary:` line when it
+prints one.
 
 `mahler timings` reports where issues' time went. Mahler's own commands
 record events as they run (`issue` and `task`, `check`, `acceptance freeze`

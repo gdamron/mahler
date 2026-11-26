@@ -91,7 +91,7 @@ other roles pick one.
 ## Commands
 
 ```sh
-npm install -g https://github.com/gdamron/mahler/releases/download/v2026.11.4/mahler-2026.11.4.tgz   # pinned; see INSTALL.md
+npm install -g https://github.com/gdamron/mahler/releases/download/v2026.11.5/mahler-2026.11.5.tgz   # pinned; see INSTALL.md
 mahler --version
 mahler install /path/to/product-workspace --linear-assignee gonzo --linear-label agent
 mahler issue DEV-123 --workspace /path/to/product-workspace --agent codex

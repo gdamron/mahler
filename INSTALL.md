@@ -256,6 +256,37 @@ new work). `mahler capacity` prints the caps, the current load, and an
 ok/busy verdict; agents run it before launching parallel work. Reinstall
 preserves these values.
 
+### Claude Code: foreground sub-agents
+
+Optional. When a conductor launches its tester or reviewer in the background,
+its own turn can end while they still run: the composer gets a reply before
+the work is done, and the sub-agents' reports then reach the composer instead
+of the conductor. Claude Code has a setting that removes the background
+option, so every sub-agent launch waits for its result:
+
+```json
+{ "env": { "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1" } }
+```
+
+Put it in the workspace's `.claude/settings.local.json`, or export the
+variable in the shell that starts Claude Code. Mahler doesn't write it for
+you.
+
+What it changes:
+
+- Sub-agents launched in one message still run in parallel.
+- A parent waits for its sub-agents, so it can't do its own work while they
+  run.
+- Shell commands can't run in the background either. Long commands need a
+  long timeout.
+
+This was checked with a toy task in headless sessions (`claude -p`, Claude
+Code 2.1.330): with the setting, two sub-agents ran at once, their parent
+replied only after both finished, and no report reached the session above
+it. It was not checked in the desktop app. Without the setting, the delegate
+skill still tells agents to launch in the foreground and to mark an early
+reply as interim.
+
 ### Guardrails and Definition of Done
 
 `guardrails` (Tier 3 limits the forge and CI enforce, declared so agents can

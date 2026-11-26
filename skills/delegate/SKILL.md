@@ -112,11 +112,30 @@ Find the chosen tier for your runtime in `.harness/MODELS.md`:
   example a cross-model review through the Codex plugin's companion script).
   Fill each `<placeholder>` from the brief — `<worktree>` is the slice
   worktree, `<base>` its base branch — and commit first when the command
-  reads the branch diff. Commands can take minutes: use a long timeout or run
-  it in the background and wait. Treat its output as the role's result and
+  reads the branch diff. Commands can take minutes: use a long timeout, or
+  run it in the background and wait where the runtime allows that. Treat its output as the role's result and
   translate it as for `skill`.
 - `agent`: launch that runtime agent type instead of the Mahler profile, with
   the same brief plus any `model` / `effort` the entry sets.
+
+**Launch in the foreground and wait.** A sub-agent launched in the
+background lets your own turn end while it still runs. Your parent then gets
+your reply before the work is done, and the sub-agent's report can reach your
+parent instead of you. So:
+
+- Launch sub-agents in the foreground. To run several at once, launch them
+  in one message; they still run in parallel, and you get every result
+  before your turn can end.
+- Don't pass a background option (Claude: `run_in_background`) when
+  launching a sub-agent, unless you are the top session and have your own
+  work to do meanwhile.
+- If you do reply while a sub-agent is still running, start the reply with
+  `Interim:`, name what is still running, and say where its report will be
+  (see "Reports" in the sub-agent delegation policy). A parent treats an
+  interim reply as progress, never as "ready".
+- Claude Code can remove the background option altogether (see "Claude
+  Code: foreground sub-agents" in INSTALL.md). When it is set, long shell
+  commands can't run in the background either: use a long timeout.
 
 **When a tier can't run, don't wait for it.** A missing tool, a usage or
 quota limit, a rate limit, an auth error, or a run far past its usual time
